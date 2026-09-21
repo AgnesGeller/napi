@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#173f2b">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Napi feladatok">
   <meta name="description" content="A Díszkertek napi munkafeladatainak gyors, mobilbarát összeállítása és nyomtatása.">
   <meta property="og:title" content="Díszkertek – Napi feladatok">
   <meta property="og:description" content="Napi munkatervek összeállítása, mentése, nyomtatása és megosztása.">
@@ -16,9 +20,10 @@
   <meta name="twitter:image" content="https://agnesgeller.github.io/napi/assets/diszkertek-logo.png">
   <title>Díszkertek – Napi feladatok</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/app-icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260921d">
+  <link rel="stylesheet" href="css/style.css?v=20260921e">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -158,18 +163,26 @@
 
   <dialog id="downloadsDialog" class="app-dialog compact-dialog">
     <form method="dialog" class="dialog-frame">
-      <header class="dialog-header"><div><p class="section-kicker">Biztonsági mentés és offline használat</p><h2>Letöltések</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
+      <header class="dialog-header"><div><p class="section-kicker">Telefon, tablet és számítógép</p><h2>Telepítés és letöltések</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
       <div class="dialog-body">
+        <button class="download-option install-option" id="installAppButton" type="button"><strong>📱 App telepítése telefonra</strong><span id="installAppHint">Telepítés ikonként a telefon főképernyőjére</span></button>
         <p class="download-reference" id="downloadReference"></p>
         <div class="download-options">
           <button class="download-option" type="button" data-export-period="week"><strong>Heti adatfájl</strong><span>A kiválasztott hét tervei és törzsadatai</span></button>
           <button class="download-option" type="button" data-export-period="month"><strong>Havi adatfájl</strong><span>A kiválasztott hónap összes terve</span></button>
           <button class="download-option" type="button" data-export-period="year"><strong>Éves adatfájl</strong><span>A kiválasztott év összes terve</span></button>
           <button class="download-option" type="button" data-export-period="all"><strong>Teljes adatfájl</strong><span>Minden beállítás, ügyfél és napi terv</span></button>
-          <a class="download-option app-package" href="downloads/diszkertek-napi-app.zip" download><strong>Teljes app letöltése</strong><span>Offline használható ZIP-csomag</span></a>
-          <button class="download-option" id="installAppButton" type="button" hidden><strong>App telepítése</strong><span>Ikonként telepítés erre az eszközre</span></button>
+          <a class="download-option app-package" href="downloads/diszkertek-napi-app.zip" download><strong>Számítógépes offline ZIP</strong><span>Technikai csomag számítógéphez – telefonos telepítéshez a fenti gombot használd</span></a>
         </div>
       </div>
+    </form>
+  </dialog>
+
+  <dialog id="installHelpDialog" class="app-dialog compact-dialog">
+    <form method="dialog" class="dialog-frame">
+      <header class="dialog-header"><div><p class="section-kicker">Mobilalkalmazás</p><h2>App telepítése</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
+      <div class="dialog-body install-help" id="installHelpContent"></div>
+      <footer class="dialog-footer"><button class="btn btn-save" value="default">Rendben</button></footer>
     </form>
   </dialog>
 
@@ -246,6 +259,6 @@
   <section id="printView" class="print-view" aria-hidden="true"></section>
 
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
-  <script src="js/app.js?v=20260921d"></script>
+  <script src="js/app.js?v=20260921e"></script>
 </body>
 </html>

@@ -608,13 +608,34 @@
     $("#downloadsDialog").showModal();
   });
   $("#downloadsDialog").addEventListener("click", event => { const button = event.target.closest("[data-export-period]"); if (button) exportPeriod(button.dataset.exportPeriod); });
+  function appRunsStandalone() { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; }
+  function mobilePlatform() {
+    const agent = navigator.userAgent || "";
+    if (/iphone|ipad|ipod/i.test(agent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "ios";
+    if (/android/i.test(agent)) return "android";
+    return "desktop";
+  }
+  function showInstallHelp() {
+    const platform = mobilePlatform();
+    const content = platform === "ios"
+      ? `<p class="install-help-intro">iPhone vagy iPad készüléken a Safari böngészőből telepíthető:</p><ol class="install-steps"><li>Nyisd meg ezt az oldalt <strong>Safariban</strong>.</li><li>Koppints alul a <strong>Megosztás</strong> ikonra.</li><li>Válaszd a <strong>Főképernyőhöz adás</strong> lehetőséget.</li><li>Koppints a <strong>Hozzáadás</strong> gombra.</li></ol>`
+      : platform === "android"
+        ? `<p class="install-help-intro">Android telefonon a Chrome böngészőből telepíthető:</p><ol class="install-steps"><li>Nyisd meg ezt az oldalt <strong>Chrome-ban</strong>.</li><li>Koppints a jobb felső sarokban a <strong>⋮ menüre</strong>.</li><li>Válaszd az <strong>Alkalmazás telepítése</strong> vagy a <strong>Hozzáadás a főképernyőhöz</strong> lehetőséget.</li><li>Erősítsd meg a telepítést.</li></ol>`
+        : `<p class="install-help-intro">A böngésző menüjéből telepítheted az alkalmazást:</p><ol class="install-steps"><li>Nyisd meg a böngésző főmenüjét.</li><li>Válaszd az <strong>Alkalmazás telepítése</strong> lehetőséget.</li><li>Erősítsd meg a telepítést.</li></ol>`;
+    $("#installHelpContent").innerHTML = `${content}<p class="install-help-note">A ZIP-fájlt nem kell telefonon megnyitni. A telepített app a főképernyőről indul és internet nélkül is megnyitható.</p>`;
+    $("#downloadsDialog").close(); $("#installHelpDialog").showModal();
+  }
   $("#installAppButton").addEventListener("click", async () => {
-    if (!installPrompt) return; await installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; $("#installAppButton").hidden = true;
+    if (appRunsStandalone()) { toast("Az alkalmazás már telepítve van ezen az eszközön."); return; }
+    if (!installPrompt) { showInstallHelp(); return; }
+    await installPrompt.prompt(); const choice = await installPrompt.userChoice; installPrompt = null;
+    if (choice.outcome !== "accepted") showInstallHelp();
   });
   $("#saveButton").addEventListener("click", async () => { try { if (!(await writeDataFile()) && !("showDirectoryPicker" in window)) $("#fileFallbackDialog").showModal(); } catch (error) { $("#saveState").textContent = "Mentési hiba"; toast(`A mentés nem sikerült: ${readableError(error)}`, true); } });
   $("#downloadDataButton").addEventListener("click", downloadData); $("#openDataInput").addEventListener("change", event => importDataFile(event.target.files[0]));
   window.addEventListener("beforeunload", event => { if (!dirty) return; event.preventDefault(); event.returnValue = ""; });
-  window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; $("#installAppButton").hidden = false; });
+  window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; $("#installAppHint").textContent = "A telepítés készen áll – koppints ide"; });
+  window.addEventListener("appinstalled", () => { installPrompt = null; $("#installAppHint").textContent = "Az app telepítve van ezen az eszközön"; toast("A Napi feladatok app telepítése sikerült."); });
 
   async function initialize() {
     $("#planDate").value = isoToday();
@@ -637,6 +658,7 @@
     }
     updateStorageStatus();
     if (!dirty) loadPlan($("#planDate").value); else { renderTasks(); $("#saveState").textContent = "Helyreállított piszkozat • mentés szükséges"; }
+    if (appRunsStandalone()) $("#installAppHint").textContent = "Az app telepítve van ezen az eszközön";
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
   }
   initialize();
