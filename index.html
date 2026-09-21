@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#173f2b">
+  <meta name="description" content="A Díszkertek napi munkafeladatainak gyors, mobilbarát összeállítása és nyomtatása.">
+  <meta property="og:title" content="Díszkertek – Napi feladatok">
+  <meta property="og:description" content="Napi munkatervek összeállítása, mentése, nyomtatása és megosztása.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://agnesgeller.github.io/napi/assets/diszkertek-logo.png">
+  <meta property="og:url" content="https://agnesgeller.github.io/napi/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Díszkertek – Napi feladatok">
+  <meta name="twitter:description" content="Napi munkatervek összeállítása, mentése, nyomtatása és megosztása.">
+  <meta name="twitter:image" content="https://agnesgeller.github.io/napi/assets/diszkertek-logo.png">
+  <title>Díszkertek – Napi feladatok</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=2">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=20260921d">
+</head>
+<body>
+  <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
+
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand-lockup">
+        <img src="assets/diszkertek-logo.png" alt="Díszkertek" width="132" height="101">
+        <div>
+          <p class="eyebrow">Minden, ami kerttel kapcsolatos</p>
+          <h1>Díszkertek <span>– Napi feladatok</span></h1>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-cream" id="folderButton" type="button">📁 Mappa kiválasztása</button>
+        <button class="btn btn-light-outline" id="downloadButton" type="button">⬇ Letöltések</button>
+        <button class="btn btn-light-outline" id="refreshButton" type="button">⟳ Frissítés</button>
+        <button class="btn btn-light-outline" id="settingsButton" type="button">⚙ Beállítások</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="planner" class="planner-shell">
+    <section class="date-bar" aria-labelledby="dateHeading">
+      <div class="view-switch" role="group" aria-label="Nézet kiválasztása">
+        <button class="active" id="dayViewButton" type="button" aria-pressed="true">Napi nézet</button>
+        <button id="weekViewButton" type="button" aria-pressed="false">Heti nézet</button>
+      </div>
+      <div>
+        <p class="section-kicker">Napi munkaterv</p>
+        <h2 id="dateHeading">Melyik napot állítjuk össze?</h2>
+      </div>
+      <div class="date-controls">
+        <label for="planDate">Dátum</label>
+        <input class="form-control" id="planDate" type="date">
+        <button class="btn btn-outline-green" id="todayButton" type="button">Mai nap</button>
+      </div>
+      <div class="departure-details" aria-label="Napi indulási információk">
+        <label>Találkozó<input class="form-control" id="meetingInput" type="text" maxlength="160" placeholder="Például: telephely, 6:30"></label>
+        <label>Megálló<input class="form-control" id="stopsInput" type="text" maxlength="240" placeholder="Például: Vizeshűtő, Lidl, Dohánybolt"></label>
+      </div>
+      <div class="copy-actions">
+        <button class="btn btn-soft" id="copyYesterdayButton" type="button">Tegnapi nap másolása</button>
+        <button class="btn btn-soft" id="copyEarlierButton" type="button">Korábbi terv másolása</button>
+      </div>
+      <div class="storage-strip" id="storageStrip" role="status">
+        <span class="storage-dot" aria-hidden="true"></span>
+        <span id="storageText">Válassz mentési mappát. Addig a terv biztonsági piszkozatként megmarad ezen az eszközön.</span>
+      </div>
+    </section>
+
+    <section class="tasks-section" id="dayView" aria-labelledby="tasksHeading">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Autók, dolgozók és helyszínek</p>
+          <h2 id="tasksHeading">A nap feladatai</h2>
+        </div>
+        <button class="btn btn-add" id="addTaskButton" type="button">＋ Napi feladat hozzáadása</button>
+      </div>
+      <div id="emptyState" class="empty-state">
+        <span aria-hidden="true">✦</span>
+        <h3>Még nincs feladat ezen a napon</h3>
+        <p>Kezdd az autó és az első napi feladat hozzáadásával.</p>
+      </div>
+      <div id="taskList" class="task-list"></div>
+      <button class="btn btn-add btn-add-bottom" id="addTaskBottomButton" type="button" hidden>＋ Napi feladat hozzáadása</button>
+    </section>
+    <section class="week-section" id="weekView" aria-labelledby="weekHeading" hidden>
+      <div class="section-heading">
+        <div><p class="section-kicker">Péntektől csütörtökig</p><h2 id="weekHeading">Heti áttekintés</h2><p class="week-range" id="weekRange"></p></div>
+        <div class="week-nav"><button class="btn btn-soft" id="previousWeekButton" type="button">← Előző hét</button><button class="btn btn-soft" id="currentWeekButton" type="button">Aktuális hét</button><button class="btn btn-soft" id="nextWeekButton" type="button">Következő hét →</button></div>
+      </div>
+      <div class="week-grid" id="weekGrid"></div>
+    </section>
+  </main>
+
+  <div class="action-dock" aria-label="Napi terv műveletek">
+    <div class="save-state" id="saveState" role="status">Nincs mentetlen módosítás</div>
+    <div class="dock-buttons">
+      <button class="btn btn-save" id="saveButton" type="button">Mentés a mappába</button>
+      <button class="btn btn-print" id="printButton" type="button">PDF / Nyomtatás</button>
+      <button class="btn btn-share" id="shareButton" type="button">Viber / Megosztás</button>
+      <button class="btn btn-copy" id="copyTextButton" type="button">Szöveg másolása</button>
+    </div>
+  </div>
+
+  <dialog id="settingsDialog" class="app-dialog settings-dialog">
+    <form method="dialog" class="dialog-frame">
+      <header class="dialog-header">
+        <div><p class="section-kicker">Törzsadatok</p><h2>Beállítások</h2></div>
+        <button class="icon-button" value="cancel" aria-label="Bezárás">×</button>
+      </header>
+      <nav class="settings-tabs" aria-label="Beállítási kategóriák">
+        <button type="button" class="active" data-settings-tab="workers">Dolgozók</button>
+        <button type="button" data-settings-tab="vehicles">Autók</button>
+        <button type="button" data-settings-tab="templates">Feladatsablonok</button>
+        <button type="button" data-settings-tab="tools">Eszközök</button>
+        <button type="button" data-settings-tab="materials">Anyagok</button>
+        <button type="button" data-settings-tab="customers">Ügyfelek</button>
+        <button type="button" data-settings-tab="data">Adatfájl</button>
+      </nav>
+      <div id="settingsContent" class="settings-content"></div>
+      <footer class="dialog-footer">
+        <button class="btn btn-save" id="settingsSaveButton" value="default">Mentés</button>
+        <button class="btn btn-secondary" value="cancel">Bezárás</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="customerDialog" class="app-dialog compact-dialog">
+    <form method="dialog" id="customerForm" class="dialog-frame">
+      <header class="dialog-header"><div><p class="section-kicker">Gyors felvétel</p><h2>Új ügyfél</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
+      <div class="dialog-body form-grid">
+        <label class="wide">Ügyfél neve<input class="form-control" name="name" required maxlength="120" autocomplete="organization"></label>
+        <label class="wide">Helyszín / cím<input class="form-control" name="address" required maxlength="240" autocomplete="street-address"></label>
+      </div>
+      <footer class="dialog-footer"><button class="btn btn-save" value="default">Ügyfél mentése</button><button class="btn btn-secondary" value="cancel">Mégse</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="historyDialog" class="app-dialog compact-dialog">
+    <form method="dialog" class="dialog-frame">
+      <header class="dialog-header"><div><p class="section-kicker">Másolás</p><h2>Korábbi napi terv</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
+      <div class="dialog-body" id="historyList"></div>
+    </form>
+  </dialog>
+
+  <dialog id="fileFallbackDialog" class="app-dialog compact-dialog">
+    <form method="dialog" class="dialog-frame">
+      <header class="dialog-header"><div><p class="section-kicker">Helyi adatkezelés</p><h2>Adatfájl kezelése</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
+      <div class="dialog-body">
+        <p>A böngésző nem tud közvetlenül mappába írni. Töltsd le az adatfájlt, majd a következő alkalommal nyisd meg itt.</p>
+        <div class="fallback-actions"><button class="btn btn-save" id="downloadDataButton" type="button">Adatfájl letöltése</button><label class="btn btn-outline-green mb-0">Adatfájl megnyitása<input id="openDataInput" type="file" accept="application/json,.json" hidden></label></div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="downloadsDialog" class="app-dialog compact-dialog">
+    <form method="dialog" class="dialog-frame">
+      <header class="dialog-header"><div><p class="section-kicker">Biztonsági mentés és offline használat</p><h2>Letöltések</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
+      <div class="dialog-body">
+        <p class="download-reference" id="downloadReference"></p>
+        <div class="download-options">
+          <button class="download-option" type="button" data-export-period="week"><strong>Heti adatfájl</strong><span>A kiválasztott hét tervei és törzsadatai</span></button>
+          <button class="download-option" type="button" data-export-period="month"><strong>Havi adatfájl</strong><span>A kiválasztott hónap összes terve</span></button>
+          <button class="download-option" type="button" data-export-period="year"><strong>Éves adatfájl</strong><span>A kiválasztott év összes terve</span></button>
+          <button class="download-option" type="button" data-export-period="all"><strong>Teljes adatfájl</strong><span>Minden beállítás, ügyfél és napi terv</span></button>
+          <a class="download-option app-package" href="downloads/diszkertek-napi-app.zip" download><strong>Teljes app letöltése</strong><span>Offline használható ZIP-csomag</span></a>
+          <button class="download-option" id="installAppButton" type="button" hidden><strong>App telepítése</strong><span>Ikonként telepítés erre az eszközre</span></button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
+
+  <template id="taskTemplate">
+    <article class="task-card">
+      <header class="task-card-header">
+        <div class="task-number" aria-hidden="true"></div>
+        <div class="task-heading-copy">
+          <p class="task-overline">Napi feladat <span class="active-badge" hidden>Éppen szerkeszted</span></p>
+          <h3 class="task-summary">Autó kiválasztása</h3>
+          <p class="task-team-summary">Dolgozók kiválasztása</p>
+          <div class="task-client-summary">
+            <span><small>Ügyfél</small><strong class="task-client-name">Nincs kiválasztva</strong></span>
+            <span><small>Cím</small><strong class="task-client-address">Nincs megadva</strong></span>
+          </div>
+        </div>
+        <div class="task-order-actions">
+          <button type="button" class="icon-button move-up" aria-label="Feladat mozgatása felfelé">↑</button>
+          <button type="button" class="icon-button move-down" aria-label="Feladat mozgatása lefelé">↓</button>
+          <button type="button" class="icon-button duplicate-task" aria-label="Feladat duplikálása">⧉</button>
+          <button type="button" class="icon-button danger remove-task" aria-label="Feladat eltávolítása">×</button>
+        </div>
+      </header>
+      <div class="task-fields">
+        <section class="task-step">
+          <div class="step-label"><span>1</span><h4>Autó</h4></div>
+          <div class="chip-grid vehicle-chips"></div>
+        </section>
+        <section class="task-step">
+          <div class="step-label"><span>2</span><h4>Dolgozók</h4></div>
+          <div class="chip-grid worker-chips"></div>
+        </section>
+        <section class="task-step step-customer">
+          <div class="step-label"><span>3</span><h4>Ügyfél és cím</h4></div>
+          <div class="customer-picker">
+            <span class="customer-field-label">Ügyfél keresése</span><span class="customer-picker-row"><input class="form-control customer-input" type="search" autocomplete="off" aria-label="Ügyfél keresése" placeholder="Írj be legalább két betűt…"><button class="customer-dropdown" type="button" aria-label="Ügyféllista lenyitása">⌄</button></span>
+            <div class="customer-suggestions" hidden></div>
+          </div>
+          <label>Cím<input class="form-control address-input" type="text" maxlength="240" placeholder="Az ügyfél kiválasztása után automatikusan kitöltődik"></label>
+          <button type="button" class="text-button add-customer">＋ Új ügyfél</button>
+        </section>
+        <section class="task-step">
+          <div class="step-label"><span>4</span><h4>Feladat</h4></div>
+          <div class="chip-grid template-chips"></div>
+          <label class="mt-3">Feladat megnevezése<input class="form-control title-input" type="text" maxlength="160" placeholder="Például: kertkarbantartás"></label>
+        </section>
+        <details class="task-step expandable" open>
+          <summary><span class="step-label"><span>5</span><strong>Eszközök</strong></span><span class="summary-hint">lenyitható</span></summary>
+          <div class="detail-content"><div class="chip-grid tool-chips"></div><label class="mt-3">Egyéb eszközök<input class="form-control extra-tools-input" type="text" maxlength="300" placeholder="Vesszővel elválasztva"></label></div>
+        </details>
+        <details class="task-step expandable">
+          <summary><span class="step-label"><span>6</span><strong>Anyagok</strong></span><span class="summary-hint">lenyitható</span></summary>
+          <div class="detail-content"><div class="chip-grid material-chips mb-3"></div><div class="materials-list"></div><button type="button" class="btn btn-soft add-material">＋ Egyedi anyag hozzáadása</button></div>
+        </details>
+        <details class="task-step expandable" open>
+          <summary><span class="step-label"><span>7</span><strong>Munkamenet</strong></span><span class="summary-hint">soronként egy lépés</span></summary>
+          <div class="detail-content"><textarea class="form-control steps-input" rows="5" maxlength="3000" placeholder="1. Előkészítés&#10;2. Munka elvégzése&#10;3. Rendrakás"></textarea><label class="mt-3">Megjegyzés<textarea class="form-control notes-input" rows="2" maxlength="1000" placeholder="Időpont, kapukód, fontos tudnivaló…"></textarea></label></div>
+        </details>
+      </div>
+    </article>
+  </template>
+
+  <template id="materialTemplate">
+    <div class="material-row">
+      <input class="form-control material-name" type="text" maxlength="120" aria-label="Anyag neve" placeholder="Anyag">
+      <input class="form-control material-quantity" type="text" maxlength="30" aria-label="Mennyiség" placeholder="Mennyiség">
+      <input class="form-control material-unit" type="text" maxlength="30" aria-label="Mértékegység" placeholder="Egység">
+      <button type="button" class="icon-button danger remove-material" aria-label="Anyag törlése">×</button>
+    </div>
+  </template>
+
+  <section id="printView" class="print-view" aria-hidden="true"></section>
+
+  <script src="assets/vendor/bootstrap.bundle.min.js"></script>
+  <script src="js/app.js?v=20260921d"></script>
+</body>
+</html>
