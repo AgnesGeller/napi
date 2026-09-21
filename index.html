@@ -23,7 +23,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/app-icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260921e">
+  <link rel="stylesheet" href="css/style.css?v=20260921f">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -101,12 +101,15 @@
   </main>
 
   <div class="action-dock" aria-label="Napi terv műveletek">
+    <button class="dock-toggle" id="dockToggleButton" type="button" aria-expanded="false" aria-controls="dockContent">Műveletek</button>
+    <div id="dockContent">
     <div class="save-state" id="saveState" role="status">Nincs mentetlen módosítás</div>
     <div class="dock-buttons">
       <button class="btn btn-save" id="saveButton" type="button">Mentés a mappába</button>
       <button class="btn btn-print" id="printButton" type="button">PDF / Nyomtatás</button>
       <button class="btn btn-share" id="shareButton" type="button">Viber / Megosztás</button>
       <button class="btn btn-copy" id="copyTextButton" type="button">Szöveg másolása</button>
+    </div>
     </div>
   </div>
 
@@ -165,7 +168,7 @@
     <form method="dialog" class="dialog-frame">
       <header class="dialog-header"><div><p class="section-kicker">Telefon, tablet és számítógép</p><h2>Telepítés és letöltések</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
       <div class="dialog-body">
-        <button class="download-option install-option" id="installAppButton" type="button"><strong>📱 App telepítése telefonra</strong><span id="installAppHint">Telepítés ikonként a telefon főképernyőjére</span></button>
+        <button class="download-option install-option" id="installAppButton" type="button"><strong>📱 App telepítése erre az eszközre</strong><span id="installAppHint">Telefonra, tabletre vagy számítógépre</span></button>
         <p class="download-reference" id="downloadReference"></p>
         <div class="download-options">
           <button class="download-option" type="button" data-export-period="week"><strong>Heti adatfájl</strong><span>A kiválasztott hét tervei és törzsadatai</span></button>
@@ -259,6 +262,6 @@
   <section id="printView" class="print-view" aria-hidden="true"></section>
 
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
-  <script src="js/app.js?v=20260921e"></script>
+  <script src="js/app.js?v=20260921f"></script>
 </body>
 </html>

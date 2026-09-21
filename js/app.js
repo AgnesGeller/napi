@@ -137,6 +137,14 @@
     $("#saveState").textContent = `Elmentve • ${new Date().toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })}`;
     try { localStorage.removeItem(RECOVERY_KEY); } catch (_) { /* Nincs teendő. */ }
   }
+  function setDockOpen(open) {
+    const dock = document.querySelector(".action-dock"); const button = $("#dockToggleButton");
+    dock.classList.toggle("is-open", open); document.body.classList.toggle("actions-open", open);
+    button.setAttribute("aria-expanded", String(open)); button.textContent = open ? "Bezárás ×" : "Műveletek";
+  }
+  $("#dockToggleButton").addEventListener("click", () => setDockOpen(!document.querySelector(".action-dock").classList.contains("is-open")));
+  document.querySelector(".dock-buttons").addEventListener("click", () => { if (window.matchMedia("(max-width: 760px)").matches) setDockOpen(false); });
+  window.matchMedia("(min-width: 761px)").addEventListener?.("change", event => { if (event.matches) setDockOpen(false); });
   function toast(message, error = false) {
     const element = document.createElement("div");
     element.className = `app-toast${error ? " error" : ""}`;
@@ -472,6 +480,7 @@
   }
   function switchView(view) {
     const weekly = view === "week"; $("#dayView").hidden = weekly; $("#weekView").hidden = !weekly; document.body.classList.toggle("week-mode", weekly);
+    setDockOpen(false);
     $("#dayViewButton").classList.toggle("active", !weekly); $("#dayViewButton").setAttribute("aria-pressed", String(!weekly));
     $("#weekViewButton").classList.toggle("active", weekly); $("#weekViewButton").setAttribute("aria-pressed", String(weekly));
     if (weekly) { if (dirty) upsertWorkingPlan(); renderWeek(); }
