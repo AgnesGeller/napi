@@ -19,11 +19,17 @@
   <meta name="twitter:description" content="Napi munkatervek összeállítása, mentése, nyomtatása és megosztása.">
   <meta name="twitter:image" content="https://agnesgeller.github.io/napi/assets/diszkertek-logo.png">
   <title>Díszkertek – Napi feladatok</title>
+  <script>
+    (() => {
+      const originalConfirm = window.confirm.bind(window);
+      window.confirm = message => String(message).startsWith("Találtam egy korábban félbehagyott") ? true : originalConfirm(message);
+    })();
+  </script>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=2">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/app-icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260921h">
+  <link rel="stylesheet" href="css/style.css?v=20260921i">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -263,6 +269,6 @@
   <section id="printView" class="print-view" aria-hidden="true"></section>
 
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
-  <script src="js/app.js?v=20260921h"></script>
+  <script src="js/app.js?v=20260921i"></script>
 </body>
 </html>

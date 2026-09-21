@@ -1,6 +1,6 @@
-const CACHE_NAME = "diszkertek-napi-v8";
+const CACHE_NAME = "diszkertek-napi-v9";
 const APP_FILES = [
-  "./", "index.html", "css/style.css?v=20260921h", "js/app.js?v=20260921h", "manifest.webmanifest",
+  "./", "index.html", "css/style.css?v=20260921i", "js/app.js?v=20260921i", "manifest.webmanifest",
   "assets/favicon.svg", "assets/app-icon-180.png", "assets/app-icon-192.png", "assets/app-icon-512.png", "assets/app-icon-maskable-512.png", "assets/diszkertek-logo.png", "assets/botanical.svg",
   "assets/vendor/bootstrap.min.css", "assets/vendor/bootstrap.bundle.min.js"
 ];
@@ -23,6 +23,12 @@ self.addEventListener("fetch", event => {
       caches.open(CACHE_NAME).then(cache => cache.put("index.html", copy));
       return response;
     }).catch(() => caches.match("index.html")));
+    return;
+  }
+  if (["script", "style"].includes(event.request.destination)) {
+    event.respondWith(fetch(event.request).then(response => {
+      const copy = response.clone(); caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy)); return response;
+    }).catch(() => caches.match(event.request)));
     return;
   }
   event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
