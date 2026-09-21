@@ -32,6 +32,8 @@ button, summary { touch-action: manipulation; }
 .header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
 .btn { min-height: 44px; border-radius: 7px; font-weight: 750; }
 .btn-cream { background: #fff5df; color: #3e2c0d; border: 1px solid #fff5df; }
+.btn-install-header { color: #fff; border: 1px solid #ef765f; background: #b53b32; }
+.btn-install-header:hover, .btn-install-header:focus-visible { color: #fff; background: #952d27; }
 .btn-light-outline { color: #fff; border: 1px solid rgba(255,255,255,.58); background: rgba(255,255,255,.06); }
 .btn-light-outline:hover, .btn-light-outline:focus-visible { background: #fff; color: var(--forest); }
 .planner-shell { width: min(1040px, calc(100% - 1.25rem)); margin: 1.1rem auto 2rem; }

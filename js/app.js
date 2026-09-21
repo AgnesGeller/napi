@@ -637,17 +637,19 @@
     $("#installHelpContent").innerHTML = `${content}<p class="install-help-note">A ZIP-fájlt nem kell telefonon megnyitni. A telepített app a főképernyőről indul és internet nélkül is megnyitható.</p>`;
     $("#downloadsDialog").close(); $("#installHelpDialog").showModal();
   }
-  $("#installAppButton").addEventListener("click", async () => {
+  async function installApplication() {
     if (appRunsStandalone()) { toast("Az alkalmazás már telepítve van ezen az eszközön."); return; }
     if (!installPrompt) { showInstallHelp(); return; }
     await installPrompt.prompt(); const choice = await installPrompt.userChoice; installPrompt = null;
     if (choice.outcome !== "accepted") showInstallHelp();
-  });
+  }
+  $("#installAppButton").addEventListener("click", installApplication);
+  $("#quickInstallButton").addEventListener("click", installApplication);
   $("#saveButton").addEventListener("click", async () => { try { if (!(await writeDataFile()) && !("showDirectoryPicker" in window)) $("#fileFallbackDialog").showModal(); } catch (error) { $("#saveState").textContent = "Mentési hiba"; toast(`A mentés nem sikerült: ${readableError(error)}`, true); } });
   $("#downloadDataButton").addEventListener("click", downloadData); $("#openDataInput").addEventListener("change", event => importDataFile(event.target.files[0]));
   window.addEventListener("beforeunload", event => { if (!dirty) return; event.preventDefault(); event.returnValue = ""; });
   window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; $("#installAppHint").textContent = "A telepítés készen áll – koppints ide"; });
-  window.addEventListener("appinstalled", () => { installPrompt = null; $("#installAppHint").textContent = "Az app telepítve van ezen az eszközön"; toast("A Napi feladatok app telepítése sikerült."); });
+  window.addEventListener("appinstalled", () => { installPrompt = null; $("#installAppHint").textContent = "Az app telepítve van ezen az eszközön"; $("#quickInstallButton").textContent = "✓ App telepítve"; toast("A Napi feladatok app telepítése sikerült."); });
 
   async function initialize() {
     $("#planDate").value = isoToday();
@@ -660,7 +662,7 @@
     if (!directoryHandle) {
       try {
         const recovery = JSON.parse(localStorage.getItem(RECOVERY_KEY));
-        if (recovery?.data && confirm("Találtam egy korábban félbehagyott, nem mentett tervet. Visszaállítsam?")) {
+        if (recovery?.data) {
           data = normalizeData(recovery.data); workingPlan = recovery.workingPlan || blankPlan(isoToday());
           workingPlan.meeting = typeof workingPlan.meeting === "string" ? workingPlan.meeting : DEFAULT_MEETING;
           workingPlan.stops = typeof workingPlan.stops === "string" ? workingPlan.stops : DEFAULT_STOPS;
