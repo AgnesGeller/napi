@@ -224,19 +224,22 @@
     }
   }
   function updateStorageStatus() {
-    const strip = $("#storageStrip");
+    const strip = $("#storageStrip"); const refreshButton = $("#refreshButton");
     if (directoryHandle) {
       strip.classList.add("ready");
       $("#storageText").textContent = `Mentési mappa: ${directoryHandle.name} • ${DATA_FILE_NAME}`;
       $("#folderButton").textContent = "📁 Mappa cseréje";
+      refreshButton.disabled = false; refreshButton.title = "Adatok újratöltése a csatlakoztatott mappából";
     } else {
       strip.classList.remove("ready");
       $("#storageText").textContent = "Válassz mentési mappát. Addig a terv biztonsági piszkozatként megmarad ezen az eszközön.";
+      refreshButton.disabled = true; refreshButton.title = "Előbb válassz mentési mappát";
     }
   }
   async function refreshFromFile() {
+    if (!directoryHandle) { toast("Nincs csatlakoztatott mappa. Használd a Mappa kiválasztása gombot.", true); return; }
+    if (!(await hasWritePermission(directoryHandle, false))) { toast("A mappa már nem érhető el. Csatlakoztasd újra a Mappa kiválasztása gombbal.", true); return; }
     if (dirty && !confirm("A frissítés elveti a még nem mentett módosításokat. Folytatod?")) return;
-    if (!directoryHandle || !(await hasWritePermission(directoryHandle, false))) { await chooseFolder(); return; }
     try {
       const loaded = await readDataFile(directoryHandle);
       if (loaded) data = loaded;
