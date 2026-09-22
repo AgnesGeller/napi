@@ -86,7 +86,8 @@ button, summary { touch-action: manipulation; }
 .week-day-actions { display: grid; grid-template-columns: 1fr auto; gap: .4rem; padding: 0 .55rem .55rem; }
 .week-open, .week-delete { min-height: 40px; padding: .4rem .55rem; font-weight: 800; }
 .week-open { color: var(--forest); border: 1px solid var(--leaf); background: #fff; }
-.week-delete { color: #8a2621; border: 1px solid #d3aaa7; background: #fff5f4; }
+.week-delete { min-width: 84px; color: #fff; border: 2px solid #7b1d19; background: #a92f28; box-shadow: 0 2px 7px rgba(104,24,20,.22); }
+.week-delete:hover, .week-delete:focus-visible { color: #fff; background: #7f211c; outline: 3px solid rgba(169,47,40,.22); }
 .section-heading { display: flex; gap: 1rem; align-items: end; justify-content: space-between; margin: 0 .2rem .8rem; }
 .btn-add, .btn-save { color: #fff; background: var(--forest); border-color: var(--forest); }
 .btn-add:hover, .btn-save:hover { color: #fff; background: #0e3020; }
@@ -323,6 +324,7 @@ button, summary { touch-action: manipulation; }
   .header-actions .btn { font-size: .9rem; }
   .settings-row { grid-template-columns: 1fr; }
   .settings-row-actions { justify-content: flex-end; }
+  .week-day-actions { grid-template-columns: 1fr 96px; }
 }
 
 @page { size: A4 portrait; margin: 0; }
@@ -330,7 +332,8 @@ button, summary { touch-action: manipulation; }
   body { padding: 0; background: #fff; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .skip-link, .app-header, .planner-shell, .action-dock, dialog, .toast-region { display: none !important; }
   .print-view { display: block; color: #19221b; font: 10.5pt/1.4 Arial, sans-serif; }
-  .print-sheet { position: relative; min-height: 297mm; padding: 10mm 12mm 12mm; overflow: hidden; }
+  .print-sheet { position: relative; box-sizing: border-box; width: 210mm; min-height: 296mm; padding: 10mm 12mm 12mm; overflow: hidden; }
+  .print-sheet + .print-sheet { break-before: page; page-break-before: always; }
   .print-sheet::before, .print-sheet::after { content: ""; position: absolute; width: 52mm; height: 52mm; background: url("../assets/botanical.svg") center/contain no-repeat; opacity: .055; pointer-events: none; }
   .print-sheet::before { top: -13mm; right: -10mm; transform: rotate(18deg); }
   .print-sheet::after { bottom: -15mm; left: -12mm; transform: rotate(205deg); }
@@ -340,8 +343,6 @@ button, summary { touch-action: manipulation; }
   .print-date { color: #263e2d; font-size: 12pt; font-weight: 800; }
   .print-departure { position: relative; z-index: 1; display: grid; grid-template-columns: .8fr 1.2fr; gap: 4mm; margin: 4mm 0 1mm; padding: 3mm 4mm; border-left: 2mm solid var(--orange); background: #fff5e3; }
   .print-departure p { margin: 0; }
-  .print-divider { position: relative; z-index: 1; margin: 6mm 0 -3mm; color: var(--orange); text-align: center; font-size: 7.5pt; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
-  .print-divider::before, .print-divider::after { content: ""; display: inline-block; width: 29%; margin: 0 3mm 2px; border-top: .4mm solid #c67a4d; }
   .print-task { position: relative; z-index: 1; break-inside: avoid; margin-top: 5mm; padding: 0 4mm 3mm; border: .6mm solid var(--print-task-border, #8fa391); border-left: 2.5mm solid var(--print-task-border, var(--forest)); background: var(--print-task-color, rgba(255,255,255,.96)); }
   .print-task-heading { display: flex; flex-wrap: wrap; gap: 2mm 3mm; align-items: center; margin: 0 -4mm 3mm; padding: 2.2mm 3mm; color: #fff; background: var(--print-task-accent, var(--forest)); }
   .print-heading-workers { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 1mm; }

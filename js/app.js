@@ -7,6 +7,7 @@
   const DB_NAME = "diszkertek-napi-mappakapcsolat";
   const DB_STORE = "handles";
   const INSTALLED_KEY = "diszkertek-napi-installed-v1";
+  const PENDING_DELETIONS_KEY = "diszkertek-napi-fuggo-torlesek-v1";
   const FINAL_NOTE = "A nap végén mindenki vegye ki a szemetét az autóból és hagyjon rendet maga után!";
   const DEFAULT_MEETING = "telephely, 6:30";
   const DEFAULT_STOPS = "Vizeshűtő, Lidl, Dohánybolt";
@@ -142,7 +143,9 @@
   let cloudSyncing = false;
   let cloudConfigDirty = false;
   const pendingCloudPlanDates = new Set();
-  const pendingCloudDeletedDates = new Set();
+  let storedPendingDeletions = [];
+  try { storedPendingDeletions = JSON.parse(localStorage.getItem(PENDING_DELETIONS_KEY)) || []; } catch (_) { /* Üres listával folytatjuk. */ }
+  const pendingCloudDeletedDates = new Set(Array.isArray(storedPendingDeletions) ? storedPendingDeletions : []);
 
   function blankTask() {
     return { id: uid(), customerId: null, locationId: null, customerName: "", address: "", workerIds: [], vehicleIds: [], jobs: [], toolIds: [], toolQuantities: {}, extraTools: "", materials: [], workLogRequired: true, workIntensity: 3, workQuality: 3, notes: "" };
@@ -283,6 +286,14 @@
       else if (initial && !remote.config) await window.NapiCloudSync.pushConfig(sharedConfigPayload());
       const remoteDates = new Set(); let currentChanged = false;
       remote.plans.forEach(row => {
+        if (row.payload?.deleted) {
+          remoteDates.add(row.plan_date);
+          const index = data.plans.findIndex(item => item.date === row.plan_date);
+          const local = data.plans[index];
+          if (index >= 0 && String(row.updated_at || "") >= String(local?.updatedAt || "")) data.plans.splice(index, 1);
+          if (row.plan_date === workingPlan.date && !dirty) currentChanged = true;
+          return;
+        }
         const plan = normalizedRemotePlan(row.payload); if (!plan?.date) return;
         remoteDates.add(plan.date); plan.updatedAt = row.updated_at || plan.updatedAt;
         const index = data.plans.findIndex(item => item.date === plan.date); const local = data.plans[index];
@@ -303,19 +314,30 @@
   async function pushCurrentState() {
     if (!navigator.onLine || !window.NapiCloudSync || !window.NapiCustomerDirectory?.hasSession?.()) return;
     try {
-      saveDataLocally();
-      pendingCloudPlanDates.add(workingPlan.date);
+      const hasPlanContent = workingPlan.tasks.length || workingPlan.meeting !== DEFAULT_MEETING || workingPlan.stops !== DEFAULT_STOPS;
+      if (hasPlanContent && (dirty || currentStoredPlan())) { upsertWorkingPlan(); pendingCloudPlanDates.add(workingPlan.date); }
+      data.updatedAt = new Date().toISOString(); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
       for (const date of pendingCloudPlanDates) {
         const plan = data.plans.find(item => item.date === date); if (plan) await window.NapiCloudSync.pushPlan(plan);
       }
       pendingCloudPlanDates.clear();
-      if (pendingCloudDeletedDates.size) { await window.NapiCloudSync.deletePlans([...pendingCloudDeletedDates]); pendingCloudDeletedDates.clear(); }
+      if (pendingCloudDeletedDates.size) { await window.NapiCloudSync.deletePlans([...pendingCloudDeletedDates]); pendingCloudDeletedDates.clear(); localStorage.removeItem(PENDING_DELETIONS_KEY); }
       if (cloudConfigDirty) { await window.NapiCloudSync.pushConfig(sharedConfigPayload()); cloudConfigDirty = false; }
     } catch (error) { console.warn("A háttérszinkron most nem érhető el.", error); }
   }
   function queueCloudSync() {
     clearTimeout(cloudSyncTimer);
     cloudSyncTimer = setTimeout(() => pushCurrentState(), 1200);
+  }
+  function syncDeletedDates(dates) {
+    dates.forEach(date => pendingCloudDeletedDates.add(date));
+    localStorage.setItem(PENDING_DELETIONS_KEY, JSON.stringify([...pendingCloudDeletedDates]));
+    window.NapiCloudSync?.deletePlans?.(dates).then(() => {
+      dates.forEach(date => pendingCloudDeletedDates.delete(date));
+      if (pendingCloudDeletedDates.size) localStorage.setItem(PENDING_DELETIONS_KEY, JSON.stringify([...pendingCloudDeletedDates]));
+      else localStorage.removeItem(PENDING_DELETIONS_KEY);
+    }).catch(error => console.warn("A felhős törlés később újrapróbálható.", error));
+    queueCloudSync();
   }
 
   function markDirty(message = "Mentetlen módosítás") {
@@ -493,8 +515,9 @@
     if (!confirm(`Biztosan törlöd a(z) ${labels[period]} terveit (${matching.length} nap)? A törlés előtt töltsd le az adatmentést.`)) return;
     const dates = new Set(matching.map(plan => plan.date)); data.plans = data.plans.filter(plan => !dates.has(plan.date));
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
-    window.NapiCloudSync?.deletePlans?.([...dates]).catch(error => console.warn("A felhős törlés később újrapróbálható.", error));
-    if (dates.has(workingPlan.date)) loadPlan(workingPlan.date); else renderWeek();
+    syncDeletedDates([...dates]);
+    if (dates.has(workingPlan.date)) { localStorage.removeItem(RECOVERY_KEY); dirty = false; loadPlan(workingPlan.date); }
+    else renderWeek();
     toast(`${matching.length} napi terv törölve.`); $("#downloadsDialog").close();
   }
   async function importDataFile(file) {
@@ -965,8 +988,9 @@
       const date = deleteButton.dataset.deleteDate;
       if (!confirm(`Biztosan törlöd a(z) ${formatDate(date)} napi tervet? Előtte tölts le heti, havi vagy éves adatmentést, ha meg szeretnéd őrizni.`)) return;
       data.plans = data.plans.filter(plan => plan.date !== date); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
-      window.NapiCloudSync?.deletePlans?.([date]).catch(error => console.warn("A felhős törlés később újrapróbálható.", error));
-      if (workingPlan.date === date) loadPlan(date); renderWeek(); toast("A napi terv törölve."); return;
+      syncDeletedDates([date]);
+      if (workingPlan.date === date) { localStorage.removeItem(RECOVERY_KEY); dirty = false; loadPlan(date); }
+      renderWeek(); toast("A napi terv törölve."); return;
     }
     const button = event.target.closest("[data-open-date]"); if (!button) return; loadPlan(button.dataset.openDate); switchView("day");
   });
@@ -998,9 +1022,9 @@
       lines.push(`Dolgozók: ${workers || "nincs kiválasztva"}`);
       lines.push(`${index + 1}. Ügyfél: ${task.customerName || "nincs kiválasztva"}`);
       lines.push(`Cím: ${task.address || "nincs megadva"}`);
-      lines.push(`Munkanapló: ${task.workLogRequired === false ? "nem kell megírni" : "meg kell írni"}`);
-      lines.push(`Munkaintenzitás: ${validRating(task.workIntensity)} – ${INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)]}`);
-      lines.push(`Munka minősége: ${validRating(task.workQuality)} – ${QUALITY_DESCRIPTIONS[validRating(task.workQuality)]}`);
+      lines.push(task.workLogRequired === false ? "Munkanaplót nem kell írni." : "Munkanaplót meg kell írni.");
+      lines.push(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)]);
+      lines.push(QUALITY_DESCRIPTIONS[validRating(task.workQuality)]);
       const descriptions = jobDescriptions(task);
       if (tools.length) { lines.push("Eszközök:"); tools.forEach(item => lines.push(`- ${item}`)); }
       const materials = task.materials.filter(item => item.name);
@@ -1014,7 +1038,10 @@
     lines.push(FINAL_NOTE); return lines.join("\n");
   }
   function renderPrintView() {
-      const tasks = workingPlan.tasks.map((task, index) => {
+    const departure = workingPlan.meeting || workingPlan.stops ? `<div class="print-departure">${workingPlan.meeting ? `<p><strong>Találkozó:</strong> ${escapeHTML(workingPlan.meeting)}</p>` : ""}${workingPlan.stops ? `<p><strong>Megálló:</strong> ${escapeHTML(workingPlan.stops)}</p>` : ""}</div>` : "";
+    const logoUrl = new URL("assets/diszkertek-logo.png", document.baseURI).href;
+    const printHeader = `<header class="print-header"><img src="${escapeHTML(logoUrl)}" alt="Díszkertek logó" width="416" height="512"><div><h1>Napi feladatok</h1><div class="print-date">${escapeHTML(formatDate(workingPlan.date))}</div></div></header>`;
+    const tasks = workingPlan.tasks.map((task, index) => {
       const workers = task.workerIds.map(id => byId(data.workers, id)).filter(Boolean).map(worker => `<span class="print-worker" style="--print-worker-color:${escapeHTML(worker.color)};--print-worker-text:${bestTextColor(worker.color)}">${escapeHTML(worker.name)}</span>`).join("");
       const vehicles = task.vehicleIds.map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
       const printVehicle = (task.vehicleIds || []).map(id => byId(data.vehicles, id)).find(Boolean);
@@ -1023,21 +1050,15 @@
       const materials = task.materials.filter(item => item.name);
       const descriptions = jobDescriptions(task);
       const jobs = descriptions.map(item => `<div class="print-job-description"><h4>${escapeHTML(item.name)}</h4>${item.steps.length ? `<ul>${item.steps.map(step => `<li>${escapeHTML(step)}</li>`).join("")}</ul>` : ""}</div>`).join("");
-      const expectations = `<section class="print-section wide"><h3>Munkavégzés</h3><p><strong>Munkanapló:</strong> ${task.workLogRequired === false ? "nem kell megírni" : "meg kell írni"}<br><strong>Munkaintenzitás:</strong> ${validRating(task.workIntensity)} – ${escapeHTML(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)])}<br><strong>Munka minősége:</strong> ${validRating(task.workQuality)} – ${escapeHTML(QUALITY_DESCRIPTIONS[validRating(task.workQuality)])}</p></section>`;
-      return `${index ? `<div class="print-divider">Következő napi feladat</div>` : ""}<article class="print-task" style="--print-task-color:${printTheme.background};--print-task-border:${printTheme.border};--print-task-accent:${printTheme.accent}"><div class="print-task-heading"><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2><div class="print-heading-workers">${workers || `<span>Nincs dolgozó kiválasztva</span>`}</div></div><div class="print-client-row"><section><small>${index + 1}. Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${item.source ? `<strong>${escapeHTML(item.source)}:</strong> ` : ""}${escapeHTML(item.name)}${item.quantity ? ` – ${escapeHTML(item.quantity)}` : ""}</li>`).join("")}</ul></section>` : ""}${expectations}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}</div></article>`;
+      const expectations = `<section class="print-section wide"><h3>Munkavégzés</h3><p>${task.workLogRequired === false ? "Munkanaplót nem kell írni." : "Munkanaplót meg kell írni."}<br>${escapeHTML(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)])}<br>${escapeHTML(QUALITY_DESCRIPTIONS[validRating(task.workQuality)])}</p></section>`;
+      const printTask = `<article class="print-task" style="--print-task-color:${printTheme.background};--print-task-border:${printTheme.border};--print-task-accent:${printTheme.accent}"><div class="print-task-heading"><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2><div class="print-heading-workers">${workers || `<span>Nincs dolgozó kiválasztva</span>`}</div></div><div class="print-client-row"><section><small>${index + 1}. Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${item.source ? `<strong>${escapeHTML(item.source)}:</strong> ` : ""}${escapeHTML(item.name)}${item.quantity ? ` – ${escapeHTML(item.quantity)}` : ""}</li>`).join("")}</ul></section>` : ""}${expectations}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}</div></article>`;
+      return `<section class="print-sheet">${printHeader}${index === 0 ? departure : ""}${printTask}<div class="print-footer-note">${FINAL_NOTE}</div></section>`;
     }).join("");
-    const departure = workingPlan.meeting || workingPlan.stops ? `<div class="print-departure">${workingPlan.meeting ? `<p><strong>Találkozó:</strong> ${escapeHTML(workingPlan.meeting)}</p>` : ""}${workingPlan.stops ? `<p><strong>Megálló:</strong> ${escapeHTML(workingPlan.stops)}</p>` : ""}</div>` : "";
-    const logoUrl = new URL("assets/diszkertek-logo.png", document.baseURI).href;
-    $("#printView").innerHTML = `<div class="print-sheet"><header class="print-header"><img src="${escapeHTML(logoUrl)}" alt="Díszkertek logó" width="416" height="512"><div><h1>Napi feladatok</h1><div class="print-date">${escapeHTML(formatDate(workingPlan.date))}</div></div></header>${departure}${tasks || `<p>Nincs feladat erre a napra.</p>`}<div class="print-footer-note">${FINAL_NOTE}</div></div>`;
+    $("#printView").innerHTML = tasks || `<section class="print-sheet">${printHeader}${departure}<p>Nincs feladat erre a napra.</p></section>`;
   }
-  $("#printButton").addEventListener("click", async () => {
+  window.addEventListener("beforeprint", renderPrintView);
+  $("#printButton").addEventListener("click", () => {
     renderPrintView();
-    const logo = $("#printView .print-header img");
-    if (logo && (!logo.complete || !logo.naturalWidth)) {
-      await new Promise(resolve => { logo.addEventListener("load", resolve, { once: true }); logo.addEventListener("error", resolve, { once: true }); });
-    }
-    try { await logo?.decode?.(); } catch (_) { /* A betöltött képet ettől még ki lehet nyomtatni. */ }
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     window.print();
   });
   async function copyText() {
@@ -1045,11 +1066,32 @@
     try { await navigator.clipboard.writeText(text); toast("A napi terv szövege a vágólapra került."); }
     catch (_) { const area = document.createElement("textarea"); area.value = text; area.style.position = "fixed"; area.style.opacity = "0"; document.body.append(area); area.select(); document.execCommand("copy"); area.remove(); toast("A napi terv szövege a vágólapra került."); }
   }
+  function copyTextImmediately(text) {
+    const area = document.createElement("textarea");
+    area.value = text; area.style.position = "fixed"; area.style.opacity = "0"; document.body.append(area); area.select();
+    try { document.execCommand("copy"); } catch (_) { /* A modern vágólapkezelés még sikerülhet. */ }
+    area.remove();
+    navigator.clipboard?.writeText(text).catch(() => {});
+  }
   $("#copyTextButton").addEventListener("click", copyText);
-  $("#shareButton").addEventListener("click", async () => {
-    if (!navigator.share) { await copyText(); return; }
-    try { await navigator.share({ title: `${workingPlan.date} – Napi feladatok`, text: planText() }); }
-    catch (error) { if (error?.name !== "AbortError") { await copyText(); toast("A megosztás helyett a szöveget a vágólapra másoltam."); } }
+  const shareButton = $("#shareButton");
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  shareButton.textContent = isAndroid ? "Megosztás" : "Viber megnyitása";
+  shareButton.title = isAndroid ? "A telefon megosztási ablakának megnyitása" : "A napi terv másolása és a Viber megnyitása";
+  shareButton.addEventListener("click", async () => {
+    const text = planText();
+    if (isAndroid && navigator.share) {
+      try { await navigator.share({ title: `${workingPlan.date} – Napi feladatok`, text }); }
+      catch (error) { if (error?.name !== "AbortError") { await copyText(); toast("A megosztás helyett a szöveget a vágólapra másoltam."); } }
+      return;
+    }
+
+    // A Viber saját hivatkozása legfeljebb 200 karaktert ad át.
+    // A teljes tervet ezért a vágólapra is tesszük, majd megnyitjuk a Vibert.
+    copyTextImmediately(text);
+    const preview = text.length > 190 ? `${text.slice(0, 187)}...` : text;
+    window.location.href = `viber://forward?text=${encodeURIComponent(preview)}`;
+    toast("A Viber megnyílik. A teljes napi tervet beillesztéshez a vágólapra másoltam.");
   });
 
   function settingsType() {
@@ -1215,7 +1257,7 @@
   window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; localStorage.removeItem(INSTALLED_KEY); updateInstallButtons(); });
   window.addEventListener("appinstalled", () => { installPrompt = null; localStorage.setItem(INSTALLED_KEY, "true"); updateInstallButtons(); toast("A Napi feladatok app telepítése sikerült."); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) { syncCustomerDirectory(); pullSharedData(); } });
-  window.addEventListener("online", () => { if (window.NapiCustomerDirectory?.hasSession?.()) { syncCustomerDirectory(); pullSharedData({ initial: true }); } });
+  window.addEventListener("online", () => { if (window.NapiCustomerDirectory?.hasSession?.()) { syncCustomerDirectory(); pullSharedData({ initial: true }).then(() => pushCurrentState()); } });
   setInterval(() => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory(); }, 120000);
   setInterval(() => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) pullSharedData(); }, 15000);
 
@@ -1247,7 +1289,7 @@
     updateStorageStatus();
     if (!dirty) loadPlan($("#planDate").value); else { renderTasks(); $("#saveState").textContent = "Helyreállított piszkozat • mentés szükséges"; }
     renderWeek();
-    if (navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) { await syncCustomerDirectory(); await pullSharedData({ initial: true }); }
+    if (navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) { await syncCustomerDirectory(); await pullSharedData({ initial: true }); if (pendingCloudDeletedDates.size) await pushCurrentState(); }
     if (appRunsStandalone()) localStorage.setItem(INSTALLED_KEY, "true");
     updateInstallButtons();
     if ("serviceWorker" in navigator) {

@@ -60,7 +60,8 @@
   async function deletePlans(dates) {
     const uniqueDates = [...new Set(dates)].filter(Boolean);
     if (!uniqueDates.length) return;
-    return request(`napi_daily_plans?plan_date=in.(${uniqueDates.join(",")})`, { method: "DELETE", prefer: "return=minimal" });
+    const deletedAt = new Date().toISOString();
+    return Promise.all(uniqueDates.map(date => pushPlan({ date, deleted: true, updatedAt: deletedAt })));
   }
 
   window.NapiCloudSync = { pull, pushConfig, pushPlan, deletePlans };
