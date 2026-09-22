@@ -83,10 +83,10 @@ button, summary { touch-action: manipulation; }
 .week-task span strong { color: var(--forest); }
 .week-task em { color: var(--muted); font-style: normal; }
 .week-empty { color: #7a877d; font-size: .82rem; font-style: italic; }
-.week-day-actions { display: grid; grid-template-columns: 1fr auto; gap: .4rem; padding: 0 .55rem .55rem; }
+.week-day-actions { display: grid; grid-template-columns: 1fr; gap: .4rem; padding: 0 .55rem .55rem; }
 .week-open, .week-delete { min-height: 40px; padding: .4rem .55rem; font-weight: 800; }
 .week-open { color: var(--forest); border: 1px solid var(--leaf); background: #fff; }
-.week-delete { min-width: 84px; color: #fff; border: 2px solid #7b1d19; background: #a92f28; box-shadow: 0 2px 7px rgba(104,24,20,.22); }
+.week-delete { width: 100%; color: #fff; border: 2px solid #7b1d19; background: #a92f28; box-shadow: 0 2px 7px rgba(104,24,20,.22); }
 .week-delete:hover, .week-delete:focus-visible { color: #fff; background: #7f211c; outline: 3px solid rgba(169,47,40,.22); }
 .section-heading { display: flex; gap: 1rem; align-items: end; justify-content: space-between; margin: 0 .2rem .8rem; }
 .btn-add, .btn-save { color: #fff; background: var(--forest); border-color: var(--forest); }
@@ -324,7 +324,6 @@ button, summary { touch-action: manipulation; }
   .header-actions .btn { font-size: .9rem; }
   .settings-row { grid-template-columns: 1fr; }
   .settings-row-actions { justify-content: flex-end; }
-  .week-day-actions { grid-template-columns: 1fr 96px; }
 }
 
 @page { size: A4 portrait; margin: 0; }
