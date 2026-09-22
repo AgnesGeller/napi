@@ -157,6 +157,7 @@
     signOut,
     list,
     cached,
+    session: activeSession,
     hasSession: () => Boolean(storedSession())
   };
 })();

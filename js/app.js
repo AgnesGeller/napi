@@ -138,6 +138,11 @@
   let customerDirectoryState = customerDirectory.length ? "cache" : "disconnected";
   let customerDirectoryLastSync = cachedCustomerDirectory.savedAt;
   let customerDirectorySyncing = false;
+  let cloudSyncTimer = null;
+  let cloudSyncing = false;
+  let cloudConfigDirty = false;
+  const pendingCloudPlanDates = new Set();
+  const pendingCloudDeletedDates = new Set();
 
   function blankTask() {
     return { id: uid(), customerId: null, locationId: null, customerName: "", address: "", workerIds: [], vehicleIds: [], jobs: [], toolIds: [], toolQuantities: {}, extraTools: "", materials: [], workLogRequired: true, workIntensity: 3, workQuality: 3, notes: "" };
@@ -231,10 +236,93 @@
   function byId(collection, id) { return collection.find(item => item.id === id); }
   function currentStoredPlan() { return data.plans.find(plan => plan.date === workingPlan.date); }
 
+  function sharedConfigPayload() {
+    return { version: data.version, workers: data.workers, vehicles: data.vehicles, tools: data.tools, materials: data.materials, templates: data.templates, customers: data.customers, recurrences: data.recurrences };
+  }
+  function remapIds(ids, oldItems, newItems) {
+    return (ids || []).map(id => {
+      if (newItems.some(item => item.id === id)) return id;
+      const oldName = oldItems.find(item => item.id === id)?.name;
+      return newItems.find(item => searchKey(item.name) === searchKey(oldName))?.id;
+    }).filter(Boolean);
+  }
+  function remapPlanReferences(plan, previous) {
+    (plan.tasks || []).forEach(task => {
+      task.workerIds = remapIds(task.workerIds, previous.workers, data.workers);
+      task.vehicleIds = remapIds(task.vehicleIds, previous.vehicles, data.vehicles);
+      const oldToolQuantities = { ...(task.toolQuantities || {}) }; const oldToolIds = [...(task.toolIds || [])];
+      task.toolIds = remapIds(oldToolIds, previous.tools, data.tools); task.toolQuantities = {};
+      oldToolIds.forEach(oldId => {
+        const oldName = previous.tools.find(item => item.id === oldId)?.name; const newId = data.tools.find(item => searchKey(item.name) === searchKey(oldName))?.id;
+        if (newId) task.toolQuantities[newId] = oldToolQuantities[oldId] || "1";
+      });
+      (task.jobs || []).forEach(job => {
+        if (!job.templateId || data.templates.some(item => item.id === job.templateId)) return;
+        const oldName = previous.templates.find(item => item.id === job.templateId)?.name || job.name;
+        job.templateId = data.templates.find(item => searchKey(item.name) === searchKey(oldName))?.id || null;
+      });
+    });
+  }
+  function applySharedConfig(payload) {
+    if (!payload || typeof payload !== "object") return;
+    const previous = { workers: data.workers, vehicles: data.vehicles, tools: data.tools, templates: data.templates };
+    const normalized = normalizeData({ ...data, ...payload, plans: data.plans });
+    data.workers = normalized.workers; data.vehicles = normalized.vehicles; data.tools = normalized.tools; data.materials = normalized.materials;
+    data.templates = normalized.templates; data.customers = normalized.customers; data.recurrences = normalized.recurrences;
+    data.plans.forEach(plan => remapPlanReferences(plan, previous)); remapPlanReferences(workingPlan, previous);
+  }
+  function normalizedRemotePlan(payload) {
+    return normalizeData({ ...data, plans: [payload] }).plans[0];
+  }
+  async function pullSharedData({ initial = false } = {}) {
+    if (cloudSyncing || !navigator.onLine || !window.NapiCloudSync || !window.NapiCustomerDirectory?.hasSession?.()) return;
+    cloudSyncing = true;
+    try {
+      const remote = await window.NapiCloudSync.pull();
+      if (remote.config && !cloudConfigDirty) applySharedConfig(remote.config.payload);
+      else if (initial && !remote.config) await window.NapiCloudSync.pushConfig(sharedConfigPayload());
+      const remoteDates = new Set(); let currentChanged = false;
+      remote.plans.forEach(row => {
+        const plan = normalizedRemotePlan(row.payload); if (!plan?.date) return;
+        remoteDates.add(plan.date); plan.updatedAt = row.updated_at || plan.updatedAt;
+        const index = data.plans.findIndex(item => item.date === plan.date); const local = data.plans[index];
+        if (!local || String(row.updated_at || "") > String(local.updatedAt || "")) {
+          if (index >= 0) data.plans[index] = plan; else data.plans.push(plan);
+          if (plan.date === workingPlan.date && !dirty) currentChanged = true;
+        }
+      });
+      if (initial) {
+        const missingPlans = data.plans.filter(plan => !remoteDates.has(plan.date));
+        for (const plan of missingPlans) await window.NapiCloudSync.pushPlan(plan);
+      }
+      data.plans.sort((a, b) => b.date.localeCompare(a.date)); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+      if (currentChanged) loadPlan(workingPlan.date); else { if (!dirty) renderTasks(); renderWeek(); }
+    } catch (error) { console.warn("A háttérszinkron most nem érhető el.", error); }
+    finally { cloudSyncing = false; }
+  }
+  async function pushCurrentState() {
+    if (!navigator.onLine || !window.NapiCloudSync || !window.NapiCustomerDirectory?.hasSession?.()) return;
+    try {
+      saveDataLocally();
+      pendingCloudPlanDates.add(workingPlan.date);
+      for (const date of pendingCloudPlanDates) {
+        const plan = data.plans.find(item => item.date === date); if (plan) await window.NapiCloudSync.pushPlan(plan);
+      }
+      pendingCloudPlanDates.clear();
+      if (pendingCloudDeletedDates.size) { await window.NapiCloudSync.deletePlans([...pendingCloudDeletedDates]); pendingCloudDeletedDates.clear(); }
+      if (cloudConfigDirty) { await window.NapiCloudSync.pushConfig(sharedConfigPayload()); cloudConfigDirty = false; }
+    } catch (error) { console.warn("A háttérszinkron most nem érhető el.", error); }
+  }
+  function queueCloudSync() {
+    clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = setTimeout(() => pushCurrentState(), 1200);
+  }
+
   function markDirty(message = "Mentetlen módosítás") {
     dirty = true;
     $("#saveState").textContent = message;
     try { localStorage.setItem(RECOVERY_KEY, JSON.stringify({ savedAt: new Date().toISOString(), data, workingPlan })); } catch (_) { /* A mappamentés ettől még használható. */ }
+    queueCloudSync();
   }
   function markSaved() {
     dirty = false;
@@ -318,6 +406,7 @@
     let folderSaved = false;
     if (directoryHandle && await hasWritePermission(directoryHandle, true)) folderSaved = await writeDataFile();
     if (!folderSaved) markSaved();
+    await pushCurrentState();
     collapsedTaskIds = new Set(workingPlan.tasks.map(task => task.id)); activeTaskId = null; renderTasks(); renderWeek();
     toast(folderSaved ? "A napi terv elmentve az alkalmazásba és az adatmappába." : "A napi terv elmentve. A Heti nézetben is megtalálod.");
     return true;
@@ -404,6 +493,7 @@
     if (!confirm(`Biztosan törlöd a(z) ${labels[period]} terveit (${matching.length} nap)? A törlés előtt töltsd le az adatmentést.`)) return;
     const dates = new Set(matching.map(plan => plan.date)); data.plans = data.plans.filter(plan => !dates.has(plan.date));
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+    window.NapiCloudSync?.deletePlans?.([...dates]).catch(error => console.warn("A felhős törlés később újrapróbálható.", error));
     if (dates.has(workingPlan.date)) loadPlan(workingPlan.date); else renderWeek();
     toast(`${matching.length} napi terv törölve.`); $("#downloadsDialog").close();
   }
@@ -439,6 +529,8 @@
           task.jobs = [{ id: uid(), templateId: template?.id || null, name: recurrence.jobName, steps: deepCopy(template?.steps || []) }];
           task.toolIds = deepCopy(template?.toolIds || []); task.toolIds.forEach(id => { task.toolQuantities[id] = "1"; });
           task.materials = deepCopy(template?.materials || []); plan.tasks.push(task); plan.updatedAt = new Date().toISOString();
+          if (date === workingPlan.date && !workingPlan.tasks.some(item => item.recurrenceId === recurrence.id)) workingPlan.tasks.push(deepCopy(task));
+          pendingCloudPlanDates.add(date);
         }
       }
       date = dateOffset(date, 1); guard += 1;
@@ -447,7 +539,13 @@
   }
   function removeRecurrence(id) {
     data.recurrences = data.recurrences.filter(item => item.id !== id);
-    data.plans.forEach(plan => { plan.tasks = plan.tasks.filter(task => task.recurrenceId !== id); });
+    workingPlan.tasks = workingPlan.tasks.filter(task => task.recurrenceId !== id);
+    data.plans.forEach(plan => {
+      if (!plan.tasks.some(task => task.recurrenceId === id)) return;
+      plan.tasks = plan.tasks.filter(task => task.recurrenceId !== id); plan.updatedAt = new Date().toISOString();
+      if (plan.tasks.length || plan.meeting !== DEFAULT_MEETING || plan.stops !== DEFAULT_STOPS) pendingCloudPlanDates.add(plan.date);
+      else pendingCloudDeletedDates.add(plan.date);
+    });
     data.plans = data.plans.filter(plan => plan.tasks.length || plan.meeting !== DEFAULT_MEETING || plan.stops !== DEFAULT_STOPS);
   }
   function loadPlan(date) {
@@ -773,7 +871,7 @@
       if (job) {
         job.steps = event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
         const template = job.templateId ? byId(data.templates, job.templateId) : null;
-        if (template) template.steps = deepCopy(job.steps);
+        if (template) { template.steps = deepCopy(job.steps); cloudConfigDirty = true; }
       }
     }
     else if (event.target.matches(".notes-input")) task.notes = event.target.value;
@@ -807,6 +905,7 @@
     try {
       await window.NapiCustomerDirectory.signIn(pin);
       if (!(await syncCustomerDirectory())) throw new Error("A belépés sikerült, de az ügyféllista nem tölthető be.");
+      await pullSharedData({ initial: true });
       form.elements.pin.value = ""; $("#customerAuthDialog").close(); toast(`Az ügyféllista csatlakoztatva: ${customerDirectory.length} cím elérhető.`);
     } catch (error) { $("#customerAuthMessage").textContent = readableError(error); }
     finally { button.disabled = false; }
@@ -817,7 +916,7 @@
     if (!name || !address) return;
     const duplicate = data.customers.find(customer => searchKey(customer.name) === searchKey(name) && searchKey(customer.address) === searchKey(address));
     const customer = duplicate || { id: uid(), name, address, active: true, order: data.customers.length };
-    if (!duplicate) data.customers.push(customer);
+    if (!duplicate) { data.customers.push(customer); cloudConfigDirty = true; }
     const task = workingPlan.tasks.find(item => item.id === pendingCustomerTaskId);
     if (task) { task.customerId = customer.id; task.customerName = customer.name; task.address = customer.address; }
     markDirty("Ügyfél hozzáadva • mentés szükséges"); renderTasks(); $("#customerDialog").close();
@@ -866,6 +965,7 @@
       const date = deleteButton.dataset.deleteDate;
       if (!confirm(`Biztosan törlöd a(z) ${formatDate(date)} napi tervet? Előtte tölts le heti, havi vagy éves adatmentést, ha meg szeretnéd őrizni.`)) return;
       data.plans = data.plans.filter(plan => plan.date !== date); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+      window.NapiCloudSync?.deletePlans?.([date]).catch(error => console.warn("A felhős törlés később újrapróbálható.", error));
       if (workingPlan.date === date) loadPlan(date); renderWeek(); toast("A napi terv törölve."); return;
     }
     const button = event.target.closest("[data-open-date]"); if (!button) return; loadPlan(button.dataset.openDate); switchView("day");
@@ -1000,7 +1100,7 @@
     let item = data.recurrences.find(entry => entry.id === editingSettingsId);
     if (item) removeRecurrence(item.id);
     item = { id: item?.id || uid(), customerName, address, templateId: template.id, jobName: template.name, weekday: Number($("#recurringWeekday").value), startDate, endDate };
-    data.recurrences.push(item); materializeRecurrence(item); editingSettingsId = null; markDirty("Ismétlődő tervek elkészítve • mentés szükséges"); renderSettings(); renderWeek();
+    data.recurrences.push(item); materializeRecurrence(item); editingSettingsId = null; cloudConfigDirty = true; markDirty("Ismétlődő tervek elkészítve • mentés szükséges"); renderSettings(); renderWeek();
     toast("Az ismétlődő feladatok bekerültek a naptárba.");
   }
   function settingsListHTML(list, description = () => "", showWorkerColor = false) {
@@ -1047,7 +1147,7 @@
       item.materials = $("#settingMaterials").value.split(/\r?\n/).map(line => line.split("|").map(value => value.trim())).filter(parts => parts.some(Boolean)).map(([source = "", materialName = "", quantity = ""]) => ({ source, name: materialName, quantity })).filter(material => material.name);
       item.steps = $("#settingSteps").value.split(/\r?\n/).map(value => value.trim()).filter(value => value && !searchKey(value).includes("munkanaplo"));
     }
-    if (!existing) list.push(item); editingSettingsId = null; markDirty("Beállítás módosítva • mentés szükséges"); renderSettings(); renderTasks();
+    if (!existing) list.push(item); editingSettingsId = null; cloudConfigDirty = true; markDirty("Beállítás módosítva • mentés szükséges"); renderSettings(); renderTasks();
   }
   $("#settingsButton").addEventListener("click", () => { activeSettingsTab = "workers"; editingSettingsId = null; renderSettings(); $("#settingsDialog").showModal(); });
   $("#settingsDialog").addEventListener("click", async event => {
@@ -1057,7 +1157,7 @@
     const recurringDelete = event.target.closest("[data-recurring-delete]");
     if (recurringDelete) {
       if (!confirm("Törlöd ezt az ismétlődő tervet és az általa előre létrehozott napi feladatokat?")) return;
-      removeRecurrence(recurringDelete.dataset.recurringDelete); editingSettingsId = null; markDirty("Ismétlődő terv törölve • mentés szükséges"); renderSettings(); renderWeek(); return;
+      removeRecurrence(recurringDelete.dataset.recurringDelete); editingSettingsId = null; cloudConfigDirty = true; markDirty("Ismétlődő terv törölve • mentés szükséges"); renderSettings(); renderWeek(); return;
     }
     const directoryAction = event.target.closest("[data-customer-directory]");
     if (directoryAction?.dataset.customerDirectory === "connect") { openCustomerAuth(); return; }
@@ -1066,7 +1166,7 @@
     const colorChoice = event.target.closest("[data-worker-color]"); if (colorChoice) { setWorkerColor(colorChoice.dataset.workerColor); return; }
     if (event.target.closest("[data-setting-submit]")) { saveSettingEditor(); return; }
     const edit = event.target.closest("[data-setting-edit]"); if (edit) { editingSettingsId = edit.dataset.settingEdit; renderSettings(); return; }
-    const toggle = event.target.closest("[data-setting-toggle]"); if (toggle) { const item = settingsType().find(entry => entry.id === toggle.dataset.settingToggle); if (item) { item.active = item.active === false; markDirty("Beállítás módosítva • mentés szükséges"); renderSettings(); renderTasks(); } return; }
+    const toggle = event.target.closest("[data-setting-toggle]"); if (toggle) { const item = settingsType().find(entry => entry.id === toggle.dataset.settingToggle); if (item) { item.active = item.active === false; cloudConfigDirty = true; markDirty("Beállítás módosítva • mentés szükséges"); renderSettings(); renderTasks(); } return; }
     const dataAction = event.target.closest("[data-data-action]"); if (dataAction?.dataset.dataAction === "choose") chooseFolder(); if (dataAction?.dataset.dataAction === "download") downloadData();
   });
   $("#settingsDialog").addEventListener("input", event => {
@@ -1114,9 +1214,10 @@
   window.addEventListener("beforeunload", event => { if (!dirty || allowPageReload) return; event.preventDefault(); event.returnValue = ""; });
   window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; localStorage.removeItem(INSTALLED_KEY); updateInstallButtons(); });
   window.addEventListener("appinstalled", () => { installPrompt = null; localStorage.setItem(INSTALLED_KEY, "true"); updateInstallButtons(); toast("A Napi feladatok app telepítése sikerült."); });
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory(); });
-  window.addEventListener("online", () => { if (window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) { syncCustomerDirectory(); pullSharedData(); } });
+  window.addEventListener("online", () => { if (window.NapiCustomerDirectory?.hasSession?.()) { syncCustomerDirectory(); pullSharedData({ initial: true }); } });
   setInterval(() => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory(); }, 120000);
+  setInterval(() => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) pullSharedData(); }, 15000);
 
   async function initialize() {
     $("#planDate").value = isoToday();
@@ -1146,7 +1247,7 @@
     updateStorageStatus();
     if (!dirty) loadPlan($("#planDate").value); else { renderTasks(); $("#saveState").textContent = "Helyreállított piszkozat • mentés szükséges"; }
     renderWeek();
-    if (navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) await syncCustomerDirectory();
+    if (navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) { await syncCustomerDirectory(); await pullSharedData({ initial: true }); }
     if (appRunsStandalone()) localStorage.setItem(INSTALLED_KEY, "true");
     updateInstallButtons();
     if ("serviceWorker" in navigator) {
