@@ -84,7 +84,7 @@ button, summary { touch-action: manipulation; }
 .empty-state p { margin: 0; color: var(--muted); }
 .task-list { display: grid; gap: 2.4rem; }
 .btn-add-bottom { width: 100%; margin-top: 1rem; min-height: 52px; }
-.task-save-button { width: 100%; margin-top: .55rem; min-height: 52px; }
+.task-save-button { width: 100%; margin-top: .7rem; min-height: 62px; }
 .task-card { position: relative; background: var(--paper); border: 1px solid #9fb0a1; border-left: 7px solid var(--forest); box-shadow: 0 9px 28px rgba(25,57,37,.12); transition: border-color .16s ease, box-shadow .16s ease; }
 .task-card + .task-card::before { content: "Következő napi feladat"; position: absolute; left: -7px; top: -1.72rem; padding: .2rem .65rem; color: #fff; background: var(--orange); font-size: .72rem; font-weight: 850; letter-spacing: .075em; text-transform: uppercase; }
 .task-card.is-active { border-color: var(--orange); border-left-color: var(--orange); box-shadow: 0 0 0 4px rgba(168,74,22,.17), 0 16px 38px rgba(25,57,37,.17); }
@@ -158,6 +158,11 @@ button, summary { touch-action: manipulation; }
 .dock-buttons .btn { min-height: 48px; }
 .btn-save { background: #f7edd7; color: #24361f; border-color: #f7edd7; }
 .btn-save:hover { background: #fff7e8; color: #172517; }
+.task-save-button, .task-save-button:focus { color: #fff; border: 3px solid #7f2f12; background: #b64918; box-shadow: 0 7px 0 #713015, 0 14px 28px rgba(94,42,18,.24); font-size: clamp(1.08rem, 2.2vw, 1.28rem); font-weight: 900; letter-spacing: .025em; }
+.task-save-button:hover { color: #fff; border-color: #66250e; background: #96380f; transform: translateY(-1px); box-shadow: 0 8px 0 #61280f, 0 16px 30px rgba(94,42,18,.28); }
+.task-save-button:active { transform: translateY(4px); box-shadow: 0 3px 0 #61280f, 0 7px 15px rgba(94,42,18,.2); }
+.task-save-button:focus-visible { outline: 4px solid rgba(23,63,43,.3); outline-offset: 3px; }
+.task-save-button span { display: inline-grid; place-items: center; width: 1.7em; height: 1.7em; margin-right: .35rem; color: #81300f; border-radius: 50%; background: #fff; font-size: .82em; }
 .btn-print { color: #fff; background: var(--orange); border-color: var(--orange); }
 .btn-share { color: #fff; background: #6f3ca7; border-color: #6f3ca7; }
 .btn-copy { color: #fff; background: transparent; border-color: rgba(255,255,255,.55); }
