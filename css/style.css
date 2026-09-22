@@ -274,18 +274,17 @@ button, summary { touch-action: manipulation; }
   .settings-row-actions { justify-content: flex-end; }
 }
 
-@page { size: A4 portrait; margin: 12mm 12mm 15mm; }
+@page { size: A4 portrait; margin: 0; }
 @media print {
   body { padding: 0; background: #fff; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .skip-link, .app-header, .planner-shell, .action-dock, dialog, .toast-region { display: none !important; }
   .print-view { display: block; color: #19221b; font: 10.5pt/1.4 Arial, sans-serif; }
-  .print-sheet { position: relative; min-height: 265mm; padding: 8mm 8mm 16mm; overflow: hidden; }
+  .print-sheet { position: relative; min-height: 297mm; padding: 10mm 12mm 12mm; overflow: hidden; }
   .print-sheet::before, .print-sheet::after { content: ""; position: absolute; width: 52mm; height: 52mm; background: url("../assets/botanical.svg") center/contain no-repeat; opacity: .055; pointer-events: none; }
   .print-sheet::before { top: -13mm; right: -10mm; transform: rotate(18deg); }
   .print-sheet::after { bottom: -15mm; left: -12mm; transform: rotate(205deg); }
   .print-header { position: relative; z-index: 1; display: grid; grid-template-columns: 48mm 1fr; align-items: center; gap: 8mm; padding-bottom: 5mm; border-bottom: 2.5px solid var(--forest); }
   .print-header img { width: 44mm; height: 24mm; object-fit: contain; object-position: left center; }
-  .print-brand { color: var(--orange); font-size: 9pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
   .print-header h1 { margin: 1mm 0; color: var(--forest); font: 700 22pt/1.12 Georgia, serif; }
   .print-date { color: #263e2d; font-size: 12pt; font-weight: 800; }
   .print-departure { position: relative; z-index: 1; display: grid; grid-template-columns: .8fr 1.2fr; gap: 4mm; margin: 4mm 0 1mm; padding: 3mm 4mm; border-left: 2mm solid var(--orange); background: #fff5e3; }
@@ -294,10 +293,9 @@ button, summary { touch-action: manipulation; }
   .print-divider::before, .print-divider::after { content: ""; display: inline-block; width: 29%; margin: 0 3mm 2px; border-top: .4mm solid #c67a4d; }
   .print-task { position: relative; z-index: 1; break-inside: avoid; margin-top: 5mm; padding: 0 4mm 3mm; border: .6mm solid #8fa391; border-left: 2.5mm solid var(--forest); background: rgba(255,255,255,.96); }
   .print-task-heading { display: flex; gap: 3mm; align-items: center; margin: 0 -4mm 3mm; padding: 2.2mm 3mm; color: #fff; background: var(--forest); }
+  .print-heading-workers { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 1mm; }
   .print-index { display: inline-grid; place-items: center; min-width: 8mm; min-height: 8mm; color: #fff; background: var(--orange); font: 800 13pt Georgia, serif; }
   .print-task h2 { margin: 0; color: #fff; font: 700 14pt Georgia, serif; }
-  .print-team-line { margin: 0 0 2.5mm; padding: 2mm 0; border-bottom: .35mm solid #c9d3ca; }
-  .print-team-line > strong { margin-right: 2mm; color: var(--orange); text-transform: uppercase; }
   .print-client-row { display: grid; grid-template-columns: .8fr 1.2fr; gap: 3mm; margin: 0 0 2mm; }
   .print-client-row section { padding: 2.2mm 3mm; border-left: 1.2mm solid var(--orange); background: #f4f7f2; }
   .print-client-row small, .print-client-row strong { display: block; }
@@ -311,7 +309,6 @@ button, summary { touch-action: manipulation; }
   .print-job-description h4 { margin: 0 0 .8mm; color: var(--forest); font: 800 9pt Arial, sans-serif; }
   .print-section p, .print-section ul, .print-section ol { margin: 0; padding-left: 5mm; }
   .print-section p { padding-left: 0; }
-  .print-worker { display: inline-block; margin: 0 1.5mm 1mm 0; padding: 1mm 2mm; color: var(--print-worker-text, #fff); background: var(--print-worker-color); border-radius: 2mm; font-size: 9pt; font-weight: 800; }
+  .print-worker { display: inline-block; padding: 1mm 2mm; color: var(--print-worker-text, #fff); background: var(--print-worker-color); border: .3mm solid rgba(255,255,255,.75); border-radius: 2mm; font-size: 9pt; font-weight: 800; }
   .print-footer-note { position: relative; z-index: 1; margin-top: 7mm; padding: 4mm; break-inside: avoid; color: #70291c; border: .6mm solid #b65b2b; background: #fff1dc; text-align: center; font: 800 11pt/1.35 Georgia, serif; }
-  .print-document-footer { position: absolute; z-index: 1; left: 8mm; right: 8mm; bottom: 2mm; padding-top: 2mm; border-top: .3mm solid #8da08f; color: #617065; text-align: center; font-size: 8pt; }
 }

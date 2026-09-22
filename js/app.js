@@ -727,12 +727,14 @@
       lines.push(`Dolgozók: ${workers || "nincs kiválasztva"}`);
       lines.push(`Ügyfél: ${task.customerName || "nincs kiválasztva"}`);
       lines.push(`Cím: ${task.address || "nincs megadva"}`);
-      const jobs = selectedJobNames(task); const descriptions = jobDescriptions(task);
-      if (jobs.length) lines.push(`Feladatok: ${jobs.join(", ")}`);
+      const descriptions = jobDescriptions(task);
       if (tools.length) { lines.push("Eszközök:"); tools.forEach(item => lines.push(`- ${item}`)); }
       const materials = task.materials.filter(item => item.name);
       if (materials.length) { lines.push("Anyagok:"); materials.forEach(item => lines.push(`- ${item.name}${item.quantity ? ` – ${item.quantity}` : ""}${item.unit ? ` ${item.unit}` : ""}`)); }
-      descriptions.filter(item => item.steps.length).forEach(item => { lines.push(`${item.name} – feladatleírás:`); item.steps.forEach(step => lines.push(`- ${step}`)); });
+      if (descriptions.length) {
+        lines.push("Feladatok:");
+        descriptions.forEach(item => { lines.push(`- ${item.name}`); item.steps.forEach(step => lines.push(`  • ${step}`)); });
+      }
       if (task.notes) lines.push(`Megjegyzés: ${task.notes}`); lines.push("");
     });
     lines.push(FINAL_NOTE); return lines.join("\n");
@@ -743,12 +745,12 @@
       const vehicles = task.vehicleIds.map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
       const tools = [...task.toolIds.map(id => byId(data.tools, id)?.name).filter(Boolean), ...String(task.extraTools || "").split(",").map(item => item.trim()).filter(Boolean)];
       const materials = task.materials.filter(item => item.name);
-      const jobs = selectedJobNames(task); const descriptions = jobDescriptions(task);
-      const workflow = descriptions.filter(item => item.steps.length).map(item => `<div class="print-job-description"><h4>${escapeHTML(item.name)}</h4><ul>${item.steps.map(step => `<li>${escapeHTML(step)}</li>`).join("")}</ul></div>`).join("");
-      return `${index ? `<div class="print-divider">Következő napi feladat</div>` : ""}<article class="print-task"><div class="print-task-heading"><span class="print-index">${index + 1}.</span><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2></div><div class="print-team-line"><strong>Dolgozók:</strong> ${workers || `<span>Nincs kiválasztva</span>`}</div><div class="print-client-row"><section><small>Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs.length ? `<section class="print-section wide"><h3>Feladatok</h3><p><strong>${jobs.map(escapeHTML).join(" • ")}</strong></p></section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${escapeHTML(item.name)}${item.quantity ? ` – ${escapeHTML(item.quantity)}` : ""}${item.unit ? ` ${escapeHTML(item.unit)}` : ""}</li>`).join("")}</ul></section>` : ""}${workflow ? `<section class="print-section wide"><h3>Feladatleírások</h3>${workflow}</section>` : ""}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}</div></article>`;
+      const descriptions = jobDescriptions(task);
+      const jobs = descriptions.map(item => `<div class="print-job-description"><h4>${escapeHTML(item.name)}</h4>${item.steps.length ? `<ul>${item.steps.map(step => `<li>${escapeHTML(step)}</li>`).join("")}</ul>` : ""}</div>`).join("");
+      return `${index ? `<div class="print-divider">Következő napi feladat</div>` : ""}<article class="print-task"><div class="print-task-heading"><span class="print-index">${index + 1}.</span><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2><div class="print-heading-workers">${workers || `<span>Nincs dolgozó kiválasztva</span>`}</div></div><div class="print-client-row"><section><small>Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${escapeHTML(item.name)}${item.quantity ? ` – ${escapeHTML(item.quantity)}` : ""}${item.unit ? ` ${escapeHTML(item.unit)}` : ""}</li>`).join("")}</ul></section>` : ""}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}</div></article>`;
     }).join("");
     const departure = workingPlan.meeting || workingPlan.stops ? `<div class="print-departure">${workingPlan.meeting ? `<p><strong>Találkozó:</strong> ${escapeHTML(workingPlan.meeting)}</p>` : ""}${workingPlan.stops ? `<p><strong>Megálló:</strong> ${escapeHTML(workingPlan.stops)}</p>` : ""}</div>` : "";
-    $("#printView").innerHTML = `<div class="print-sheet"><header class="print-header"><img src="assets/diszkertek-logo.png" alt="Díszkertek"><div><div class="print-brand">Díszkertek – Minden, ami kerttel kapcsolatos</div><h1>Napi feladatok</h1><div class="print-date">${escapeHTML(formatDate(workingPlan.date))}</div></div></header>${departure}${tasks || `<p>Nincs feladat erre a napra.</p>`}<div class="print-footer-note">${FINAL_NOTE}</div><footer class="print-document-footer">Díszkertek • Napi feladatok</footer></div>`;
+    $("#printView").innerHTML = `<div class="print-sheet"><header class="print-header"><img src="assets/diszkertek-logo.png" alt="Díszkertek"><div><h1>Napi feladatok</h1><div class="print-date">${escapeHTML(formatDate(workingPlan.date))}</div></div></header>${departure}${tasks || `<p>Nincs feladat erre a napra.</p>`}<div class="print-footer-note">${FINAL_NOTE}</div></div>`;
   }
   $("#printButton").addEventListener("click", () => { renderPrintView(); window.print(); });
   async function copyText() {
