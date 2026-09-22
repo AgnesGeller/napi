@@ -2,7 +2,7 @@
   "name": "Díszkertek – Napi feladatok",
   "short_name": "Napi feladatok",
   "lang": "hu",
-  "id": "./",
+  "id": "/napi/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -44,7 +44,7 @@
       </div>
       <div class="header-actions">
         <button class="btn btn-cream" id="folderButton" type="button">📁 Mappa kiválasztása</button>
-        <button class="btn btn-install-header" id="quickInstallButton" type="button">📱 App telepítése</button>
+        <button class="btn btn-install-header" id="quickInstallButton" type="button" hidden>📱 App telepítése</button>
         <button class="btn btn-light-outline" id="downloadButton" type="button">⬇ Adatmentések</button>
         <button class="btn btn-light-outline" id="refreshButton" type="button" title="A legújabb appverzió betöltése">⟳ Frissítés</button>
         <button class="btn btn-light-outline" id="settingsButton" type="button">＋ Új dolgozó</button>
@@ -183,7 +183,7 @@
     <form method="dialog" class="dialog-frame">
       <header class="dialog-header"><div><p class="section-kicker">Telefon, tablet és számítógép</p><h2>Telepítés és letöltések</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
       <div class="dialog-body">
-        <button class="download-option install-option" id="installAppButton" type="button"><strong>📱 App telepítése erre az eszközre</strong><span id="installAppHint">Telefonra, tabletre vagy számítógépre</span></button>
+        <button class="download-option install-option" id="installAppButton" type="button" hidden><strong>📱 App telepítése erre az eszközre</strong><span id="installAppHint">A telepítés készen áll</span></button>
         <p class="download-reference" id="downloadReference"></p>
         <div class="download-options">
           <button class="download-option" type="button" data-export-period="week"><strong>Heti adatfájl</strong><span>A kiválasztott hét tervei és törzsadatai</span></button>
@@ -193,14 +193,6 @@
           <a class="download-option app-package" href="downloads/diszkertek-napi-app.zip" download><strong>Számítógépes offline ZIP</strong><span>Technikai csomag számítógéphez – telefonos telepítéshez a fenti gombot használd</span></a>
         </div>
       </div>
-    </form>
-  </dialog>
-
-  <dialog id="installHelpDialog" class="app-dialog compact-dialog">
-    <form method="dialog" class="dialog-frame">
-      <header class="dialog-header"><div><p class="section-kicker">Mobilalkalmazás</p><h2>App telepítése</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
-      <div class="dialog-body install-help" id="installHelpContent"></div>
-      <footer class="dialog-footer"><button class="btn btn-save" value="default">Rendben</button></footer>
     </form>
   </dialog>
 
@@ -278,6 +270,6 @@
 
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260922e"></script>
-  <script src="js/app.js?v=20260922h"></script>
+  <script src="js/app.js?v=20260922i"></script>
 </body>
 </html>

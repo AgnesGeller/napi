@@ -726,30 +726,17 @@
   function appRunsStandalone() { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; }
   function updateInstallButtons() {
     const installed = appRunsStandalone() || localStorage.getItem(INSTALLED_KEY) === "true";
-    $("#quickInstallButton").hidden = installed;
-    $("#installAppButton").hidden = installed;
-  }
-  function mobilePlatform() {
-    const agent = navigator.userAgent || "";
-    if (/iphone|ipad|ipod/i.test(agent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "ios";
-    if (/android/i.test(agent)) return "android";
-    return "desktop";
-  }
-  function showInstallHelp() {
-    const platform = mobilePlatform();
-    const content = platform === "ios"
-      ? `<p class="install-help-intro">iPhone vagy iPad készüléken a Safari böngészőből telepíthető:</p><ol class="install-steps"><li>Nyisd meg ezt az oldalt <strong>Safariban</strong>.</li><li>Koppints alul a <strong>Megosztás</strong> ikonra.</li><li>Válaszd a <strong>Főképernyőhöz adás</strong> lehetőséget.</li><li>Koppints a <strong>Hozzáadás</strong> gombra.</li></ol>`
-      : platform === "android"
-        ? `<p class="install-help-intro">Android telefonon a Chrome böngészőből telepíthető:</p><ol class="install-steps"><li>Nyisd meg ezt az oldalt <strong>Chrome-ban</strong>.</li><li>Koppints a jobb felső sarokban a <strong>⋮ menüre</strong>.</li><li>Válaszd az <strong>Alkalmazás telepítése</strong> vagy a <strong>Hozzáadás a főképernyőhöz</strong> lehetőséget.</li><li>Erősítsd meg a telepítést.</li></ol>`
-        : `<p class="install-help-intro">A böngésző menüjéből telepítheted az alkalmazást:</p><ol class="install-steps"><li>Nyisd meg a böngésző főmenüjét.</li><li>Válaszd az <strong>Alkalmazás telepítése</strong> lehetőséget.</li><li>Erősítsd meg a telepítést.</li></ol>`;
-    $("#installHelpContent").innerHTML = `${content}<p class="install-help-note">A ZIP-fájlt nem kell telefonon megnyitni. A telepített app a főképernyőről indul és internet nélkül is megnyitható.</p>`;
-    $("#downloadsDialog").close(); $("#installHelpDialog").showModal();
+    const available = Boolean(installPrompt);
+    $("#quickInstallButton").hidden = installed || !available;
+    $("#installAppButton").hidden = installed || !available;
   }
   async function installApplication() {
     if (appRunsStandalone()) { toast("Az alkalmazás már telepítve van ezen az eszközön."); return; }
-    if (!installPrompt) { showInstallHelp(); return; }
+    if (!installPrompt) { updateInstallButtons(); return; }
+    if ($("#downloadsDialog").open) $("#downloadsDialog").close();
     await installPrompt.prompt(); const choice = await installPrompt.userChoice; installPrompt = null;
-    if (choice.outcome !== "accepted") showInstallHelp();
+    if (choice.outcome === "accepted") localStorage.setItem(INSTALLED_KEY, "true");
+    updateInstallButtons();
   }
   $("#installAppButton").addEventListener("click", installApplication);
   $("#quickInstallButton").addEventListener("click", installApplication);
@@ -759,7 +746,7 @@
   ["pointerup", "pointercancel"].forEach(type => document.addEventListener(type, () => document.querySelectorAll("[data-tooltip-visible]").forEach(button => button.removeAttribute("data-tooltip-visible"))));
   document.addEventListener("click", event => event.target.closest("[data-tooltip]")?.removeAttribute("data-tooltip-visible"));
   window.addEventListener("beforeunload", event => { if (!dirty || allowPageReload) return; event.preventDefault(); event.returnValue = ""; });
-  window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; localStorage.removeItem(INSTALLED_KEY); updateInstallButtons(); $("#installAppHint").textContent = "A telepítés készen áll – koppints ide"; });
+  window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; localStorage.removeItem(INSTALLED_KEY); updateInstallButtons(); });
   window.addEventListener("appinstalled", () => { installPrompt = null; localStorage.setItem(INSTALLED_KEY, "true"); updateInstallButtons(); toast("A Napi feladatok app telepítése sikerült."); });
   document.addEventListener("visibilitychange", () => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory(); });
   window.addEventListener("online", () => { if (window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory(); });

@@ -203,11 +203,6 @@ button, summary { touch-action: manipulation; }
 .install-option { margin-bottom: .9rem; color: #fff; border-color: var(--forest); border-left-color: var(--orange); background: var(--forest); }
 .install-option:hover, .install-option:focus-visible { color: #fff; background: #0e3020; }
 .install-option span { color: #e6efe8; }
-.install-help-intro { margin: 0 0 1rem; color: #314638; }
-.install-steps { display: grid; gap: .65rem; margin: 0; padding: 0; list-style: none; counter-reset: install-step; }
-.install-steps li { position: relative; min-height: 44px; padding: .65rem .75rem .65rem 3.2rem; border: 1px solid #ccd6cd; background: #fff; }
-.install-steps li::before { counter-increment: install-step; content: counter(install-step); position: absolute; left: .75rem; top: .55rem; width: 1.8rem; height: 1.8rem; display: grid; place-items: center; color: #fff; border-radius: 50%; background: var(--orange); font-weight: 850; }
-.install-help-note { margin: .9rem 0 0; padding: .65rem .75rem; color: #5c3b1f; border-left: 4px solid var(--orange); background: #fff5e3; font-size: .9rem; }
 .history-item { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: #fff; }
 .history-item:hover { background: var(--leaf-light); }
 .history-item b, .history-item span { display: block; }
