@@ -416,6 +416,7 @@
   function renderTask(task, index) {
     const card = $("#taskTemplate").content.firstElementChild.cloneNode(true); card.dataset.taskId = task.id;
     card.classList.toggle("is-active", task.id === activeTaskId); card.querySelector(".active-badge").hidden = task.id !== activeTaskId;
+    applyTaskVehicleTheme(card, task);
     card.querySelector(".task-number").textContent = `${index + 1}.`;
     updateTaskSummary(card, task, index);
     card.querySelector(".move-up").disabled = index === 0; card.querySelector(".move-down").disabled = index === workingPlan.tasks.length - 1;
@@ -424,7 +425,10 @@
     const workerContainer = card.querySelector(".worker-chips");
     activeSorted(data.workers).forEach(worker => workerContainer.append(makeChip(worker.name, task.workerIds.includes(worker.id), "worker-chip", { group: "worker", id: worker.id, style: `--worker-color:${worker.color};--chip-text:${bestTextColor(worker.color)}` })));
     const vehicleContainer = card.querySelector(".vehicle-chips");
-    activeSorted(data.vehicles).forEach(vehicle => vehicleContainer.append(makeChip(vehicle.name, task.vehicleIds.includes(vehicle.id), "", { group: "vehicle", id: vehicle.id })));
+    activeSorted(data.vehicles).forEach(vehicle => {
+      const theme = vehicleTheme(vehicle);
+      vehicleContainer.append(makeChip(vehicle.name, task.vehicleIds.includes(vehicle.id), "vehicle-chip", { group: "vehicle", id: vehicle.id, style: `--vehicle-color:${theme.background};--vehicle-accent:${theme.accent};--vehicle-chip-text:${theme.text}` }));
+    });
     const templateContainer = card.querySelector(".template-chips");
     activeSorted(data.templates).forEach(template => templateContainer.append(makeChip(template.name, taskJobs(task).some(job => job.templateId === template.id), "", { templateId: template.id })));
     const jobCount = taskJobs(task).length; card.querySelector(".job-count").textContent = jobCount ? `${jobCount} kiválasztva` : "Nincs kiválasztva";
@@ -443,6 +447,25 @@
     return (r * 299 + g * 587 + b * 114) / 1000 > 155 ? "#172019" : "#fff";
   }
   function validWorkerColor(value) { return /^#[0-9a-f]{6}$/i.test(String(value || "")) ? String(value).toLowerCase() : "#2f6944"; }
+  function vehicleTheme(vehicle) {
+    const themes = [
+      { background: "#fff0ad", header: "#ffe27a", border: "#c18a00", accent: "#8a6200", text: "#fff" },
+      { background: "#ffdeda", header: "#ffc2bd", border: "#c84b43", accent: "#a43731", text: "#fff" },
+      { background: "#dcefff", header: "#bce1fa", border: "#3c82a8", accent: "#286a8b", text: "#fff" },
+      { background: "#ebddff", header: "#d9c0f7", border: "#805eaa", accent: "#68488c", text: "#fff" }
+    ];
+    const known = { platos: 0, dobozos: 1, merci: 2, opel: 3 };
+    const index = known[searchKey(vehicle?.name)] ?? Math.max(0, data.vehicles.findIndex(item => item.id === vehicle?.id)) % themes.length;
+    return themes[index];
+  }
+  function applyTaskVehicleTheme(card, task) {
+    const vehicle = (task.vehicleIds || []).map(id => byId(data.vehicles, id)).find(Boolean);
+    const theme = vehicle ? vehicleTheme(vehicle) : { background: "#edf2eb", header: "#e2e9df", border: "#7b8e7e" };
+    card.style.setProperty("--task-color", theme.background);
+    card.style.setProperty("--task-header-color", theme.header);
+    card.style.setProperty("--task-border-color", theme.border);
+    card.classList.toggle("has-vehicle", Boolean(vehicle));
+  }
   function renderTasks() {
     const list = $("#taskList");
     const hadCards = Boolean(list.querySelector(".task-card"));
@@ -596,7 +619,7 @@
     const chip = event.target.closest(".choice-chip");
     if (chip?.dataset.group) {
       const target = chip.dataset.group === "worker" ? task.workerIds : chip.dataset.group === "vehicle" ? task.vehicleIds : task.toolIds;
-      toggleInList(target, chip.dataset.id); chip.setAttribute("aria-pressed", String(target.includes(chip.dataset.id))); updateTaskSummary(card, task, index); markDirty(); return;
+      toggleInList(target, chip.dataset.id); chip.setAttribute("aria-pressed", String(target.includes(chip.dataset.id))); updateTaskSummary(card, task, index); if (chip.dataset.group === "vehicle") applyTaskVehicleTheme(card, task); markDirty(); return;
     }
     if (chip?.dataset.templateId) { const template = byId(data.templates, chip.dataset.templateId); if (template) toggleTemplate(task, template); return; }
     if (chip?.dataset.materialId) {
@@ -758,16 +781,28 @@
       const tasks = workingPlan.tasks.map((task, index) => {
       const workers = task.workerIds.map(id => byId(data.workers, id)).filter(Boolean).map(worker => `<span class="print-worker" style="--print-worker-color:${escapeHTML(worker.color)};--print-worker-text:${bestTextColor(worker.color)}">${escapeHTML(worker.name)}</span>`).join("");
       const vehicles = task.vehicleIds.map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
+      const printVehicle = (task.vehicleIds || []).map(id => byId(data.vehicles, id)).find(Boolean);
+      const printTheme = printVehicle ? vehicleTheme(printVehicle) : { background: "#edf2eb", border: "#7b8e7e", accent: "#173f2b" };
       const tools = [...task.toolIds.map(id => byId(data.tools, id)?.name).filter(Boolean), ...String(task.extraTools || "").split(",").map(item => item.trim()).filter(Boolean)];
       const materials = task.materials.filter(item => item.name);
       const descriptions = jobDescriptions(task);
       const jobs = descriptions.map(item => `<div class="print-job-description"><h4>${escapeHTML(item.name)}</h4>${item.steps.length ? `<ul>${item.steps.map(step => `<li>${escapeHTML(step)}</li>`).join("")}</ul>` : ""}</div>`).join("");
-      return `${index ? `<div class="print-divider">Következő napi feladat</div>` : ""}<article class="print-task"><div class="print-task-heading"><span class="print-index">${index + 1}.</span><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2><div class="print-heading-workers">${workers || `<span>Nincs dolgozó kiválasztva</span>`}</div></div><div class="print-client-row"><section><small>Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${escapeHTML(item.name)}${item.quantity ? ` – ${escapeHTML(item.quantity)}` : ""}${item.unit ? ` ${escapeHTML(item.unit)}` : ""}</li>`).join("")}</ul></section>` : ""}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}</div></article>`;
+      return `${index ? `<div class="print-divider">Következő napi feladat</div>` : ""}<article class="print-task" style="--print-task-color:${printTheme.background};--print-task-border:${printTheme.border};--print-task-accent:${printTheme.accent}"><div class="print-task-heading"><span class="print-index">${index + 1}.</span><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2><div class="print-heading-workers">${workers || `<span>Nincs dolgozó kiválasztva</span>`}</div></div><div class="print-client-row"><section><small>Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${escapeHTML(item.name)}${item.quantity ? ` – ${escapeHTML(item.quantity)}` : ""}${item.unit ? ` ${escapeHTML(item.unit)}` : ""}</li>`).join("")}</ul></section>` : ""}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}</div></article>`;
     }).join("");
     const departure = workingPlan.meeting || workingPlan.stops ? `<div class="print-departure">${workingPlan.meeting ? `<p><strong>Találkozó:</strong> ${escapeHTML(workingPlan.meeting)}</p>` : ""}${workingPlan.stops ? `<p><strong>Megálló:</strong> ${escapeHTML(workingPlan.stops)}</p>` : ""}</div>` : "";
-    $("#printView").innerHTML = `<div class="print-sheet"><header class="print-header"><img src="assets/diszkertek-logo.png" alt="Díszkertek"><div><h1>Napi feladatok</h1><div class="print-date">${escapeHTML(formatDate(workingPlan.date))}</div></div></header>${departure}${tasks || `<p>Nincs feladat erre a napra.</p>`}<div class="print-footer-note">${FINAL_NOTE}</div></div>`;
+    const logoUrl = new URL("assets/diszkertek-logo.png", document.baseURI).href;
+    $("#printView").innerHTML = `<div class="print-sheet"><header class="print-header"><img src="${escapeHTML(logoUrl)}" alt="Díszkertek logó" width="416" height="512"><div><h1>Napi feladatok</h1><div class="print-date">${escapeHTML(formatDate(workingPlan.date))}</div></div></header>${departure}${tasks || `<p>Nincs feladat erre a napra.</p>`}<div class="print-footer-note">${FINAL_NOTE}</div></div>`;
   }
-  $("#printButton").addEventListener("click", () => { renderPrintView(); window.print(); });
+  $("#printButton").addEventListener("click", async () => {
+    renderPrintView();
+    const logo = $("#printView .print-header img");
+    if (logo && (!logo.complete || !logo.naturalWidth)) {
+      await new Promise(resolve => { logo.addEventListener("load", resolve, { once: true }); logo.addEventListener("error", resolve, { once: true }); });
+    }
+    try { await logo?.decode?.(); } catch (_) { /* A betöltött képet ettől még ki lehet nyomtatni. */ }
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    window.print();
+  });
   async function copyText() {
     const text = planText();
     try { await navigator.clipboard.writeText(text); toast("A napi terv szövege a vágólapra került."); }
