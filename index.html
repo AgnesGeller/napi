@@ -29,7 +29,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/app-icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260921i">
+  <link rel="stylesheet" href="css/style.css?v=20260922e">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -47,7 +47,7 @@
         <button class="btn btn-cream" id="folderButton" type="button">📁 Mappa kiválasztása</button>
         <button class="btn btn-install-header" id="quickInstallButton" type="button">📱 App telepítése</button>
         <button class="btn btn-light-outline" id="downloadButton" type="button">⬇ Adatmentések</button>
-        <button class="btn btn-light-outline" id="refreshButton" type="button" disabled title="Előbb válassz mentési mappát">⟳ Adatok frissítése</button>
+        <button class="btn btn-light-outline" id="refreshButton" type="button" title="A legújabb appverzió betöltése">⟳ Frissítés</button>
         <button class="btn btn-light-outline" id="settingsButton" type="button">⚙ Beállítások</button>
       </div>
     </div>
@@ -154,6 +154,19 @@
     </form>
   </dialog>
 
+  <dialog id="customerAuthDialog" class="app-dialog compact-dialog">
+    <form method="dialog" id="customerAuthForm" class="dialog-frame">
+      <header class="dialog-header"><div><p class="section-kicker">Közös ügyféllista</p><h2>Ügyféllista csatlakoztatása</h2></div><button class="icon-button" type="button" data-close-customer-auth aria-label="Bezárás">×</button></header>
+      <div class="dialog-body">
+        <p class="directory-intro">A Napi feladatok a Munkalap jóváhagyott ügyfeleit és címeit csak olvassa. A napi tervek továbbra is a helyi adatfájlban maradnak.</p>
+        <p><strong>Felhasználó: Tamás</strong></p>
+        <label>PIN-kód<input class="form-control" name="pin" type="password" inputmode="numeric" autocomplete="current-password" required></label>
+        <p class="directory-message" id="customerAuthMessage" role="status"></p>
+      </div>
+      <footer class="dialog-footer"><button class="btn btn-save" value="default">Csatlakoztatás</button><button class="btn btn-secondary" type="button" data-close-customer-auth>Mégse</button></footer>
+    </form>
+  </dialog>
+
   <dialog id="historyDialog" class="app-dialog compact-dialog">
     <form method="dialog" class="dialog-frame">
       <header class="dialog-header"><div><p class="section-kicker">Másolás</p><h2>Korábbi napi terv</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
@@ -212,10 +225,10 @@
           </div>
         </div>
         <div class="task-order-actions">
-          <button type="button" class="icon-button move-up" aria-label="Feladat mozgatása felfelé">↑</button>
-          <button type="button" class="icon-button move-down" aria-label="Feladat mozgatása lefelé">↓</button>
-          <button type="button" class="icon-button duplicate-task" aria-label="Feladat duplikálása">⧉</button>
-          <button type="button" class="icon-button danger remove-task" aria-label="Feladat eltávolítása">×</button>
+          <button type="button" class="icon-button move-up" aria-label="Feladat mozgatása felfelé" data-tooltip="Mozgatás felfelé">↑</button>
+          <button type="button" class="icon-button move-down" aria-label="Feladat mozgatása lefelé" data-tooltip="Mozgatás lefelé">↓</button>
+          <button type="button" class="icon-button duplicate-task" aria-label="Feladat másolása" data-tooltip="Feladat másolása">⧉</button>
+          <button type="button" class="icon-button danger remove-task" aria-label="Feladat törlése" data-tooltip="Feladat törlése">×</button>
         </div>
       </header>
       <div class="task-fields">
@@ -269,6 +282,7 @@
   <section id="printView" class="print-view" aria-hidden="true"></section>
 
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
-  <script src="js/app.js?v=20260921i"></script>
+  <script src="js/customer-directory.js?v=20260922e"></script>
+  <script src="js/app.js?v=20260922e"></script>
 </body>
 </html>

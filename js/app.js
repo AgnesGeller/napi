@@ -5,6 +5,7 @@
   const RECOVERY_KEY = "diszkertek-napi-helyreallitas-v1";
   const DB_NAME = "diszkertek-napi-mappakapcsolat";
   const DB_STORE = "handles";
+  const INSTALLED_KEY = "diszkertek-napi-installed-v1";
   const FINAL_NOTE = "A nap végén mindenki vegye ki a szemetét az autóból és hagyjon rendet maga után!";
   const DEFAULT_MEETING = "telephely, 6:30";
   const DEFAULT_STOPS = "Vizeshűtő, Lidl, Dohánybolt";
@@ -85,10 +86,16 @@
   let pendingCustomerTaskId = null;
   let weekAnchor = isoToday();
   let installPrompt = null;
+  let allowPageReload = false;
   let activeTaskId = null;
+  const cachedCustomerDirectory = window.NapiCustomerDirectory?.cached?.() || { directory: [], savedAt: null };
+  let customerDirectory = cachedCustomerDirectory.directory;
+  let customerDirectoryState = customerDirectory.length ? "cache" : "disconnected";
+  let customerDirectoryLastSync = cachedCustomerDirectory.savedAt;
+  let customerDirectorySyncing = false;
 
   function blankTask() {
-    return { id: uid(), customerId: null, customerName: "", address: "", workerIds: [], vehicleIds: [], templateId: null, title: "", toolIds: [], extraTools: "", materials: [], steps: [], notes: "" };
+    return { id: uid(), customerId: null, locationId: null, customerName: "", address: "", workerIds: [], vehicleIds: [], templateId: null, title: "", toolIds: [], extraTools: "", materials: [], steps: [], notes: "" };
   }
   function blankPlan(date) { return { id: uid(), date, meeting: DEFAULT_MEETING, stops: DEFAULT_STOPS, tasks: [] }; }
   function normalizeData(candidate) {
@@ -107,7 +114,7 @@
         ...plan,
         meeting: typeof plan.meeting === "string" ? plan.meeting : DEFAULT_MEETING,
         stops: typeof plan.stops === "string" ? plan.stops : DEFAULT_STOPS,
-        tasks: Array.isArray(plan.tasks) ? plan.tasks : []
+        tasks: Array.isArray(plan.tasks) ? plan.tasks.map(task => ({ ...task, locationId: task.locationId || null })) : []
       })) : []
     };
   }
@@ -224,28 +231,30 @@
     }
   }
   function updateStorageStatus() {
-    const strip = $("#storageStrip"); const refreshButton = $("#refreshButton");
+    const strip = $("#storageStrip");
     if (directoryHandle) {
       strip.classList.add("ready");
       $("#storageText").textContent = `Mentési mappa: ${directoryHandle.name} • ${DATA_FILE_NAME}`;
       $("#folderButton").textContent = "📁 Mappa cseréje";
-      refreshButton.disabled = false; refreshButton.title = "Adatok újratöltése a csatlakoztatott mappából";
     } else {
       strip.classList.remove("ready");
       $("#storageText").textContent = "Válassz mentési mappát. Addig a terv biztonsági piszkozatként megmarad ezen az eszközön.";
-      refreshButton.disabled = true; refreshButton.title = "Előbb válassz mentési mappát";
     }
   }
-  async function refreshFromFile() {
-    if (!directoryHandle) { toast("Nincs csatlakoztatott mappa. Használd a Mappa kiválasztása gombot.", true); return; }
-    if (!(await hasWritePermission(directoryHandle, false))) { toast("A mappa már nem érhető el. Csatlakoztasd újra a Mappa kiválasztása gombbal.", true); return; }
-    if (dirty && !confirm("A frissítés elveti a még nem mentett módosításokat. Folytatod?")) return;
+  async function refreshApplication() {
+    const button = $("#refreshButton");
+    button.disabled = true; button.textContent = "⟳ Frissítés…";
     try {
-      const loaded = await readDataFile(directoryHandle);
-      if (loaded) data = loaded;
-      loadPlan($("#planDate").value || isoToday());
-      toast("Az adatok frissültek.");
-    } catch (error) { toast(`A frissítés nem sikerült: ${readableError(error)}`, true); }
+      allowPageReload = true;
+      if ("serviceWorker" in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) await registration.update();
+      }
+      window.location.reload();
+    } catch (_) {
+      allowPageReload = true;
+      window.location.reload();
+    }
   }
   function downloadData() {
     upsertWorkingPlan();
@@ -354,6 +363,7 @@
     workingPlan.tasks.forEach((task, index) => list.append(renderTask(task, index)));
     $("#emptyState").hidden = workingPlan.tasks.length > 0;
     $("#addTaskBottomButton").hidden = workingPlan.tasks.length === 0;
+    updateCustomerDirectoryButtons();
   }
   function findTaskFromElement(element) { return workingPlan.tasks.find(task => task.id === element.closest(".task-card")?.dataset.taskId); }
   function setActiveTask(card, task) {
@@ -382,10 +392,84 @@
     task.templateId = template.id; task.title = template.name; task.toolIds = deepCopy(template.toolIds || []); task.materials = deepCopy(template.materials || []); task.steps = deepCopy(template.steps || []);
     markDirty("A sablon beillesztve • mentés szükséges"); renderTasks();
   }
+  function updateCustomerDirectoryButtons() {
+    document.querySelectorAll(".add-customer").forEach(button => {
+      button.textContent = customerDirectoryState === "ready" ? "↻ Ügyféllista frissítése" : "🔒 Ügyféllista csatlakoztatása";
+    });
+  }
+  function openCustomerAuth() {
+    const api = window.NapiCustomerDirectory;
+    if (!api) { toast("Az ügyféllista-kapcsolat nem tölthető be.", true); return; }
+    const form = $("#customerAuthForm");
+    form.elements.pin.value = "";
+    $("#customerAuthMessage").textContent = "";
+    $("#customerAuthDialog").showModal();
+    setTimeout(() => form.elements.pin.focus(), 0);
+  }
+  function customerDirectoryEntryForTask(task) {
+    if (task.locationId) return customerDirectory.find(item => item.locationId === task.locationId) || null;
+    if (!task.customerId) return null;
+    const matches = customerDirectory.filter(item => item.customerId === task.customerId);
+    return matches.find(item => searchKey(item.address) === searchKey(task.address)) || (matches.length === 1 ? matches[0] : null);
+  }
+  function reconcileCustomerSnapshots() {
+    let changed = false;
+    const updatePlan = plan => (plan.tasks || []).forEach(task => {
+      const current = customerDirectoryEntryForTask(task);
+      if (!current) return;
+      if (task.customerName !== current.name || task.address !== current.address || task.locationId !== current.locationId) {
+        task.customerName = current.name; task.address = current.address; task.locationId = current.locationId; changed = true;
+      }
+    });
+    data.plans.forEach(updatePlan);
+    updatePlan(workingPlan);
+    return changed;
+  }
+  async function syncCustomerDirectory({ notify = false } = {}) {
+    const api = window.NapiCustomerDirectory;
+    if (!api || customerDirectorySyncing) return false;
+    if (!api.hasSession()) {
+      customerDirectoryState = customerDirectory.length ? "cache" : "disconnected";
+      updateCustomerDirectoryButtons();
+      if (notify) openCustomerAuth();
+      return false;
+    }
+    customerDirectorySyncing = true;
+    customerDirectoryState = "loading";
+    updateCustomerDirectoryButtons();
+    try {
+      customerDirectory = await api.list();
+      customerDirectoryState = "ready";
+      customerDirectoryLastSync = new Date().toISOString();
+      const snapshotsChanged = reconcileCustomerSnapshots();
+      if (snapshotsChanged) markDirty("Az ügyféladatok frissültek • mentés szükséges");
+      renderTasks();
+      if (activeSettingsTab === "customers" && $("#settingsDialog").open) renderSettings();
+      if (notify) toast(`Az ügyféllista frissült: ${customerDirectory.length} cím elérhető.`);
+      return true;
+    } catch (error) {
+      customerDirectoryState = customerDirectory.length ? "cache" : "error";
+      updateCustomerDirectoryButtons();
+      if (notify) toast(readableError(error), true);
+      return false;
+    } finally { customerDirectorySyncing = false; }
+  }
+  function customerDirectorySettingsHTML() {
+    const connected = window.NapiCustomerDirectory?.hasSession?.();
+    const lastSync = customerDirectoryLastSync ? new Date(customerDirectoryLastSync).toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" }) : "még nem történt";
+    const status = customerDirectoryState === "ready" ? "Csatlakoztatva" : customerDirectoryState === "loading" ? "Frissítés folyamatban…" : customerDirectory.length ? "Offline lista" : "Nincs csatlakoztatva";
+    const grouped = new Map();
+    customerDirectory.forEach(item => {
+      if (!grouped.has(item.customerId)) grouped.set(item.customerId, { name: item.name, addresses: [] });
+      if (item.address) grouped.get(item.customerId).addresses.push(item.address);
+    });
+    const rows = [...grouped.values()].sort((a, b) => a.name.localeCompare(b.name, "hu")).map(customer => `<div class="settings-row"><div><strong>${escapeHTML(customer.name)}</strong><p>${escapeHTML(customer.addresses.join(" · ") || "Nincs megadott cím")}</p></div></div>`).join("");
+    return `<div class="customer-directory-panel"><div><p class="directory-state"><span class="directory-dot ${customerDirectoryState === "ready" ? "ready" : ""}"></span><strong>${status}</strong> · utolsó frissítés: ${escapeHTML(lastSync)}</p><p>A lista a Munkalap jóváhagyott ügyfeleit és címeit mutatja. Új ügyfelet és módosítást a Munkalapban lehet rögzíteni.</p></div><div class="fallback-actions"><button class="btn btn-outline-green" type="button" data-customer-directory="${connected ? "refresh" : "connect"}">${connected ? "Lista frissítése" : "Csatlakoztatás"}</button>${connected ? `<button class="btn btn-soft" type="button" data-customer-directory="disconnect">Leválasztás</button>` : ""}</div></div><div class="settings-list customer-directory-list">${rows || `<p>Nincs megjeleníthető ügyfél. Csatlakoztasd az ügyféllistát.</p>`}</div>`;
+  }
   function customerMatches(query, showAll = false) {
     const needle = searchKey(query);
     if (!showAll && needle.length < 2) return [];
-    return activeSorted(data.customers).filter(customer => !needle || searchKey(`${customer.name} ${customer.address}`).includes(needle)).slice(0, 8);
+    return activeSorted(customerDirectory).filter(customer => !needle || searchKey(`${customer.name} ${customer.address}`).includes(needle)).slice(0, 12);
   }
   function showCustomerSuggestions(card, query, showAll = false) {
     const box = card.querySelector(".customer-suggestions"); const matches = customerMatches(query, showAll);
@@ -406,13 +490,13 @@
     if (chip?.dataset.materialId) { const material = byId(data.materials, chip.dataset.materialId); if (material && !task.materials.some(item => searchKey(item.name) === searchKey(material.name))) { task.materials.push({ name: material.name, quantity: "", unit: "" }); markDirty(); renderTasks(); } return; }
     const customerChoice = event.target.closest("[data-customer-choice]");
     if (customerChoice) {
-      const customer = byId(data.customers, customerChoice.dataset.customerChoice); if (!customer) return;
-      task.customerId = customer.id; task.customerName = customer.name; task.address = customer.address || "";
+      const customer = byId(customerDirectory, customerChoice.dataset.customerChoice); if (!customer) return;
+      task.customerId = customer.customerId; task.locationId = customer.locationId; task.customerName = customer.name; task.address = customer.address || "";
       card.querySelector(".customer-input").value = task.customerName; card.querySelector(".address-input").value = task.address; card.querySelector(".customer-suggestions").hidden = true;
       updateTaskSummary(card, task, index); markDirty(); return;
     }
-    if (event.target.closest(".customer-dropdown")) { showCustomerSuggestions(card, "", true); return; }
-    if (event.target.closest(".add-customer")) { pendingCustomerTaskId = task.id; $("#customerForm").reset(); $("#customerDialog").showModal(); return; }
+    if (event.target.closest(".customer-dropdown")) { if (!customerDirectory.length) openCustomerAuth(); else showCustomerSuggestions(card, "", true); return; }
+    if (event.target.closest(".add-customer")) { if (window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory({ notify: true }); else openCustomerAuth(); return; }
     if (event.target.closest(".add-material")) { task.materials.push({ name: "", quantity: "", unit: "" }); markDirty(); renderTasks(); return; }
     const materialRow = event.target.closest(".material-row");
     if (event.target.closest(".remove-material") && materialRow) { task.materials.splice(Number(materialRow.dataset.materialIndex), 1); markDirty(); renderTasks(); return; }
@@ -423,7 +507,7 @@
   });
   $("#taskList").addEventListener("input", event => {
     const card = event.target.closest(".task-card"); if (!card) return; const task = findTaskFromElement(card); if (!task) return;
-    if (event.target.matches(".customer-input")) { task.customerId = null; task.customerName = event.target.value; showCustomerSuggestions(card, event.target.value); }
+    if (event.target.matches(".customer-input")) { task.customerId = null; task.locationId = null; task.customerName = event.target.value; showCustomerSuggestions(card, event.target.value); }
     else if (event.target.matches(".address-input")) task.address = event.target.value;
     else if (event.target.matches(".title-input")) task.title = event.target.value;
     else if (event.target.matches(".extra-tools-input")) task.extraTools = event.target.value;
@@ -443,6 +527,19 @@
   function addTask() { const task = blankTask(); workingPlan.tasks.push(task); activeTaskId = task.id; markDirty(); renderTasks(); $("#taskList .task-card:last-child")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
   $("#addTaskButton").addEventListener("click", addTask);
   $("#addTaskBottomButton").addEventListener("click", addTask);
+  $("#customerAuthForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = event.currentTarget; const button = form.querySelector("button[value='default']");
+    const pin = form.elements.pin.value;
+    button.disabled = true; $("#customerAuthMessage").textContent = "Csatlakozás…";
+    try {
+      await window.NapiCustomerDirectory.signIn(pin);
+      if (!(await syncCustomerDirectory())) throw new Error("A belépés sikerült, de az ügyféllista nem tölthető be.");
+      form.elements.pin.value = ""; $("#customerAuthDialog").close(); toast(`Az ügyféllista csatlakoztatva: ${customerDirectory.length} cím elérhető.`);
+    } catch (error) { $("#customerAuthMessage").textContent = readableError(error); }
+    finally { button.disabled = false; }
+  });
+  $("#customerAuthDialog").addEventListener("click", event => { if (event.target.closest("[data-close-customer-auth]")) $("#customerAuthDialog").close(); });
   $("#customerForm").addEventListener("submit", event => {
     event.preventDefault(); const form = new FormData(event.currentTarget); const name = String(form.get("name") || "").trim(); const address = String(form.get("address") || "").trim();
     if (!name || !address) return;
@@ -559,7 +656,7 @@
       const title = activeSettingsTab === "vehicles" ? "autó" : activeSettingsTab === "tools" ? "eszköz" : "anyag";
       container.innerHTML = `<div class="settings-editor"><h3>${editing ? `${title[0].toUpperCase() + title.slice(1)} szerkesztése` : `Új ${title}`}</h3><label>Név<input class="form-control" id="settingName" value="${escapeHTML(editing?.name || "")}" maxlength="100"></label><button class="btn btn-outline-green" type="button" data-setting-submit>Mentés</button></div>${settingsListHTML(list)}`;
     } else if (activeSettingsTab === "customers") {
-      container.innerHTML = `<div class="settings-editor"><h3>${editing ? "Ügyfél szerkesztése" : "Új ügyfél"}</h3><div class="form-grid"><label>Név<input class="form-control" id="settingName" value="${escapeHTML(editing?.name || "")}" maxlength="120"></label><label>Cím<input class="form-control" id="settingAddress" value="${escapeHTML(editing?.address || "")}" maxlength="240"></label></div><button class="btn btn-outline-green" type="button" data-setting-submit>Mentés</button></div>${settingsListHTML(list, item => item.address || "Nincs megadott cím")}`;
+      container.innerHTML = customerDirectorySettingsHTML();
     } else {
       const template = editing || { name: "", toolIds: [], materials: [], steps: [] };
       const toolNames = template.toolIds.map(id => byId(data.tools, id)?.name).filter(Boolean).join(", ");
@@ -598,8 +695,12 @@
     if (!existing) list.push(item); editingSettingsId = null; markDirty("Beállítás módosítva • mentés szükséges"); renderSettings(); renderTasks();
   }
   $("#settingsButton").addEventListener("click", () => { activeSettingsTab = "workers"; editingSettingsId = null; renderSettings(); $("#settingsDialog").showModal(); });
-  $("#settingsDialog").addEventListener("click", event => {
+  $("#settingsDialog").addEventListener("click", async event => {
     const tab = event.target.closest("[data-settings-tab]"); if (tab) { activeSettingsTab = tab.dataset.settingsTab; editingSettingsId = null; renderSettings(); return; }
+    const directoryAction = event.target.closest("[data-customer-directory]");
+    if (directoryAction?.dataset.customerDirectory === "connect") { openCustomerAuth(); return; }
+    if (directoryAction?.dataset.customerDirectory === "refresh") { await syncCustomerDirectory({ notify: true }); return; }
+    if (directoryAction?.dataset.customerDirectory === "disconnect") { await window.NapiCustomerDirectory.signOut(); customerDirectory = []; customerDirectoryLastSync = null; customerDirectoryState = "disconnected"; renderSettings(); renderTasks(); toast("Az ügyféllista leválasztva, a helyi gyorsítótár törölve."); return; }
     const colorChoice = event.target.closest("[data-worker-color]"); if (colorChoice) { setWorkerColor(colorChoice.dataset.workerColor); return; }
     if (event.target.closest("[data-setting-submit]")) { saveSettingEditor(); return; }
     const edit = event.target.closest("[data-setting-edit]"); if (edit) { editingSettingsId = edit.dataset.settingEdit; renderSettings(); return; }
@@ -614,13 +715,18 @@
   $("#meetingInput").addEventListener("input", event => { workingPlan.meeting = event.target.value; markDirty(); });
   $("#stopsInput").addEventListener("input", event => { workingPlan.stops = event.target.value; markDirty(); });
   $("#todayButton").addEventListener("click", () => changeDate(isoToday()));
-  $("#folderButton").addEventListener("click", chooseFolder); $("#refreshButton").addEventListener("click", refreshFromFile);
+  $("#folderButton").addEventListener("click", chooseFolder); $("#refreshButton").addEventListener("click", refreshApplication);
   $("#downloadButton").addEventListener("click", () => {
     $("#downloadReference").textContent = `A heti, havi és éves mentés alapdátuma: ${formatDate(workingPlan.date)}.`;
     $("#downloadsDialog").showModal();
   });
   $("#downloadsDialog").addEventListener("click", event => { const button = event.target.closest("[data-export-period]"); if (button) exportPeriod(button.dataset.exportPeriod); });
   function appRunsStandalone() { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; }
+  function updateInstallButtons() {
+    const installed = appRunsStandalone() || localStorage.getItem(INSTALLED_KEY) === "true";
+    $("#quickInstallButton").hidden = installed;
+    $("#installAppButton").hidden = installed;
+  }
   function mobilePlatform() {
     const agent = navigator.userAgent || "";
     if (/iphone|ipad|ipod/i.test(agent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "ios";
@@ -647,9 +753,15 @@
   $("#quickInstallButton").addEventListener("click", installApplication);
   $("#saveButton").addEventListener("click", async () => { try { if (!(await writeDataFile()) && !("showDirectoryPicker" in window)) $("#fileFallbackDialog").showModal(); } catch (error) { $("#saveState").textContent = "Mentési hiba"; toast(`A mentés nem sikerült: ${readableError(error)}`, true); } });
   $("#downloadDataButton").addEventListener("click", downloadData); $("#openDataInput").addEventListener("change", event => importDataFile(event.target.files[0]));
-  window.addEventListener("beforeunload", event => { if (!dirty) return; event.preventDefault(); event.returnValue = ""; });
-  window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; $("#installAppHint").textContent = "A telepítés készen áll – koppints ide"; });
-  window.addEventListener("appinstalled", () => { installPrompt = null; $("#installAppHint").textContent = "Az app telepítve van ezen az eszközön"; $("#quickInstallButton").textContent = "✓ App telepítve"; toast("A Napi feladatok app telepítése sikerült."); });
+  document.addEventListener("pointerdown", event => { const button = event.target.closest("[data-tooltip]"); if (button && event.pointerType !== "mouse") button.dataset.tooltipVisible = "true"; });
+  ["pointerup", "pointercancel"].forEach(type => document.addEventListener(type, () => document.querySelectorAll("[data-tooltip-visible]").forEach(button => button.removeAttribute("data-tooltip-visible"))));
+  document.addEventListener("click", event => event.target.closest("[data-tooltip]")?.removeAttribute("data-tooltip-visible"));
+  window.addEventListener("beforeunload", event => { if (!dirty || allowPageReload) return; event.preventDefault(); event.returnValue = ""; });
+  window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; localStorage.removeItem(INSTALLED_KEY); updateInstallButtons(); $("#installAppHint").textContent = "A telepítés készen áll – koppints ide"; });
+  window.addEventListener("appinstalled", () => { installPrompt = null; localStorage.setItem(INSTALLED_KEY, "true"); updateInstallButtons(); toast("A Napi feladatok app telepítése sikerült."); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory(); });
+  window.addEventListener("online", () => { if (window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory(); });
+  setInterval(() => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory(); }, 120000);
 
   async function initialize() {
     $("#planDate").value = isoToday();
@@ -672,7 +784,9 @@
     }
     updateStorageStatus();
     if (!dirty) loadPlan($("#planDate").value); else { renderTasks(); $("#saveState").textContent = "Helyreállított piszkozat • mentés szükséges"; }
-    if (appRunsStandalone()) $("#installAppHint").textContent = "Az app telepítve van ezen az eszközön";
+    if (navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) await syncCustomerDirectory();
+    if (appRunsStandalone()) localStorage.setItem(INSTALLED_KEY, "true");
+    updateInstallButtons();
     if ("serviceWorker" in navigator) {
       let reloadingForUpdate = false;
       navigator.serviceWorker.addEventListener("controllerchange", () => {
