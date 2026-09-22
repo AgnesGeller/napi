@@ -277,7 +277,7 @@ button, summary { touch-action: manipulation; }
 @page { size: A4 portrait; margin: 12mm 12mm 15mm; }
 @media print {
   body { padding: 0; background: #fff; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-  .app-header, .planner-shell, .action-dock, dialog, .toast-region { display: none !important; }
+  .skip-link, .app-header, .planner-shell, .action-dock, dialog, .toast-region { display: none !important; }
   .print-view { display: block; color: #19221b; font: 10.5pt/1.4 Arial, sans-serif; }
   .print-sheet { position: relative; min-height: 265mm; padding: 8mm 8mm 16mm; overflow: hidden; }
   .print-sheet::before, .print-sheet::after { content: ""; position: absolute; width: 52mm; height: 52mm; background: url("../assets/botanical.svg") center/contain no-repeat; opacity: .055; pointer-events: none; }

@@ -151,7 +151,8 @@
         name: String(task.title || legacyTemplate?.name || "Feladat").trim(),
         steps: Array.isArray(task.steps) ? task.steps : deepCopy(legacyTemplate?.steps || [])
       }] : []);
-      return { ...task, locationId: task.locationId || null, jobs, toolIds: Array.isArray(task.toolIds) ? task.toolIds : [], materials: Array.isArray(task.materials) ? task.materials : [] };
+      const { templateId: _legacyTemplateId, title: _legacyTitle, steps: _legacySteps, ...currentTask } = task;
+      return { ...currentTask, locationId: task.locationId || null, jobs, toolIds: Array.isArray(task.toolIds) ? task.toolIds : [], materials: Array.isArray(task.materials) ? task.materials : [] };
     };
     return {
       version: 2,
@@ -372,6 +373,7 @@
 
   function makeChip(label, pressed, className, attributes = {}) {
     const button = document.createElement("button"); button.type = "button"; button.className = `choice-chip ${className || ""}`.trim(); button.textContent = label; button.setAttribute("aria-pressed", String(Boolean(pressed)));
+    button.title = pressed ? "Kattints újra a kijelölés levételéhez" : "Kattints a kiválasztáshoz";
     Object.entries(attributes).forEach(([key, value]) => { if (key === "style") button.setAttribute("style", value); else button.dataset[key] = value; });
     return button;
   }
@@ -582,7 +584,12 @@
       toggleInList(target, chip.dataset.id); chip.setAttribute("aria-pressed", String(target.includes(chip.dataset.id))); updateTaskSummary(card, task, index); markDirty(); return;
     }
     if (chip?.dataset.templateId) { const template = byId(data.templates, chip.dataset.templateId); if (template) toggleTemplate(task, template); return; }
-    if (chip?.dataset.materialId) { const material = byId(data.materials, chip.dataset.materialId); if (material && !task.materials.some(item => searchKey(item.name) === searchKey(material.name))) { task.materials.push({ name: material.name, quantity: "", unit: "" }); markDirty(); renderTasks(); } return; }
+    if (chip?.dataset.materialId) {
+      const material = byId(data.materials, chip.dataset.materialId); if (!material) return;
+      const selectedIndex = task.materials.findIndex(item => searchKey(item.name) === searchKey(material.name));
+      if (selectedIndex >= 0) task.materials.splice(selectedIndex, 1); else task.materials.push({ name: material.name, quantity: "", unit: "" });
+      markDirty(); renderTasks(); return;
+    }
     const customerChoice = event.target.closest("[data-customer-choice]");
     if (customerChoice) {
       const customer = byId(customerDirectory, customerChoice.dataset.customerChoice); if (!customer) return;
