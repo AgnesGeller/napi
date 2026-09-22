@@ -29,7 +29,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/app-icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260922f">
+  <link rel="stylesheet" href="css/style.css?v=20260922g">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -236,22 +236,28 @@
           <label>Cím<input class="form-control address-input" type="text" maxlength="240" placeholder="Az ügyfél kiválasztása után automatikusan kitöltődik"></label>
           <button type="button" class="text-button add-customer">＋ Új ügyfél</button>
         </section>
-        <section class="task-step">
-          <div class="step-label"><span>4</span><h4>Feladat</h4></div>
-          <div class="chip-grid template-chips"></div>
-          <label class="mt-3">Feladat megnevezése<input class="form-control title-input" type="text" maxlength="160" placeholder="Például: kertkarbantartás"></label>
-        </section>
-        <details class="task-step expandable" open>
+        <details class="task-step expandable" data-detail="jobs" open>
+          <summary><span class="step-label"><span>4</span><strong>Feladatok</strong></span><span class="summary-hint job-count">Nincs kiválasztva</span></summary>
+          <div class="detail-content">
+            <p class="field-help">Több feladatot is kiválaszthatsz.</p>
+            <div class="chip-grid template-chips"></div>
+            <div class="new-job-row">
+              <input class="form-control new-job-input" type="text" maxlength="120" placeholder="Új feladat neve" aria-label="Új feladat neve">
+              <button type="button" class="btn btn-soft add-custom-job">＋ Hozzáadás</button>
+            </div>
+          </div>
+        </details>
+        <details class="task-step expandable" data-detail="tools">
           <summary><span class="step-label"><span>5</span><strong>Eszközök</strong></span><span class="summary-hint">lenyitható</span></summary>
           <div class="detail-content"><div class="chip-grid tool-chips"></div><label class="mt-3">Egyéb eszközök<input class="form-control extra-tools-input" type="text" maxlength="300" placeholder="Vesszővel elválasztva"></label></div>
         </details>
-        <details class="task-step expandable">
+        <details class="task-step expandable" data-detail="materials">
           <summary><span class="step-label"><span>6</span><strong>Anyagok</strong></span><span class="summary-hint">lenyitható</span></summary>
           <div class="detail-content"><div class="chip-grid material-chips mb-3"></div><div class="materials-list"></div><button type="button" class="btn btn-soft add-material">＋ Egyedi anyag hozzáadása</button></div>
         </details>
-        <details class="task-step expandable" open>
-          <summary><span class="step-label"><span>7</span><strong>Munkamenet</strong></span><span class="summary-hint">soronként egy lépés</span></summary>
-          <div class="detail-content"><textarea class="form-control steps-input" rows="5" maxlength="3000" placeholder="1. Előkészítés&#10;2. Munka elvégzése&#10;3. Rendrakás"></textarea><label class="mt-3">Megjegyzés<textarea class="form-control notes-input" rows="2" maxlength="1000" placeholder="Időpont, kapukód, fontos tudnivaló…"></textarea></label></div>
+        <details class="task-step expandable" data-detail="workflow">
+          <summary><span class="step-label"><span>7</span><strong>Feladatleírások</strong></span><span class="summary-hint">feladatonként szerkeszthető</span></summary>
+          <div class="detail-content"><div class="job-workflows"></div><label class="mt-3">Megjegyzés<textarea class="form-control notes-input" rows="2" maxlength="1000" placeholder="Időpont, kapukód, fontos tudnivaló…"></textarea></label></div>
         </details>
       </div>
     </article>
@@ -270,6 +276,6 @@
 
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260922e"></script>
-  <script src="js/app.js?v=20260922i"></script>
+  <script src="js/app.js?v=20260922j"></script>
 </body>
 </html>

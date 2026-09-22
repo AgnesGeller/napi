@@ -140,6 +140,14 @@ button, summary { touch-action: manipulation; }
 .expandable summary .step-label { margin: 0; }
 .summary-hint { color: var(--muted); font-size: .82rem; }
 .detail-content { padding: .2rem 0 1rem 2.25rem; }
+.field-help { margin: 0 0 .65rem; color: var(--muted); font-size: .86rem; }
+.new-job-row { display: grid; grid-template-columns: minmax(160px, 1fr) auto; gap: .5rem; margin-top: .75rem; }
+.new-job-row .btn { min-height: 46px; white-space: nowrap; }
+.job-workflows { display: grid; gap: .7rem; }
+.job-workflow { display: grid; gap: .35rem; padding: .7rem; border-left: 4px solid var(--orange); background: #f6f8f3; }
+.job-workflow > span { color: var(--forest); font-weight: 800; }
+.job-workflow textarea { min-height: 108px; resize: vertical; }
+.empty-detail { margin: 0; padding: .7rem; color: var(--muted); background: #f6f8f3; }
 .materials-list { display: grid; gap: .5rem; margin-bottom: .65rem; }
 .material-row { display: grid; grid-template-columns: minmax(110px, 2fr) minmax(86px, .8fr) minmax(86px, .8fr) 42px; gap: .45rem; }
 .action-dock { position: fixed; z-index: 50; left: 0; right: 0; bottom: 0; padding: .55rem max(.75rem, env(safe-area-inset-right)) calc(.55rem + env(safe-area-inset-bottom)) max(.75rem, env(safe-area-inset-left)); color: #fff; background: rgba(18,49,32,.97); border-top: 3px solid var(--orange); box-shadow: 0 -8px 28px rgba(0,0,0,.18); backdrop-filter: blur(10px); }
@@ -259,6 +267,8 @@ button, summary { touch-action: manipulation; }
   .brand-lockup h1 span { font-size: .68em; }
   .copy-actions { display: grid; grid-template-columns: 1fr; }
   .choice-chip { flex: 1 1 calc(50% - .5rem); }
+  .detail-content { padding-left: 0; }
+  .new-job-row { grid-template-columns: 1fr; }
   .header-actions .btn { font-size: .9rem; }
   .settings-row { grid-template-columns: 1fr; }
   .settings-row-actions { justify-content: flex-end; }
@@ -297,6 +307,8 @@ button, summary { touch-action: manipulation; }
   .print-section { margin: 2mm 0; break-inside: avoid; }
   .print-section.wide { grid-column: 1 / -1; }
   .print-section h3 { margin: 0 0 1mm; color: var(--orange); font: 800 8.5pt Arial, sans-serif; letter-spacing: .07em; text-transform: uppercase; }
+  .print-job-description + .print-job-description { margin-top: 2mm; }
+  .print-job-description h4 { margin: 0 0 .8mm; color: var(--forest); font: 800 9pt Arial, sans-serif; }
   .print-section p, .print-section ul, .print-section ol { margin: 0; padding-left: 5mm; }
   .print-section p { padding-left: 0; }
   .print-worker { display: inline-block; margin: 0 1.5mm 1mm 0; padding: 1mm 2mm; color: var(--print-worker-text, #fff); background: var(--print-worker-color); border-radius: 2mm; font-size: 9pt; font-weight: 800; }
