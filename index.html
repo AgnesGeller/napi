@@ -29,7 +29,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/app-icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260922e">
+  <link rel="stylesheet" href="css/style.css?v=20260922f">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -39,7 +39,6 @@
       <div class="brand-lockup">
         <img src="assets/diszkertek-logo.png" alt="Díszkertek" width="132" height="101">
         <div>
-          <p class="eyebrow">Minden, ami kerttel kapcsolatos</p>
           <h1>Díszkertek <span>– Napi feladatok</span></h1>
         </div>
       </div>
@@ -48,7 +47,7 @@
         <button class="btn btn-install-header" id="quickInstallButton" type="button">📱 App telepítése</button>
         <button class="btn btn-light-outline" id="downloadButton" type="button">⬇ Adatmentések</button>
         <button class="btn btn-light-outline" id="refreshButton" type="button" title="A legújabb appverzió betöltése">⟳ Frissítés</button>
-        <button class="btn btn-light-outline" id="settingsButton" type="button">⚙ Beállítások</button>
+        <button class="btn btn-light-outline" id="settingsButton" type="button">＋ Új dolgozó</button>
       </div>
     </div>
   </header>
@@ -75,10 +74,6 @@
       <div class="copy-actions">
         <button class="btn btn-soft" id="copyYesterdayButton" type="button">Tegnapi nap másolása</button>
         <button class="btn btn-soft" id="copyEarlierButton" type="button">Korábbi terv másolása</button>
-      </div>
-      <div class="storage-strip" id="storageStrip" role="status">
-        <span class="storage-dot" aria-hidden="true"></span>
-        <span id="storageText">Válassz mentési mappát. Addig a terv biztonsági piszkozatként megmarad ezen az eszközön.</span>
       </div>
     </section>
 
@@ -123,7 +118,7 @@
   <dialog id="settingsDialog" class="app-dialog settings-dialog">
     <form method="dialog" class="dialog-frame">
       <header class="dialog-header">
-        <div><p class="section-kicker">Törzsadatok</p><h2>Beállítások</h2></div>
+        <div><p class="section-kicker">Törzsadatok</p><h2 id="settingsDialogTitle">Új dolgozó</h2></div>
         <button class="icon-button" value="cancel" aria-label="Bezárás">×</button>
       </header>
       <nav class="settings-tabs" aria-label="Beállítási kategóriák">
@@ -243,7 +238,7 @@
         <section class="task-step step-customer">
           <div class="step-label"><span>3</span><h4>Ügyfél és cím</h4></div>
           <div class="customer-picker">
-            <span class="customer-field-label">Ügyfél keresése</span><span class="customer-picker-row"><input class="form-control customer-input" type="search" autocomplete="off" aria-label="Ügyfél keresése" placeholder="Írj be legalább két betűt…"><button class="customer-dropdown" type="button" aria-label="Ügyféllista lenyitása">⌄</button></span>
+            <span class="customer-field-label">Ügyfél keresése</span><span class="customer-picker-row"><input class="form-control customer-input" type="search" autocomplete="off" aria-label="Ügyfél keresése" placeholder="Írj be legalább két betűt…"><button class="customer-dropdown" type="button" aria-label="Ügyféllista megnyitása" title="Ügyféllista megnyitása"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span>
             <div class="customer-suggestions" hidden></div>
           </div>
           <label>Cím<input class="form-control address-input" type="text" maxlength="240" placeholder="Az ügyfél kiválasztása után automatikusan kitöltődik"></label>
@@ -283,6 +278,6 @@
 
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260922e"></script>
-  <script src="js/app.js?v=20260922e"></script>
+  <script src="js/app.js?v=20260922h"></script>
 </body>
 </html>

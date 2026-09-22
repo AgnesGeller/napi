@@ -53,9 +53,6 @@ button, summary { touch-action: manipulation; }
 .copy-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: .75rem; }
 .btn-soft { min-height: 40px; color: var(--forest); border: 1px solid #c3d0c4; background: var(--leaf-light); }
 .btn-soft:hover { background: #d3e4d5; }
-.storage-strip { display: flex; gap: .55rem; align-items: flex-start; margin: 1rem -1.1rem -1.1rem; padding: .75rem 1.1rem; border-top: 1px solid var(--line); color: #405045; background: #f8faf6; font-size: .9rem; }
-.storage-dot { flex: 0 0 auto; width: .64rem; height: .64rem; margin-top: .28rem; border-radius: 50%; background: #b17028; box-shadow: 0 0 0 4px #f3e5d2; }
-.storage-strip.ready .storage-dot { background: #2b7a48; box-shadow: 0 0 0 4px #dbebdf; }
 .tasks-section { margin-top: 1.3rem; }
 .week-section { margin-top: 1.3rem; }
 .week-range { margin: .35rem 0 0; color: var(--muted); }

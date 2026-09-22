@@ -231,14 +231,12 @@
     }
   }
   function updateStorageStatus() {
-    const strip = $("#storageStrip");
     if (directoryHandle) {
-      strip.classList.add("ready");
-      $("#storageText").textContent = `Mentési mappa: ${directoryHandle.name} • ${DATA_FILE_NAME}`;
       $("#folderButton").textContent = "📁 Mappa cseréje";
+      $("#folderButton").title = `Mentési mappa: ${directoryHandle.name}`;
     } else {
-      strip.classList.remove("ready");
-      $("#storageText").textContent = "Válassz mentési mappát. Addig a terv biztonsági piszkozatként megmarad ezen az eszközön.";
+      $("#folderButton").textContent = "📁 Mappa kiválasztása";
+      $("#folderButton").title = "A napi tervek mentési helyének kiválasztása";
     }
   }
   async function refreshApplication() {
@@ -393,8 +391,10 @@
     markDirty("A sablon beillesztve • mentés szükséges"); renderTasks();
   }
   function updateCustomerDirectoryButtons() {
+    const connected = customerDirectory.length > 0 || ["ready", "loading", "cache"].includes(customerDirectoryState);
     document.querySelectorAll(".add-customer").forEach(button => {
-      button.textContent = customerDirectoryState === "ready" ? "↻ Ügyféllista frissítése" : "🔒 Ügyféllista csatlakoztatása";
+      button.hidden = connected;
+      button.textContent = "🔒 Ügyféllista csatlakoztatása";
     });
   }
   function openCustomerAuth() {
@@ -641,6 +641,8 @@
     return activeSettingsTab === "workers" ? data.workers : activeSettingsTab === "vehicles" ? data.vehicles : activeSettingsTab === "tools" ? data.tools : activeSettingsTab === "materials" ? data.materials : activeSettingsTab === "templates" ? data.templates : data.customers;
   }
   function renderSettings() {
+    const dialogTitles = { workers: "Új dolgozó", vehicles: "Autók kezelése", templates: "Feladatsablonok", tools: "Eszközök kezelése", materials: "Anyagok kezelése", customers: "Ügyféllista", data: "Adatfájl" };
+    $("#settingsDialogTitle").textContent = dialogTitles[activeSettingsTab] || "Törzsadatok";
     document.querySelectorAll("[data-settings-tab]").forEach(button => button.classList.toggle("active", button.dataset.settingsTab === activeSettingsTab));
     const container = $("#settingsContent");
     if (activeSettingsTab === "data") {
