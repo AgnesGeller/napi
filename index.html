@@ -29,7 +29,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/app-icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260922k">
+  <link rel="stylesheet" href="css/style.css?v=20260922n">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -43,7 +43,7 @@
         </div>
       </div>
       <div class="header-actions">
-        <button class="btn btn-cream" id="folderButton" type="button">📁 Mappa kiválasztása</button>
+        <button class="btn btn-cream" id="folderButton" type="button">📁 Biztonsági adatmappa</button>
         <button class="btn btn-install-header" id="quickInstallButton" type="button" hidden>📱 App telepítése</button>
         <button class="btn btn-light-outline" id="downloadButton" type="button">⬇ Adatmentések</button>
         <button class="btn btn-light-outline" id="refreshButton" type="button" title="A legújabb appverzió betöltése">⟳ Frissítés</button>
@@ -92,6 +92,7 @@
       </div>
       <div id="taskList" class="task-list"></div>
       <button class="btn btn-add btn-add-bottom" id="addTaskBottomButton" type="button" hidden>＋ Napi feladat hozzáadása</button>
+      <button class="btn btn-save task-save-button" id="saveButton" type="button">Mentés</button>
     </section>
     <section class="week-section" id="weekView" aria-labelledby="weekHeading" hidden>
       <div class="section-heading">
@@ -107,8 +108,7 @@
     <div id="dockContent">
     <div class="save-state" id="saveState" role="status">Nincs mentetlen módosítás</div>
     <div class="dock-buttons">
-      <button class="btn btn-save" id="saveButton" type="button">Mentés a mappába</button>
-      <button class="btn btn-print" id="printButton" type="button">PDF / Nyomtatás</button>
+      <button class="btn btn-print" id="printButton" type="button" title="A napi terv mentése PDF-fájlként a számítógépre">PDF mentése a gépre</button>
       <button class="btn btn-share" id="shareButton" type="button">Viber / Megosztás</button>
       <button class="btn btn-copy" id="copyTextButton" type="button">Szöveg másolása</button>
     </div>
@@ -276,6 +276,6 @@
 
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260922e"></script>
-  <script src="js/app.js?v=20260922n"></script>
+  <script src="js/app.js?v=20260922q"></script>
 </body>
 </html>

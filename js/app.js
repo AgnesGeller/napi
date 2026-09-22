@@ -2,6 +2,7 @@
   "use strict";
 
   const DATA_FILE_NAME = "diszkertek-napi-adatok.json";
+  const LOCAL_DATA_KEY = "diszkertek-napi-adatok-v1";
   const RECOVERY_KEY = "diszkertek-napi-helyreallitas-v1";
   const DB_NAME = "diszkertek-napi-mappakapcsolat";
   const DB_STORE = "handles";
@@ -197,6 +198,11 @@
     $("#saveState").textContent = `Elmentve • ${new Date().toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })}`;
     try { localStorage.removeItem(RECOVERY_KEY); } catch (_) { /* Nincs teendő. */ }
   }
+  function saveDataLocally() {
+    upsertWorkingPlan();
+    data.updatedAt = new Date().toISOString();
+    localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+  }
   function setDockOpen(open) {
     const dock = document.querySelector(".action-dock"); const button = $("#dockToggleButton");
     dock.classList.toggle("is-open", open); document.body.classList.toggle("actions-open", open);
@@ -255,14 +261,22 @@
       else toast("Előbb válaszd ki a mentési mappát.", true);
       return false;
     }
-    upsertWorkingPlan();
-    data.updatedAt = new Date().toISOString();
+    saveDataLocally();
     $("#saveState").textContent = "Mentés…";
     const fileHandle = await directoryHandle.getFileHandle(DATA_FILE_NAME, { create: true });
     const writable = await fileHandle.createWritable();
     await writable.write(JSON.stringify(data, null, 2));
     await writable.close();
     markSaved();
+    return true;
+  }
+  async function saveCurrentPlan() {
+    saveDataLocally();
+    let folderSaved = false;
+    if (directoryHandle && await hasWritePermission(directoryHandle, true)) folderSaved = await writeDataFile();
+    if (!folderSaved) markSaved();
+    if (!$("#weekView").hidden) renderWeek();
+    toast(folderSaved ? "A napi terv elmentve az alkalmazásba és az adatmappába." : "A napi terv elmentve. A Heti nézetben is megtalálod.");
     return true;
   }
   async function chooseFolder() {
@@ -285,11 +299,11 @@
   }
   function updateStorageStatus() {
     if (directoryHandle) {
-      $("#folderButton").textContent = "📁 Mappa cseréje";
+      $("#folderButton").textContent = "📁 Biztonsági mappa cseréje";
       $("#folderButton").title = `Mentési mappa: ${directoryHandle.name}`;
     } else {
-      $("#folderButton").textContent = "📁 Mappa kiválasztása";
-      $("#folderButton").title = "A napi tervek mentési helyének kiválasztása";
+      $("#folderButton").textContent = "📁 Biztonsági adatmappa";
+      $("#folderButton").title = "Külön biztonsági másolat mappájának kiválasztása";
     }
   }
   async function refreshApplication() {
@@ -560,8 +574,9 @@
       if (!grouped.has(item.customerId)) grouped.set(item.customerId, { name: item.name, addresses: [] });
       if (item.address) grouped.get(item.customerId).addresses.push(item.address);
     });
-    const rows = [...grouped.values()].sort((a, b) => a.name.localeCompare(b.name, "hu")).map(customer => `<div class="settings-row"><div><strong>${escapeHTML(customer.name)}</strong><p>${escapeHTML(customer.addresses.join(" · ") || "Nincs megadott cím")}</p></div></div>`).join("");
-    return `<div class="customer-directory-panel"><div><p class="directory-state"><span class="directory-dot ${customerDirectoryState === "ready" ? "ready" : ""}"></span><strong>${status}</strong> · utolsó frissítés: ${escapeHTML(lastSync)}</p><p>A lista a Munkalap jóváhagyott ügyfeleit és címeit mutatja. Új ügyfelet és módosítást a Munkalapban lehet rögzíteni.</p></div><div class="fallback-actions"><button class="btn btn-outline-green" type="button" data-customer-directory="${connected ? "refresh" : "connect"}">${connected ? "Lista frissítése" : "Csatlakoztatás"}</button>${connected ? `<button class="btn btn-soft" type="button" data-customer-directory="disconnect">Leválasztás</button>` : ""}</div></div><div class="settings-list customer-directory-list">${rows || `<p>Nincs megjeleníthető ügyfél. Csatlakoztasd az ügyféllistát.</p>`}</div>`;
+    const customers = [...grouped.values()].sort((a, b) => a.name.localeCompare(b.name, "hu"));
+    const rows = customers.map(customer => `<div class="settings-row" data-settings-row data-search-key="${escapeHTML(searchKey(`${customer.name} ${customer.addresses.join(" ")}`))}"><div><strong>${escapeHTML(customer.name)}</strong><p>${escapeHTML(customer.addresses.join(" · ") || "Nincs megadott cím")}</p></div></div>`).join("");
+    return `<div class="customer-directory-panel"><div><p class="directory-state"><span class="directory-dot ${customerDirectoryState === "ready" ? "ready" : ""}"></span><strong>${status}</strong> · utolsó frissítés: ${escapeHTML(lastSync)}</p><p>A lista a Munkalap jóváhagyott ügyfeleit és címeit mutatja. Új ügyfelet és módosítást a Munkalapban lehet rögzíteni.</p></div><div class="fallback-actions"><button class="btn btn-outline-green" type="button" data-customer-directory="${connected ? "refresh" : "connect"}">${connected ? "Lista frissítése" : "Csatlakoztatás"}</button>${connected ? `<button class="btn btn-soft" type="button" data-customer-directory="disconnect">Leválasztás</button>` : ""}</div></div>${searchableSettingsListHTML(rows || `<p>Nincs megjeleníthető ügyfél. Csatlakoztasd az ügyféllistát.</p>`, customers.length, "Mentett ügyfelek")}`;
   }
   function customerMatches(query, showAll = false) {
     const needle = searchKey(query);
@@ -795,10 +810,26 @@
   }
   function settingsListHTML(list, description = () => "", showWorkerColor = false) {
     const sorted = [...list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name, "hu"));
-    return `<div class="settings-list">${sorted.map(item => {
+    const rows = sorted.map(item => {
       const color = validWorkerColor(item.color);
-      return `<div class="settings-row${item.active === false ? " inactive" : ""}"><div class="settings-item-copy">${showWorkerColor ? `<span class="worker-list-color" style="--worker-list-color:${color}" aria-hidden="true"></span>` : ""}<span><strong>${escapeHTML(item.name)}</strong><p>${escapeHTML(description(item))}${showWorkerColor ? ` • ${color.toUpperCase()}` : ""}</p></span></div><div class="settings-row-actions"><button class="icon-button" type="button" data-setting-edit="${item.id}" aria-label="Szerkesztés">✎</button><button class="icon-button${item.active === false ? "" : " danger"}" type="button" data-setting-toggle="${item.id}" aria-label="${item.active === false ? "Aktiválás" : "Inaktiválás"}">${item.active === false ? "↺" : "×"}</button></div></div>`;
-    }).join("")}</div>`;
+      const detail = description(item);
+      return `<div class="settings-row${item.active === false ? " inactive" : ""}" data-settings-row data-search-key="${escapeHTML(searchKey(`${item.name} ${detail}`))}"><div class="settings-item-copy">${showWorkerColor ? `<span class="worker-list-color" style="--worker-list-color:${color}" aria-hidden="true"></span>` : ""}<span><strong>${escapeHTML(item.name)}</strong><p>${escapeHTML(detail)}${showWorkerColor ? ` • ${color.toUpperCase()}` : ""}</p></span></div><div class="settings-row-actions"><button class="icon-button" type="button" data-setting-edit="${item.id}" aria-label="Szerkesztés">✎</button><button class="icon-button${item.active === false ? "" : " danger"}" type="button" data-setting-toggle="${item.id}" aria-label="${item.active === false ? "Aktiválás" : "Inaktiválás"}">${item.active === false ? "↺" : "×"}</button></div></div>`;
+    }).join("");
+    return searchableSettingsListHTML(rows, sorted.length);
+  }
+  function searchableSettingsListHTML(rows, count, title = "Mentett elemek") {
+    return `<details class="settings-saved-list"><summary>${escapeHTML(title)} <span>(${count})</span></summary><div class="settings-search"><label>Keresés a mentett adatok között<input class="form-control" type="search" data-settings-search placeholder="Írj be legalább 2 betűt" autocomplete="off"></label><p data-settings-search-info>Írj be legalább 2 betűt a szűréshez.</p></div><div class="settings-list">${rows}</div><p class="settings-no-results" data-settings-no-results hidden>Nincs találat.</p></details>`;
+  }
+  function filterSettingsList(input) {
+    const details = input.closest(".settings-saved-list");
+    const query = searchKey(input.value); const active = query.length >= 2;
+    let visible = 0;
+    details.querySelectorAll("[data-settings-row]").forEach(row => {
+      const matches = !active || row.dataset.searchKey.includes(query);
+      row.hidden = !matches; if (matches) visible += 1;
+    });
+    details.querySelector("[data-settings-search-info]").textContent = active ? `${visible} találat` : "Írj be legalább 2 betűt a szűréshez.";
+    details.querySelector("[data-settings-no-results]").hidden = visible > 0;
   }
   function setWorkerColor(color) {
     const normalized = validWorkerColor(color); const input = $("#settingColor"); const output = $("#settingColorCode");
@@ -836,9 +867,12 @@
     const toggle = event.target.closest("[data-setting-toggle]"); if (toggle) { const item = settingsType().find(entry => entry.id === toggle.dataset.settingToggle); if (item) { item.active = item.active === false; markDirty("Beállítás módosítva • mentés szükséges"); renderSettings(); renderTasks(); } return; }
     const dataAction = event.target.closest("[data-data-action]"); if (dataAction?.dataset.dataAction === "choose") chooseFolder(); if (dataAction?.dataset.dataAction === "download") downloadData();
   });
-  $("#settingsDialog").addEventListener("input", event => { if (event.target.matches("#settingColor")) setWorkerColor(event.target.value); });
+  $("#settingsDialog").addEventListener("input", event => {
+    if (event.target.matches("#settingColor")) setWorkerColor(event.target.value);
+    if (event.target.matches("[data-settings-search]")) filterSettingsList(event.target);
+  });
   $("#settingsDialog").addEventListener("change", event => { if (event.target.matches("[data-data-import]")) importDataFile(event.target.files[0]); });
-  $("#settingsSaveButton").addEventListener("click", async event => { event.preventDefault(); try { if (await writeDataFile()) $("#settingsDialog").close(); } catch (error) { $("#saveState").textContent = "Mentési hiba"; toast(`A mentés nem sikerült: ${readableError(error)}`, true); } });
+  $("#settingsSaveButton").addEventListener("click", async event => { event.preventDefault(); try { if (await saveCurrentPlan()) $("#settingsDialog").close(); } catch (error) { $("#saveState").textContent = "Mentési hiba"; toast(`A mentés nem sikerült: ${readableError(error)}`, true); } });
 
   $("#planDate").addEventListener("change", event => changeDate(event.target.value));
   $("#meetingInput").addEventListener("input", event => { workingPlan.meeting = event.target.value; markDirty(); });
@@ -867,7 +901,7 @@
   }
   $("#installAppButton").addEventListener("click", installApplication);
   $("#quickInstallButton").addEventListener("click", installApplication);
-  $("#saveButton").addEventListener("click", async () => { try { if (!(await writeDataFile()) && !("showDirectoryPicker" in window)) $("#fileFallbackDialog").showModal(); } catch (error) { $("#saveState").textContent = "Mentési hiba"; toast(`A mentés nem sikerült: ${readableError(error)}`, true); } });
+  $("#saveButton").addEventListener("click", async () => { try { await saveCurrentPlan(); } catch (error) { $("#saveState").textContent = "Mentési hiba"; toast(`A mentés nem sikerült: ${readableError(error)}`, true); } });
   $("#downloadDataButton").addEventListener("click", downloadData); $("#openDataInput").addEventListener("change", event => importDataFile(event.target.files[0]));
   document.addEventListener("pointerdown", event => { const button = event.target.closest("[data-tooltip]"); if (button && event.pointerType !== "mouse") button.dataset.tooltipVisible = "true"; });
   ["pointerup", "pointercancel"].forEach(type => document.addEventListener(type, () => document.querySelectorAll("[data-tooltip-visible]").forEach(button => button.removeAttribute("data-tooltip-visible"))));
@@ -881,6 +915,10 @@
 
   async function initialize() {
     $("#planDate").value = isoToday();
+    try {
+      const storedData = JSON.parse(localStorage.getItem(LOCAL_DATA_KEY));
+      if (storedData) data = normalizeData(storedData);
+    } catch (_) { /* Hibás helyi mentést figyelmen kívül hagyunk. */ }
     try {
       if ("showDirectoryPicker" in window) {
         const stored = await readStoredDirectoryHandle();
