@@ -10,6 +10,20 @@
   const FINAL_NOTE = "A nap végén mindenki vegye ki a szemetét az autóból és hagyjon rendet maga után!";
   const DEFAULT_MEETING = "telephely, 6:30";
   const DEFAULT_STOPS = "Vizeshűtő, Lidl, Dohánybolt";
+  const INTENSITY_DESCRIPTIONS = {
+    1: "Lassú tempó – kényelmesebb munkavégzés, több pihenőidővel.",
+    2: "Kímélő tempó – folyamatos, de nyugodt munkavégzés, sietség nélkül.",
+    3: "Normál tempó – átlagos, megszokott, folyamatos és egyenletes haladás.",
+    4: "Fokozott tempó – lendületes munkavégzés, kevés pihenővel és nagyobb koncentrációval.",
+    5: "Maximális tempó – nagyon gyors, koncentrált munkavégzés; a mielőbbi befejezés kiemelt."
+  };
+  const QUALITY_DESCRIPTIONS = {
+    1: "Minimális kivitelezési szint – a feladat legyen elvégezve; a részletek nem elsődlegesek.",
+    2: "Alap kivitelezési szint – rendezett összkép, apró pontatlanságok elfogadhatók.",
+    3: "Normál minőség – a megszokott szakmai színvonalon, rendezetten kell dolgozni.",
+    4: "Igényes kivitelezés – fokozott figyelem a részletekre, szélekre és befejezésekre.",
+    5: "Prémium kivitelezés – maximális precizitás; minden részlet legyen pontos és kifogástalan."
+  };
   const $ = selector => document.querySelector(selector);
   const uid = () => globalThis.crypto?.randomUUID?.() || `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const deepCopy = value => JSON.parse(JSON.stringify(value));
@@ -48,7 +62,7 @@
       {
         id: uid(), name: "Füvesítés és támfalépítés", active: true,
         toolIds: ["fűhenger", "talicska", "gereblye", "lapát", "ásó"].map(toolId).filter(Boolean),
-        materials: [{ name: "Termőföld", quantity: "", unit: "m³" }, { name: "Támfalkő", quantity: "", unit: "db" }],
+        materials: [{ source: "", name: "Termőföld", quantity: "m³" }, { source: "", name: "Támfalkő", quantity: "db" }],
         steps: ["A terület előkészítése.", "A füvesítés és támfalépítés elvégzése.", "A terület rendbetétele.", "Munkanapló megírása."], order: 2
       },
       {
@@ -67,10 +81,10 @@
       {
         id: uid(), name: "Talajpermetezés – 4 in 1", active: true, toolIds: [],
         materials: [
-          { name: "Vasgálic", quantity: "150", unit: "g / 15 l víz" },
-          { name: "Magellan", quantity: "1", unit: "kupak / 15 l víz" },
-          { name: "Amalgerol", quantity: "150", unit: "ml / 15 l víz" },
-          { name: "Amistar", quantity: "15", unit: "ml / 15 l víz" }
+          { source: "", name: "Vasgálic", quantity: "150 g / 15 l víz" },
+          { source: "", name: "Magellan", quantity: "1 kupak / 15 l víz" },
+          { source: "", name: "Amalgerol", quantity: "150 ml / 15 l víz" },
+          { source: "", name: "Amistar", quantity: "15 ml / 15 l víz" }
         ],
         steps: ["Ha a gyomirtós permetezővel dolgoztok, előtte a tartályt és a pisztolyt is alaposan ki kell öblíteni.", "A keverék elkészítése a megadott arányban.", "Talajpermetezés elvégzése."], order: 6
       },
@@ -103,7 +117,8 @@
         steps: ["Rendrakás a telephelyen és az autókban.", "A hulladék és a szükséges anyagok elszállítása.", "Munkanaplót megírni."], order: 13
       }
     ];
-    return { version: 2, updatedAt: new Date().toISOString(), workers, vehicles, tools, materials, templates, customers: [], plans: [] };
+    templates.forEach(template => { template.steps = (template.steps || []).filter(step => !searchKey(step).includes("munkanaplo")); });
+    return { version: 4, updatedAt: new Date().toISOString(), workers, vehicles, tools, materials, templates, customers: [], recurrences: [], plans: [] };
   }
 
   let data = createInitialData();
@@ -117,6 +132,7 @@
   let installPrompt = null;
   let allowPageReload = false;
   let activeTaskId = null;
+  let collapsedTaskIds = new Set();
   const cachedCustomerDirectory = window.NapiCustomerDirectory?.cached?.() || { directory: [], savedAt: null };
   let customerDirectory = cachedCustomerDirectory.directory;
   let customerDirectoryState = customerDirectory.length ? "cache" : "disconnected";
@@ -124,16 +140,17 @@
   let customerDirectorySyncing = false;
 
   function blankTask() {
-    return { id: uid(), customerId: null, locationId: null, customerName: "", address: "", workerIds: [], vehicleIds: [], jobs: [], toolIds: [], extraTools: "", materials: [], notes: "" };
+    return { id: uid(), customerId: null, locationId: null, customerName: "", address: "", workerIds: [], vehicleIds: [], jobs: [], toolIds: [], toolQuantities: {}, extraTools: "", materials: [], workLogRequired: true, workIntensity: 3, workQuality: 3, notes: "" };
   }
   function blankPlan(date) { return { id: uid(), date, meeting: DEFAULT_MEETING, stops: DEFAULT_STOPS, tasks: [] }; }
   function normalizeData(candidate) {
     if (!candidate || typeof candidate !== "object") throw new Error("Az adatfájl nem megfelelő formátumú.");
     const initial = createInitialData();
     const templates = Array.isArray(candidate.templates) ? candidate.templates.map(template => {
-      let steps = Array.isArray(template.steps) ? template.steps : [];
+      let steps = Array.isArray(template.steps) ? template.steps.filter(step => !searchKey(step).includes("munkanaplo")) : [];
       if (searchKey(template.name) === "kertkarbantartas") steps = steps.filter(step => searchKey(step) !== "kertkarbantartas elvegzese.");
-      return { ...template, steps };
+      const templateMaterials = Array.isArray(template.materials) ? template.materials.map(normalizeMaterialItem) : [];
+      return { ...template, materials: templateMaterials, steps };
     }) : initial.templates;
     initial.templates.forEach(seed => {
       if (!templates.some(template => searchKey(template.name) === searchKey(seed.name))) templates.push(deepCopy(seed));
@@ -145,18 +162,21 @@
         id: job.id || `${task.id || "task"}-job-${index}`,
         templateId: job.templateId || null,
         name: String(job.name || "Feladat").trim(),
-        steps: Array.isArray(job.steps) ? job.steps : []
+        steps: Array.isArray(job.steps) ? job.steps.filter(step => !searchKey(step).includes("munkanaplo")) : []
       })) : (task.templateId || task.title || task.steps?.length ? [{
         id: `${task.id || "task"}-legacy-job`,
         templateId: task.templateId || null,
         name: String(task.title || legacyTemplate?.name || "Feladat").trim(),
-        steps: Array.isArray(task.steps) ? task.steps : deepCopy(legacyTemplate?.steps || [])
+        steps: (Array.isArray(task.steps) ? task.steps : deepCopy(legacyTemplate?.steps || [])).filter(step => !searchKey(step).includes("munkanaplo"))
       }] : []);
       const { templateId: _legacyTemplateId, title: _legacyTitle, steps: _legacySteps, ...currentTask } = task;
-      return { ...currentTask, locationId: task.locationId || null, jobs, toolIds: Array.isArray(task.toolIds) ? task.toolIds : [], materials: Array.isArray(task.materials) ? task.materials : [] };
+      const toolIds = Array.isArray(task.toolIds) ? task.toolIds : [];
+      const toolQuantities = task.toolQuantities && typeof task.toolQuantities === "object" ? { ...task.toolQuantities } : {};
+      toolIds.forEach(id => { if (!toolQuantities[id]) toolQuantities[id] = "1"; });
+      return { ...currentTask, locationId: task.locationId || null, jobs, toolIds, toolQuantities, materials: Array.isArray(task.materials) ? task.materials.map(normalizeMaterialItem) : [], workLogRequired: task.workLogRequired !== false, workIntensity: validRating(task.workIntensity), workQuality: validRating(task.workQuality) };
     };
     return {
-      version: 2,
+      version: 4,
       updatedAt: candidate.updatedAt || new Date().toISOString(),
       workers: Array.isArray(candidate.workers) ? candidate.workers : initial.workers,
       vehicles: Array.isArray(candidate.vehicles) ? candidate.vehicles : initial.vehicles,
@@ -164,6 +184,7 @@
       materials: Array.isArray(candidate.materials) ? candidate.materials : initial.materials,
       templates,
       customers: Array.isArray(candidate.customers) ? candidate.customers : [],
+      recurrences: Array.isArray(candidate.recurrences) ? candidate.recurrences : [],
       plans: Array.isArray(candidate.plans) ? candidate.plans.map(plan => ({
         ...plan,
         meeting: typeof plan.meeting === "string" ? plan.meeting : DEFAULT_MEETING,
@@ -172,6 +193,11 @@
       })) : []
     };
   }
+  function normalizeMaterialItem(item = {}) {
+    const quantity = [item.quantity, item.unit].filter(Boolean).join(" ").trim();
+    return { source: String(item.source || item.purchaseLocation || item.address || ""), name: String(item.name || ""), quantity };
+  }
+  function validRating(value) { const number = Number(value); return number >= 1 && number <= 5 ? number : 3; }
   function dateFromISO(value) { return new Date(`${value}T12:00:00`); }
   function formatDate(value, options = { year: "numeric", month: "long", day: "numeric", weekday: "long" }) {
     return new Intl.DateTimeFormat("hu-HU", options).format(dateFromISO(value));
@@ -183,6 +209,23 @@
   function startOfWeek(value) {
     const date = dateFromISO(value); const daysSinceFriday = (date.getDay() - 5 + 7) % 7; date.setDate(date.getDate() - daysSinceFriday);
     return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  }
+  function easterSunday(year) {
+    const a = year % 19, b = Math.floor(year / 100), c = year % 100, d = Math.floor(b / 4), e = b % 4;
+    const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+  function hungarianHoliday(dateValue) {
+    const year = Number(dateValue.slice(0, 4)); const easter = easterSunday(year);
+    const holidays = new Map([
+      [`${year}-01-01`, "Újév"], [`${year}-03-15`, "Nemzeti ünnep"], [dateOffset(easter, -2), "Nagypéntek"],
+      [dateOffset(easter, 1), "Húsvéthétfő"], [`${year}-05-01`, "A munka ünnepe"], [dateOffset(easter, 50), "Pünkösdhétfő"],
+      [`${year}-08-20`, "Államalapítás ünnepe"], [`${year}-10-23`, "Nemzeti ünnep"], [`${year}-11-01`, "Mindenszentek"],
+      [`${year}-12-25`, "Karácsony"], [`${year}-12-26`, "Karácsony másnapja"]
+    ]);
+    return holidays.get(dateValue) || "";
   }
   function activeSorted(collection) { return collection.filter(item => item.active !== false).sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name, "hu")); }
   function byId(collection, id) { return collection.find(item => item.id === id); }
@@ -275,7 +318,7 @@
     let folderSaved = false;
     if (directoryHandle && await hasWritePermission(directoryHandle, true)) folderSaved = await writeDataFile();
     if (!folderSaved) markSaved();
-    if (!$("#weekView").hidden) renderWeek();
+    collapsedTaskIds = new Set(workingPlan.tasks.map(task => task.id)); activeTaskId = null; renderTasks(); renderWeek();
     toast(folderSaved ? "A napi terv elmentve az alkalmazásba és az adatmappába." : "A napi terv elmentve. A Heti nézetben is megtalálod.");
     return true;
   }
@@ -348,6 +391,22 @@
     downloadJSON(payload, `diszkertek-napi-${suffix}.json`);
     toast(`${period === "week" ? "A heti" : period === "month" ? "A havi" : period === "year" ? "Az éves" : "A teljes"} adatfájl letöltődött.`);
   }
+  function planMatchesPeriod(plan, period, reference) {
+    if (period === "week") { const from = startOfWeek(reference); return plan.date >= from && plan.date <= dateOffset(from, 6); }
+    if (period === "month") return plan.date.startsWith(reference.slice(0, 7));
+    if (period === "year") return plan.date.startsWith(reference.slice(0, 4));
+    return true;
+  }
+  function deletePeriod(period) {
+    const labels = { week: "kiválasztott hét", month: "kiválasztott hónap", year: "kiválasztott év", all: "összes napi terv" };
+    const matching = data.plans.filter(plan => planMatchesPeriod(plan, period, workingPlan.date));
+    if (!matching.length) { toast("Ebben az időszakban nincs törölhető napi terv."); return; }
+    if (!confirm(`Biztosan törlöd a(z) ${labels[period]} terveit (${matching.length} nap)? A törlés előtt töltsd le az adatmentést.`)) return;
+    const dates = new Set(matching.map(plan => plan.date)); data.plans = data.plans.filter(plan => !dates.has(plan.date));
+    localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+    if (dates.has(workingPlan.date)) loadPlan(workingPlan.date); else renderWeek();
+    toast(`${matching.length} napi terv törölve.`); $("#downloadsDialog").close();
+  }
   async function importDataFile(file) {
     try {
       const imported = JSON.parse(await file.text());
@@ -362,15 +421,40 @@
   }
 
   function upsertWorkingPlan() {
+    workingPlan.updatedAt = new Date().toISOString();
     const index = data.plans.findIndex(plan => plan.date === workingPlan.date);
     const clean = deepCopy(workingPlan);
     if (index >= 0) data.plans[index] = clean; else data.plans.push(clean);
     data.plans.sort((a, b) => b.date.localeCompare(a.date));
   }
+  function materializeRecurrence(recurrence) {
+    let date = recurrence.startDate; let guard = 0;
+    while (date <= recurrence.endDate && guard < 370) {
+      if (dateFromISO(date).getDay() === Number(recurrence.weekday)) {
+        let plan = data.plans.find(item => item.date === date);
+        if (!plan) { plan = blankPlan(date); data.plans.push(plan); }
+        if (!plan.tasks.some(task => task.recurrenceId === recurrence.id)) {
+          const task = blankTask(); task.recurrenceId = recurrence.id; task.customerName = recurrence.customerName; task.address = recurrence.address;
+          const template = recurrence.templateId ? byId(data.templates, recurrence.templateId) : null;
+          task.jobs = [{ id: uid(), templateId: template?.id || null, name: recurrence.jobName, steps: deepCopy(template?.steps || []) }];
+          task.toolIds = deepCopy(template?.toolIds || []); task.toolIds.forEach(id => { task.toolQuantities[id] = "1"; });
+          task.materials = deepCopy(template?.materials || []); plan.tasks.push(task); plan.updatedAt = new Date().toISOString();
+        }
+      }
+      date = dateOffset(date, 1); guard += 1;
+    }
+    data.plans.sort((a, b) => b.date.localeCompare(a.date));
+  }
+  function removeRecurrence(id) {
+    data.recurrences = data.recurrences.filter(item => item.id !== id);
+    data.plans.forEach(plan => { plan.tasks = plan.tasks.filter(task => task.recurrenceId !== id); });
+    data.plans = data.plans.filter(plan => plan.tasks.length || plan.meeting !== DEFAULT_MEETING || plan.stops !== DEFAULT_STOPS);
+  }
   function loadPlan(date) {
     const stored = data.plans.find(plan => plan.date === date);
     workingPlan = stored ? deepCopy(stored) : blankPlan(date);
-    activeTaskId = workingPlan.tasks[0]?.id || null;
+    activeTaskId = stored ? null : (workingPlan.tasks[0]?.id || null);
+    collapsedTaskIds = new Set(stored ? workingPlan.tasks.map(task => task.id) : []);
     $("#planDate").value = date;
     $("#meetingInput").value = workingPlan.meeting ?? DEFAULT_MEETING;
     $("#stopsInput").value = workingPlan.stops ?? DEFAULT_STOPS;
@@ -378,7 +462,7 @@
     dirty = false;
     $("#saveState").textContent = stored ? "Betöltve • nincs mentetlen módosítás" : "Új napi terv";
     renderTasks();
-    if (!$("#weekView").hidden) renderWeek();
+    if ($("#weekView").open) renderWeek();
   }
   function changeDate(date) {
     if (dirty && !confirm("A dátumváltás elveti a még nem mentett módosításokat. Folytatod?")) { $("#planDate").value = workingPlan.date; return; }
@@ -393,7 +477,7 @@
   }
   function renderMaterial(container, material, index) {
     const row = $("#materialTemplate").content.firstElementChild.cloneNode(true); row.dataset.materialIndex = index;
-    row.querySelector(".material-name").value = material.name || ""; row.querySelector(".material-quantity").value = material.quantity || ""; row.querySelector(".material-unit").value = material.unit || "";
+    row.querySelector(".material-source").value = material.source || ""; row.querySelector(".material-name").value = material.name || ""; row.querySelector(".material-quantity").value = material.quantity || "";
     container.append(row);
   }
   function taskJobs(task) { return Array.isArray(task.jobs) ? task.jobs : []; }
@@ -408,7 +492,7 @@
     jobs.forEach(job => {
       const block = document.createElement("label");
       block.className = "job-workflow";
-      block.innerHTML = `<span>${escapeHTML(job.name)}</span><textarea class="form-control job-steps-input" data-job-id="${escapeHTML(job.id)}" rows="4" maxlength="3000" placeholder="Soronként egy teendő"></textarea>`;
+      block.innerHTML = `<span class="job-workflow-heading"><strong>${escapeHTML(job.name)}</strong><button class="btn btn-soft job-info-button" type="button" data-job-info="${escapeHTML(job.id)}">Hasznos tudnivalók</button></span><textarea class="form-control job-steps-input" data-job-id="${escapeHTML(job.id)}" rows="4" maxlength="3000" placeholder="Soronként egy teendő"></textarea>`;
       block.querySelector("textarea").value = (job.steps || []).join("\n");
       container.append(block);
     });
@@ -416,12 +500,14 @@
   function renderTask(task, index) {
     const card = $("#taskTemplate").content.firstElementChild.cloneNode(true); card.dataset.taskId = task.id;
     card.classList.toggle("is-active", task.id === activeTaskId); card.querySelector(".active-badge").hidden = task.id !== activeTaskId;
+    card.classList.toggle("is-collapsed", collapsedTaskIds.has(task.id));
     applyTaskVehicleTheme(card, task);
     card.querySelector(".task-number").textContent = `${index + 1}.`;
     updateTaskSummary(card, task, index);
     card.querySelector(".move-up").disabled = index === 0; card.querySelector(".move-down").disabled = index === workingPlan.tasks.length - 1;
     card.querySelector(".customer-input").value = task.customerName || ""; card.querySelector(".address-input").value = task.address || "";
     card.querySelector(".extra-tools-input").value = task.extraTools || ""; card.querySelector(".notes-input").value = task.notes || "";
+    card.querySelector(".worklog-required").checked = task.workLogRequired !== false;
     const workerContainer = card.querySelector(".worker-chips");
     activeSorted(data.workers).forEach(worker => workerContainer.append(makeChip(worker.name, task.workerIds.includes(worker.id), "worker-chip", { group: "worker", id: worker.id, style: `--worker-color:${worker.color};--chip-text:${bestTextColor(worker.color)}` })));
     const vehicleContainer = card.querySelector(".vehicle-chips");
@@ -434,11 +520,28 @@
     const jobCount = taskJobs(task).length; card.querySelector(".job-count").textContent = jobCount ? `${jobCount} kiválasztva` : "Nincs kiválasztva";
     const toolContainer = card.querySelector(".tool-chips");
     activeSorted(data.tools).forEach(tool => toolContainer.append(makeChip(tool.name, task.toolIds.includes(tool.id), "", { group: "tool", id: tool.id })));
+    renderToolQuantities(card.querySelector(".tool-quantities"), task);
     const materialChipContainer = card.querySelector(".material-chips");
     activeSorted(data.materials).forEach(material => materialChipContainer.append(makeChip(material.name, task.materials.some(item => searchKey(item.name) === searchKey(material.name)), "", { materialId: material.id })));
     const materials = card.querySelector(".materials-list"); (task.materials || []).forEach((material, materialIndex) => renderMaterial(materials, material, materialIndex));
     renderJobWorkflows(card.querySelector(".job-workflows"), task);
+    renderRatingSelect(card.querySelector(".work-intensity"), task.workIntensity, INTENSITY_DESCRIPTIONS);
+    renderRatingSelect(card.querySelector(".work-quality"), task.workQuality, QUALITY_DESCRIPTIONS);
+    updateRatingDescriptions(card, task);
     return card;
+  }
+  function renderToolQuantities(container, task) {
+    container.innerHTML = task.toolIds.map(id => {
+      const tool = byId(data.tools, id); if (!tool) return "";
+      return `<label class="tool-quantity-row"><span>${escapeHTML(tool.name)}</span><input class="form-control tool-quantity-input" data-tool-id="${escapeHTML(id)}" value="${escapeHTML(task.toolQuantities?.[id] || "1")}" maxlength="20" inputmode="decimal" aria-label="${escapeHTML(tool.name)} mennyisége"><b>db</b></label>`;
+    }).join("");
+  }
+  function renderRatingSelect(select, selected, descriptions) {
+    select.innerHTML = Object.keys(descriptions).map(value => `<option value="${value}" ${Number(value) === validRating(selected) ? "selected" : ""}>${value} – ${escapeHTML(descriptions[value].split(" – ")[0])}</option>`).join("");
+  }
+  function updateRatingDescriptions(card, task) {
+    card.querySelector(".intensity-description").textContent = INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)];
+    card.querySelector(".quality-description").textContent = QUALITY_DESCRIPTIONS[validRating(task.workQuality)];
   }
   function bestTextColor(hex) {
     const raw = String(hex || "#000000").replace("#", "");
@@ -507,8 +610,9 @@
     else {
       jobs.push({ id: uid(), templateId: template.id, name: template.name, steps: deepCopy(template.steps || []) });
       task.toolIds = [...new Set([...(task.toolIds || []), ...(template.toolIds || [])])];
+      task.toolIds.forEach(id => { if (!task.toolQuantities[id]) task.toolQuantities[id] = "1"; });
       (template.materials || []).forEach(material => {
-        if (!task.materials.some(item => searchKey(item.name) === searchKey(material.name))) task.materials.push(deepCopy(material));
+        if (!task.materials.some(item => searchKey(item.name) === searchKey(material.name))) task.materials.push(normalizeMaterialItem(material));
       });
     }
     markDirty("Feladatlista módosítva • mentés szükséges"); renderTasks();
@@ -616,16 +720,26 @@
     const card = event.target.closest(".task-card"); if (!card) return;
     const task = findTaskFromElement(card); const index = workingPlan.tasks.indexOf(task);
     setActiveTask(card, task);
+    if (event.target.closest(".edit-task")) { collapsedTaskIds.delete(task.id); activeTaskId = task.id; renderTasks(); const refreshedCard = $("#taskList").querySelector(`[data-task-id="${CSS.escape(task.id)}"]`); refreshedCard?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    const infoButton = event.target.closest("[data-job-info]");
+    if (infoButton) {
+      const job = taskJobs(task).find(item => item.id === infoButton.dataset.jobInfo); if (!job) return;
+      $("#jobInfoTitle").textContent = job.name;
+      $("#jobInfoContent").innerHTML = job.steps.length ? `<ol class="job-info-steps">${job.steps.map(step => `<li>${escapeHTML(step)}</li>`).join("")}</ol>` : `<p>Ehhez a feladathoz még nincs külön kivitelezési tudnivaló. A Feladatleírások résznél hozzáadhatod.</p>`;
+      $("#jobInfoDialog").showModal(); return;
+    }
     const chip = event.target.closest(".choice-chip");
     if (chip?.dataset.group) {
       const target = chip.dataset.group === "worker" ? task.workerIds : chip.dataset.group === "vehicle" ? task.vehicleIds : task.toolIds;
-      toggleInList(target, chip.dataset.id); chip.setAttribute("aria-pressed", String(target.includes(chip.dataset.id))); updateTaskSummary(card, task, index); if (chip.dataset.group === "vehicle") applyTaskVehicleTheme(card, task); markDirty(); return;
+      toggleInList(target, chip.dataset.id);
+      if (chip.dataset.group === "tool") { if (target.includes(chip.dataset.id)) task.toolQuantities[chip.dataset.id] ||= "1"; else delete task.toolQuantities[chip.dataset.id]; }
+      chip.setAttribute("aria-pressed", String(target.includes(chip.dataset.id))); updateTaskSummary(card, task, index); if (chip.dataset.group === "vehicle") applyTaskVehicleTheme(card, task); if (chip.dataset.group === "tool") renderToolQuantities(card.querySelector(".tool-quantities"), task); markDirty(); return;
     }
     if (chip?.dataset.templateId) { const template = byId(data.templates, chip.dataset.templateId); if (template) toggleTemplate(task, template); return; }
     if (chip?.dataset.materialId) {
       const material = byId(data.materials, chip.dataset.materialId); if (!material) return;
       const selectedIndex = task.materials.findIndex(item => searchKey(item.name) === searchKey(material.name));
-      if (selectedIndex >= 0) task.materials.splice(selectedIndex, 1); else task.materials.push({ name: material.name, quantity: "", unit: "" });
+      if (selectedIndex >= 0) task.materials.splice(selectedIndex, 1); else task.materials.push({ source: "", name: material.name, quantity: "" });
       markDirty(); renderTasks(); return;
     }
     const customerChoice = event.target.closest("[data-customer-choice]");
@@ -638,7 +752,7 @@
     if (event.target.closest(".customer-dropdown")) { if (!customerDirectory.length) openCustomerAuth(); else showCustomerSuggestions(card, "", true); return; }
     if (event.target.closest(".add-customer")) { if (window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory({ notify: true }); else openCustomerAuth(); return; }
     if (event.target.closest(".add-custom-job")) { const input = card.querySelector(".new-job-input"); addCustomJob(task, input.value); return; }
-    if (event.target.closest(".add-material")) { task.materials.push({ name: "", quantity: "", unit: "" }); markDirty(); renderTasks(); return; }
+    if (event.target.closest(".add-material")) { task.materials.push({ source: "", name: "", quantity: "" }); markDirty(); renderTasks(); return; }
     const materialRow = event.target.closest(".material-row");
     if (event.target.closest(".remove-material") && materialRow) { task.materials.splice(Number(materialRow.dataset.materialIndex), 1); markDirty(); renderTasks(); return; }
     if (event.target.closest(".duplicate-task")) { const duplicate = deepCopy(task); duplicate.id = uid(); workingPlan.tasks.splice(index + 1, 0, duplicate); markDirty(); renderTasks(); return; }
@@ -650,6 +764,9 @@
     const card = event.target.closest(".task-card"); if (!card) return; const task = findTaskFromElement(card); if (!task) return;
     if (event.target.matches(".customer-input")) { task.customerId = null; task.locationId = null; task.customerName = event.target.value; showCustomerSuggestions(card, event.target.value); }
     else if (event.target.matches(".address-input")) task.address = event.target.value;
+    else if (event.target.matches(".tool-quantity-input")) task.toolQuantities[event.target.dataset.toolId] = event.target.value;
+    else if (event.target.matches(".work-intensity")) { task.workIntensity = validRating(event.target.value); updateRatingDescriptions(card, task); }
+    else if (event.target.matches(".work-quality")) { task.workQuality = validRating(event.target.value); updateRatingDescriptions(card, task); }
     else if (event.target.matches(".extra-tools-input")) task.extraTools = event.target.value;
     else if (event.target.matches(".job-steps-input")) {
       const job = taskJobs(task).find(item => item.id === event.target.dataset.jobId);
@@ -662,11 +779,15 @@
     else if (event.target.matches(".notes-input")) task.notes = event.target.value;
     else if (event.target.closest(".material-row")) {
       const row = event.target.closest(".material-row"); const material = task.materials[Number(row.dataset.materialIndex)];
+      if (event.target.matches(".material-source")) material.source = event.target.value;
       if (event.target.matches(".material-name")) material.name = event.target.value;
       if (event.target.matches(".material-quantity")) material.quantity = event.target.value;
-      if (event.target.matches(".material-unit")) material.unit = event.target.value;
     }
     updateTaskSummary(card, task, workingPlan.tasks.indexOf(task)); markDirty();
+  });
+  $("#taskList").addEventListener("change", event => {
+    const card = event.target.closest(".task-card"); if (!card) return; const task = findTaskFromElement(card); if (!task) return;
+    if (event.target.matches(".worklog-required")) { task.workLogRequired = event.target.checked; markDirty(); }
   });
   $("#taskList").addEventListener("keydown", event => {
     if (!event.target.matches(".new-job-input") || event.key !== "Enter") return;
@@ -675,7 +796,7 @@
   $("#taskList").addEventListener("focusin", event => { const card = event.target.closest(".task-card"); if (card) setActiveTask(card, findTaskFromElement(card)); if (event.target.matches(".customer-input") && searchKey(event.target.value).length >= 2) showCustomerSuggestions(card, event.target.value); });
   document.addEventListener("click", event => { if (!event.target.closest(".customer-picker")) document.querySelectorAll(".customer-suggestions").forEach(box => box.hidden = true); });
 
-  function addTask() { const task = blankTask(); workingPlan.tasks.push(task); activeTaskId = task.id; markDirty(); renderTasks(); $("#taskList .task-card:last-child")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
+  function addTask() { const task = blankTask(); workingPlan.tasks.push(task); activeTaskId = task.id; collapsedTaskIds.delete(task.id); markDirty(); renderTasks(); $("#taskList .task-card:last-child")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
   $("#addTaskButton").addEventListener("click", addTask);
   $("#addTaskBottomButton").addEventListener("click", addTask);
   $("#customerAuthForm").addEventListener("submit", async event => {
@@ -724,20 +845,32 @@
       const taskHTML = tasks.length ? tasks.map((task, index) => {
         const workers = task.workerIds.map(id => byId(data.workers, id)?.name).filter(Boolean).join(", ");
         const vehicles = task.vehicleIds.map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
-        return `<div class="week-task"><b>${index + 1}. ${escapeHTML(vehicles || "Autó nélkül")}</b><small class="week-workers">Dolgozók: ${escapeHTML(workers || "nincs kiválasztva")}</small><span><strong>${escapeHTML(task.customerName || "Ügyfél nélkül")}</strong>${task.address ? `<em>${escapeHTML(task.address)}</em>` : ""}</span></div>`;
+        return `<div class="week-task"><b>${escapeHTML(vehicles || "Autó nélkül")}</b><small class="week-workers">Dolgozók: ${escapeHTML(workers || "nincs kiválasztva")}</small><span><strong>${index + 1}. ${escapeHTML(task.customerName || "Ügyfél nélkül")}</strong>${task.address ? `<em>${escapeHTML(task.address)}</em>` : ""}</span></div>`;
       }).join("") : `<p class="week-empty">Nincs elmentett feladat.</p>`;
-      return `<article class="week-day${date === isoToday() ? " today" : ""}"><header><p class="week-day-name">${escapeHTML(formatDate(date, { weekday: "long" }))}</p><p class="week-day-date">${escapeHTML(formatDate(date, { month: "short", day: "numeric" }))}</p></header><div class="week-day-tasks">${taskHTML}</div><button class="week-open" type="button" data-open-date="${date}">${tasks.length ? "Nap megnyitása" : "Terv készítése"}</button></article>`;
+      const holiday = hungarianHoliday(date);
+      return `<article class="week-day${date === isoToday() ? " today" : ""}${holiday ? " holiday" : ""}"><header><div><p class="week-day-name">${escapeHTML(formatDate(date, { weekday: "long" }))}</p><p class="week-day-date">${escapeHTML(formatDate(date, { month: "short", day: "numeric" }))}</p></div>${holiday ? `<span class="holiday-label">${escapeHTML(holiday)}</span>` : ""}</header><div class="week-day-tasks">${taskHTML}</div><div class="week-day-actions"><button class="week-open" type="button" data-open-date="${date}">${tasks.length ? "Nap megnyitása" : "Terv készítése"}</button>${plan ? `<button class="week-delete" type="button" data-delete-date="${date}">Törlés</button>` : ""}</div></article>`;
     }).join("");
   }
   function switchView(view) {
-    const weekly = view === "week"; $("#dayView").hidden = weekly; $("#weekView").hidden = !weekly; document.body.classList.toggle("week-mode", weekly);
+    const weekly = view === "week";
     setDockOpen(false);
     $("#dayViewButton").classList.toggle("active", !weekly); $("#dayViewButton").setAttribute("aria-pressed", String(!weekly));
     $("#weekViewButton").classList.toggle("active", weekly); $("#weekViewButton").setAttribute("aria-pressed", String(weekly));
-    if (weekly) { if (dirty) upsertWorkingPlan(); renderWeek(); }
+    if (weekly) { if (dirty) upsertWorkingPlan(); $("#weekView").open = true; renderWeek(); $("#weekView").scrollIntoView({ behavior: "smooth", block: "start" }); }
+    else $("#dayView").scrollIntoView({ behavior: "smooth", block: "start" });
   }
   $("#dayViewButton").addEventListener("click", () => switchView("day")); $("#weekViewButton").addEventListener("click", () => switchView("week"));
-  $("#weekGrid").addEventListener("click", event => { const button = event.target.closest("[data-open-date]"); if (!button) return; loadPlan(button.dataset.openDate); switchView("day"); window.scrollTo({ top: 0, behavior: "smooth" }); });
+  $("#weekGrid").addEventListener("click", event => {
+    const deleteButton = event.target.closest("[data-delete-date]");
+    if (deleteButton) {
+      const date = deleteButton.dataset.deleteDate;
+      if (!confirm(`Biztosan törlöd a(z) ${formatDate(date)} napi tervet? Előtte tölts le heti, havi vagy éves adatmentést, ha meg szeretnéd őrizni.`)) return;
+      data.plans = data.plans.filter(plan => plan.date !== date); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+      if (workingPlan.date === date) loadPlan(date); renderWeek(); toast("A napi terv törölve."); return;
+    }
+    const button = event.target.closest("[data-open-date]"); if (!button) return; loadPlan(button.dataset.openDate); switchView("day");
+  });
+  $("#weekView").addEventListener("toggle", () => { if ($("#weekView").open) renderWeek(); });
   $("#previousWeekButton").addEventListener("click", () => { weekAnchor = dateOffset(weekAnchor, -7); renderWeek(); });
   $("#nextWeekButton").addEventListener("click", () => { weekAnchor = dateOffset(weekAnchor, 7); renderWeek(); });
   $("#currentWeekButton").addEventListener("click", () => { weekAnchor = isoToday(); renderWeek(); });
@@ -760,15 +893,18 @@
     workingPlan.tasks.forEach((task, index) => {
       const workers = task.workerIds.map(id => byId(data.workers, id)?.name).filter(Boolean).join(", ");
       const vehicles = task.vehicleIds.map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
-      const tools = [...task.toolIds.map(id => byId(data.tools, id)?.name).filter(Boolean), ...String(task.extraTools || "").split(",").map(item => item.trim()).filter(Boolean)];
-      lines.push(`${index + 1}. ${vehicles || "Autó nélkül"}`);
+      const tools = [...task.toolIds.map(id => { const tool = byId(data.tools, id); return tool ? `${tool.name} – ${task.toolQuantities?.[id] || "1"} db` : ""; }).filter(Boolean), ...String(task.extraTools || "").split(",").map(item => item.trim()).filter(Boolean)];
+      lines.push(`Autó: ${vehicles || "nincs kiválasztva"}`);
       lines.push(`Dolgozók: ${workers || "nincs kiválasztva"}`);
-      lines.push(`Ügyfél: ${task.customerName || "nincs kiválasztva"}`);
+      lines.push(`${index + 1}. Ügyfél: ${task.customerName || "nincs kiválasztva"}`);
       lines.push(`Cím: ${task.address || "nincs megadva"}`);
+      lines.push(`Munkanapló: ${task.workLogRequired === false ? "nem kell megírni" : "meg kell írni"}`);
+      lines.push(`Munkaintenzitás: ${validRating(task.workIntensity)} – ${INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)]}`);
+      lines.push(`Munka minősége: ${validRating(task.workQuality)} – ${QUALITY_DESCRIPTIONS[validRating(task.workQuality)]}`);
       const descriptions = jobDescriptions(task);
       if (tools.length) { lines.push("Eszközök:"); tools.forEach(item => lines.push(`- ${item}`)); }
       const materials = task.materials.filter(item => item.name);
-      if (materials.length) { lines.push("Anyagok:"); materials.forEach(item => lines.push(`- ${item.name}${item.quantity ? ` – ${item.quantity}` : ""}${item.unit ? ` ${item.unit}` : ""}`)); }
+      if (materials.length) { lines.push("Anyagok:"); materials.forEach(item => lines.push(`- ${item.source ? `${item.source}: ` : ""}${item.name}${item.quantity ? ` – ${item.quantity}` : ""}`)); }
       if (descriptions.length) {
         lines.push("Feladatok:");
         descriptions.forEach(item => { lines.push(`- ${item.name}`); item.steps.forEach(step => lines.push(`  • ${step}`)); });
@@ -783,11 +919,12 @@
       const vehicles = task.vehicleIds.map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
       const printVehicle = (task.vehicleIds || []).map(id => byId(data.vehicles, id)).find(Boolean);
       const printTheme = printVehicle ? vehicleTheme(printVehicle) : { background: "#edf2eb", border: "#7b8e7e", accent: "#173f2b" };
-      const tools = [...task.toolIds.map(id => byId(data.tools, id)?.name).filter(Boolean), ...String(task.extraTools || "").split(",").map(item => item.trim()).filter(Boolean)];
+      const tools = [...task.toolIds.map(id => { const tool = byId(data.tools, id); return tool ? `${tool.name} – ${task.toolQuantities?.[id] || "1"} db` : ""; }).filter(Boolean), ...String(task.extraTools || "").split(",").map(item => item.trim()).filter(Boolean)];
       const materials = task.materials.filter(item => item.name);
       const descriptions = jobDescriptions(task);
       const jobs = descriptions.map(item => `<div class="print-job-description"><h4>${escapeHTML(item.name)}</h4>${item.steps.length ? `<ul>${item.steps.map(step => `<li>${escapeHTML(step)}</li>`).join("")}</ul>` : ""}</div>`).join("");
-      return `${index ? `<div class="print-divider">Következő napi feladat</div>` : ""}<article class="print-task" style="--print-task-color:${printTheme.background};--print-task-border:${printTheme.border};--print-task-accent:${printTheme.accent}"><div class="print-task-heading"><span class="print-index">${index + 1}.</span><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2><div class="print-heading-workers">${workers || `<span>Nincs dolgozó kiválasztva</span>`}</div></div><div class="print-client-row"><section><small>Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${escapeHTML(item.name)}${item.quantity ? ` – ${escapeHTML(item.quantity)}` : ""}${item.unit ? ` ${escapeHTML(item.unit)}` : ""}</li>`).join("")}</ul></section>` : ""}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}</div></article>`;
+      const expectations = `<section class="print-section wide"><h3>Munkavégzés</h3><p><strong>Munkanapló:</strong> ${task.workLogRequired === false ? "nem kell megírni" : "meg kell írni"}<br><strong>Munkaintenzitás:</strong> ${validRating(task.workIntensity)} – ${escapeHTML(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)])}<br><strong>Munka minősége:</strong> ${validRating(task.workQuality)} – ${escapeHTML(QUALITY_DESCRIPTIONS[validRating(task.workQuality)])}</p></section>`;
+      return `${index ? `<div class="print-divider">Következő napi feladat</div>` : ""}<article class="print-task" style="--print-task-color:${printTheme.background};--print-task-border:${printTheme.border};--print-task-accent:${printTheme.accent}"><div class="print-task-heading"><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2><div class="print-heading-workers">${workers || `<span>Nincs dolgozó kiválasztva</span>`}</div></div><div class="print-client-row"><section><small>${index + 1}. Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${item.source ? `<strong>${escapeHTML(item.source)}:</strong> ` : ""}${escapeHTML(item.name)}${item.quantity ? ` – ${escapeHTML(item.quantity)}` : ""}</li>`).join("")}</ul></section>` : ""}${expectations}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}</div></article>`;
     }).join("");
     const departure = workingPlan.meeting || workingPlan.stops ? `<div class="print-departure">${workingPlan.meeting ? `<p><strong>Találkozó:</strong> ${escapeHTML(workingPlan.meeting)}</p>` : ""}${workingPlan.stops ? `<p><strong>Megálló:</strong> ${escapeHTML(workingPlan.stops)}</p>` : ""}</div>` : "";
     const logoUrl = new URL("assets/diszkertek-logo.png", document.baseURI).href;
@@ -818,6 +955,15 @@
   function settingsType() {
     return activeSettingsTab === "workers" ? data.workers : activeSettingsTab === "vehicles" ? data.vehicles : activeSettingsTab === "tools" ? data.tools : activeSettingsTab === "materials" ? data.materials : activeSettingsTab === "templates" ? data.templates : data.customers;
   }
+  function recurringSettingsHTML() {
+    const editing = data.recurrences.find(item => item.id === editingSettingsId);
+    const today = isoToday(); const yearEnd = `${today.slice(0, 4)}-12-31`;
+    const customerOptions = customerDirectory.map(customer => `<option value="${escapeHTML(`${customer.name} | ${customer.address}`)}"></option>`).join("");
+    const templateOptions = activeSorted(data.templates).map(template => `<option value="${template.id}" ${editing?.templateId === template.id ? "selected" : ""}>${escapeHTML(template.name)}</option>`).join("");
+    const weekdays = [[1,"Hétfő"],[2,"Kedd"],[3,"Szerda"],[4,"Csütörtök"],[5,"Péntek"],[6,"Szombat"],[0,"Vasárnap"]].map(([value,label]) => `<option value="${value}" ${Number(editing?.weekday ?? 5) === value ? "selected" : ""}>${label}</option>`).join("");
+    const rows = data.recurrences.map(item => `<div class="settings-row" data-settings-row data-search-key="${escapeHTML(searchKey(`${item.customerName} ${item.address} ${item.jobName}`))}"><div><strong>${escapeHTML(item.customerName)}</strong><p>${escapeHTML(item.address)} · ${escapeHTML([["Vasárnap"],["Hétfő"],["Kedd"],["Szerda"],["Csütörtök"],["Péntek"],["Szombat"]][Number(item.weekday)]?.[0] || "")} · ${escapeHTML(item.jobName)}</p><p>${escapeHTML(formatDate(item.startDate, { year:"numeric", month:"short", day:"numeric" }))} – ${escapeHTML(formatDate(item.endDate, { year:"numeric", month:"short", day:"numeric" }))}</p></div><div class="settings-row-actions"><button class="icon-button" type="button" data-recurring-edit="${item.id}" aria-label="Szerkesztés">✎</button><button class="icon-button danger" type="button" data-recurring-delete="${item.id}" aria-label="Törlés">×</button></div></div>`).join("");
+    return `<div class="settings-editor recurring-editor"><h3>${editing ? "Ismétlődő terv szerkesztése" : "Új ismétlődő terv"}</h3><p class="field-help">A megadott feladat a kiválasztott hét minden ilyen napjára előre bekerül. Az egyes napok később külön szerkeszthetők vagy törölhetők.</p><label>Ügyfél és cím<input class="form-control" id="recurringCustomer" list="recurringCustomerOptions" value="${escapeHTML(editing ? `${editing.customerName} | ${editing.address}` : "")}" placeholder="Kezdd el írni az ügyfél nevét" autocomplete="off"><datalist id="recurringCustomerOptions">${customerOptions}</datalist></label><label>Feladat<select class="form-select" id="recurringTemplate"><option value="">Válassz feladatot</option>${templateOptions}</select></label><label>Hét napja<select class="form-select" id="recurringWeekday">${weekdays}</select></label><div class="form-grid"><label>Első nap<input class="form-control" id="recurringStart" type="date" value="${editing?.startDate || today}"></label><label>Utolsó nap<input class="form-control" id="recurringEnd" type="date" value="${editing?.endDate || yearEnd}"></label></div><button class="btn btn-outline-green" type="button" data-recurring-submit>Előre beírás a naptárba</button></div>${searchableSettingsListHTML(rows || `<p class="empty-detail">Még nincs ismétlődő terv.</p>`, data.recurrences.length, "Ismétlődő tervek")}`;
+  }
   function renderSettings() {
     $("#settingsDialogTitle").textContent = "Adatok kezelése";
     document.querySelectorAll("[data-settings-tab]").forEach(button => button.classList.toggle("active", button.dataset.settingsTab === activeSettingsTab));
@@ -826,6 +972,7 @@
       container.innerHTML = `<div class="settings-editor"><h3>Helyi adatfájl</h3><p>Az alkalmazás minden adatot a <strong>${DATA_FILE_NAME}</strong> fájlba ment. Érdemes erről időnként biztonsági másolatot készíteni.</p><div class="fallback-actions"><button class="btn btn-outline-green" type="button" data-data-action="choose">Mappa kiválasztása</button><button class="btn btn-soft" type="button" data-data-action="download">Biztonsági másolat letöltése</button><label class="btn btn-soft mb-0">Másolat visszatöltése<input type="file" data-data-import accept="application/json,.json" hidden></label></div></div>`;
       return;
     }
+    if (activeSettingsTab === "recurring") { container.innerHTML = recurringSettingsHTML(); return; }
     const list = settingsType(); const editing = list.find(item => item.id === editingSettingsId);
     if (activeSettingsTab === "workers") {
       const selectedColor = validWorkerColor(editing?.color);
@@ -839,9 +986,22 @@
     } else {
       const template = editing || { name: "", toolIds: [], materials: [], steps: [] };
       const toolNames = template.toolIds.map(id => byId(data.tools, id)?.name).filter(Boolean).join(", ");
-      const materialLines = template.materials.map(item => [item.name, item.quantity, item.unit].join(" | ")).join("\n");
-      container.innerHTML = `<div class="settings-editor"><h3>${editing ? "Sablon szerkesztése" : "Új feladatsablon"}</h3><label>Név<input class="form-control" id="settingName" value="${escapeHTML(template.name)}" maxlength="120"></label><label>Eszközök vesszővel elválasztva<input class="form-control" id="settingTools" value="${escapeHTML(toolNames)}" placeholder="például: lapát, gereblye"></label><label>Anyagok – soronként: név | mennyiség | egység<textarea class="form-control" id="settingMaterials" rows="3">${escapeHTML(materialLines)}</textarea></label><label>Munkamenet – soronként egy lépés<textarea class="form-control" id="settingSteps" rows="5">${escapeHTML(template.steps.join("\n"))}</textarea></label><button class="btn btn-outline-green" type="button" data-setting-submit>Mentés</button></div>${settingsListHTML(list, item => `${item.steps?.length || 0} lépés • ${item.toolIds?.length || 0} eszköz`)}`;
+      const materialLines = template.materials.map(item => [item.source, item.name, item.quantity].join(" | ")).join("\n");
+      container.innerHTML = `<div class="settings-editor"><h3>${editing ? "Sablon szerkesztése" : "Új feladatsablon"}</h3><label>Név<input class="form-control" id="settingName" value="${escapeHTML(template.name)}" maxlength="120"></label><label>Alapértelmezett eszközök vesszővel elválasztva<input class="form-control" id="settingTools" value="${escapeHTML(toolNames)}" placeholder="például: lapát, gereblye"></label><label>Anyagok – soronként: beszerzés helye | megnevezés | mennyiség<textarea class="form-control" id="settingMaterials" rows="3">${escapeHTML(materialLines)}</textarea></label><label>Kivitelezési tudnivalók – soronként egy lépés<textarea class="form-control" id="settingSteps" rows="5">${escapeHTML(template.steps.join("\n"))}</textarea></label><button class="btn btn-outline-green" type="button" data-setting-submit>Mentés</button></div>${settingsListHTML(list, item => `${item.steps?.length || 0} lépés • ${item.toolIds?.length || 0} eszköz`)}`;
     }
+  }
+  function saveRecurringEditor() {
+    const value = $("#recurringCustomer")?.value.trim() || ""; const separator = value.indexOf("|");
+    const customerName = (separator >= 0 ? value.slice(0, separator) : value).trim(); const address = (separator >= 0 ? value.slice(separator + 1) : "").trim();
+    const template = byId(data.templates, $("#recurringTemplate")?.value); const startDate = $("#recurringStart")?.value; const endDate = $("#recurringEnd")?.value;
+    if (!customerName || !address) { toast("Válassz ügyfelet és címet a listából.", true); return; }
+    if (!template) { toast("Válassz feladatot.", true); return; }
+    if (!startDate || !endDate || endDate < startDate) { toast("Ellenőrizd az első és az utolsó napot.", true); return; }
+    let item = data.recurrences.find(entry => entry.id === editingSettingsId);
+    if (item) removeRecurrence(item.id);
+    item = { id: item?.id || uid(), customerName, address, templateId: template.id, jobName: template.name, weekday: Number($("#recurringWeekday").value), startDate, endDate };
+    data.recurrences.push(item); materializeRecurrence(item); editingSettingsId = null; markDirty("Ismétlődő tervek elkészítve • mentés szükséges"); renderSettings(); renderWeek();
+    toast("Az ismétlődő feladatok bekerültek a naptárba.");
   }
   function settingsListHTML(list, description = () => "", showWorkerColor = false) {
     const sorted = [...list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name, "hu"));
@@ -884,14 +1044,21 @@
         if (!tool) { tool = { id: uid(), name: nameValue, active: true, order: data.tools.length }; data.tools.push(tool); }
         return tool.id;
       });
-      item.materials = $("#settingMaterials").value.split(/\r?\n/).map(line => line.split("|").map(value => value.trim())).filter(parts => parts[0]).map(([materialName, quantity = "", unit = ""]) => ({ name: materialName, quantity, unit }));
-      item.steps = $("#settingSteps").value.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+      item.materials = $("#settingMaterials").value.split(/\r?\n/).map(line => line.split("|").map(value => value.trim())).filter(parts => parts.some(Boolean)).map(([source = "", materialName = "", quantity = ""]) => ({ source, name: materialName, quantity })).filter(material => material.name);
+      item.steps = $("#settingSteps").value.split(/\r?\n/).map(value => value.trim()).filter(value => value && !searchKey(value).includes("munkanaplo"));
     }
     if (!existing) list.push(item); editingSettingsId = null; markDirty("Beállítás módosítva • mentés szükséges"); renderSettings(); renderTasks();
   }
   $("#settingsButton").addEventListener("click", () => { activeSettingsTab = "workers"; editingSettingsId = null; renderSettings(); $("#settingsDialog").showModal(); });
   $("#settingsDialog").addEventListener("click", async event => {
     const tab = event.target.closest("[data-settings-tab]"); if (tab) { activeSettingsTab = tab.dataset.settingsTab; editingSettingsId = null; renderSettings(); return; }
+    if (event.target.closest("[data-recurring-submit]")) { saveRecurringEditor(); return; }
+    const recurringEdit = event.target.closest("[data-recurring-edit]"); if (recurringEdit) { editingSettingsId = recurringEdit.dataset.recurringEdit; renderSettings(); return; }
+    const recurringDelete = event.target.closest("[data-recurring-delete]");
+    if (recurringDelete) {
+      if (!confirm("Törlöd ezt az ismétlődő tervet és az általa előre létrehozott napi feladatokat?")) return;
+      removeRecurrence(recurringDelete.dataset.recurringDelete); editingSettingsId = null; markDirty("Ismétlődő terv törölve • mentés szükséges"); renderSettings(); renderWeek(); return;
+    }
     const directoryAction = event.target.closest("[data-customer-directory]");
     if (directoryAction?.dataset.customerDirectory === "connect") { openCustomerAuth(); return; }
     if (directoryAction?.dataset.customerDirectory === "refresh") { await syncCustomerDirectory({ notify: true }); return; }
@@ -918,7 +1085,10 @@
     $("#downloadReference").textContent = `A heti, havi és éves mentés alapdátuma: ${formatDate(workingPlan.date)}.`;
     $("#downloadsDialog").showModal();
   });
-  $("#downloadsDialog").addEventListener("click", event => { const button = event.target.closest("[data-export-period]"); if (button) exportPeriod(button.dataset.exportPeriod); });
+  $("#downloadsDialog").addEventListener("click", event => {
+    const exportButton = event.target.closest("[data-export-period]"); if (exportButton) { exportPeriod(exportButton.dataset.exportPeriod); return; }
+    const deleteButton = event.target.closest("[data-delete-period]"); if (deleteButton) deletePeriod(deleteButton.dataset.deletePeriod);
+  });
   function appRunsStandalone() { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; }
   function updateInstallButtons() {
     const installed = appRunsStandalone() || localStorage.getItem(INSTALLED_KEY) === "true";
@@ -975,6 +1145,7 @@
     }
     updateStorageStatus();
     if (!dirty) loadPlan($("#planDate").value); else { renderTasks(); $("#saveState").textContent = "Helyreállított piszkozat • mentés szükséges"; }
+    renderWeek();
     if (navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) await syncCustomerDirectory();
     if (appRunsStandalone()) localStorage.setItem(INSTALLED_KEY, "true");
     updateInstallButtons();

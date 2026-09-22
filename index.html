@@ -29,7 +29,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/app-icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260922q">
+  <link rel="stylesheet" href="css/style.css?v=20260922s">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -94,13 +94,14 @@
       <button class="btn btn-add btn-add-bottom" id="addTaskBottomButton" type="button" hidden>＋ Napi feladat hozzáadása</button>
       <button class="btn btn-save task-save-button" id="saveButton" type="button"><span aria-hidden="true">✓</span> Mentés</button>
     </section>
-    <section class="week-section" id="weekView" aria-labelledby="weekHeading" hidden>
-      <div class="section-heading">
-        <div><p class="section-kicker">Péntektől csütörtökig</p><h2 id="weekHeading">Heti áttekintés</h2><p class="week-range" id="weekRange"></p></div>
+    <details class="week-section weekly-overview" id="weekView" open>
+      <summary class="weekly-overview-summary"><span><strong id="weekHeading">Heti áttekintés</strong><small>Péntektől csütörtökig · lenyitható</small></span><span class="weekly-chevron" aria-hidden="true">⌄</span></summary>
+      <div class="section-heading week-heading-content">
+        <div><p class="section-kicker">Péntektől csütörtökig</p><h2>Heti áttekintés</h2><p class="week-range" id="weekRange"></p></div>
         <div class="week-nav"><button class="btn btn-soft" id="previousWeekButton" type="button">← Előző hét</button><button class="btn btn-soft" id="currentWeekButton" type="button">Aktuális hét</button><button class="btn btn-soft" id="nextWeekButton" type="button">Következő hét →</button></div>
       </div>
       <div class="week-grid" id="weekGrid"></div>
-    </section>
+    </details>
   </main>
 
   <div class="action-dock" aria-label="Napi terv műveletek">
@@ -128,6 +129,7 @@
         <button type="button" data-settings-tab="tools">Eszközök</button>
         <button type="button" data-settings-tab="materials">Anyagok</button>
         <button type="button" data-settings-tab="customers">Ügyfelek</button>
+        <button type="button" data-settings-tab="recurring">Ismétlődő tervek</button>
         <button type="button" data-settings-tab="data">Adatfájl</button>
       </nav>
       <div id="settingsContent" class="settings-content"></div>
@@ -192,7 +194,16 @@
           <button class="download-option" type="button" data-export-period="all"><strong>Teljes adatfájl</strong><span>Minden beállítás, ügyfél és napi terv</span></button>
           <a class="download-option app-package" href="downloads/diszkertek-napi-app.zip" download><strong>Számítógépes offline ZIP</strong><span>Technikai csomag számítógéphez – telefonos telepítéshez a fenti gombot használd</span></a>
         </div>
+        <details class="delete-archive"><summary>Régi tervek törlése</summary><p>Előbb töltsd le a megőrizni kívánt adatmentést. A törlés a törzsadatokat és az ismétlődő beállításokat nem érinti.</p><div class="archive-delete-buttons"><button class="btn btn-soft" type="button" data-delete-period="week">Kiválasztott hét</button><button class="btn btn-soft" type="button" data-delete-period="month">Kiválasztott hónap</button><button class="btn btn-soft" type="button" data-delete-period="year">Kiválasztott év</button><button class="btn btn-danger" type="button" data-delete-period="all">Minden napi terv</button></div></details>
       </div>
+    </form>
+  </dialog>
+
+  <dialog id="jobInfoDialog" class="app-dialog job-info-dialog">
+    <form method="dialog" class="dialog-frame">
+      <header class="dialog-header"><div><p class="section-kicker">Kivitelezési tudnivalók</p><h2 id="jobInfoTitle">Feladat</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
+      <div class="dialog-body" id="jobInfoContent"></div>
+      <footer class="dialog-footer"><button class="btn btn-outline-green" value="cancel">Bezárás</button></footer>
     </form>
   </dialog>
 
@@ -201,17 +212,17 @@
   <template id="taskTemplate">
     <article class="task-card">
       <header class="task-card-header">
-        <div class="task-number" aria-hidden="true"></div>
         <div class="task-heading-copy">
           <p class="task-overline">Napi feladat <span class="active-badge" hidden>Éppen szerkeszted</span></p>
           <h3 class="task-summary" hidden></h3>
           <p class="task-team-summary" hidden></p>
           <div class="task-client-summary">
-            <span><small>Ügyfél</small><strong class="task-client-name">Nincs kiválasztva</strong></span>
+            <span class="numbered-customer"><b class="task-number" aria-hidden="true"></b><span><small>Ügyfél</small><strong class="task-client-name">Nincs kiválasztva</strong></span></span>
             <span><small>Cím</small><strong class="task-client-address">Nincs megadva</strong></span>
           </div>
         </div>
         <div class="task-order-actions">
+          <button type="button" class="btn btn-soft edit-task">Szerkesztés</button>
           <button type="button" class="icon-button move-up" aria-label="Feladat mozgatása felfelé" data-tooltip="Mozgatás felfelé">↑</button>
           <button type="button" class="icon-button move-down" aria-label="Feladat mozgatása lefelé" data-tooltip="Mozgatás lefelé">↓</button>
           <button type="button" class="icon-button duplicate-task" aria-label="Feladat másolása" data-tooltip="Feladat másolása">⧉</button>
@@ -234,6 +245,7 @@
             <div class="customer-suggestions" hidden></div>
           </div>
           <label>Cím<input class="form-control address-input" type="text" maxlength="240" placeholder="Az ügyfél kiválasztása után automatikusan kitöltődik"></label>
+          <label class="worklog-option"><span><input class="worklog-required" type="checkbox" checked> Munkanaplót meg kell írni</span></label>
           <button type="button" class="text-button add-customer">＋ Új ügyfél</button>
         </section>
         <details class="task-step expandable" data-detail="jobs" open>
@@ -249,7 +261,7 @@
         </details>
         <details class="task-step expandable" data-detail="tools">
           <summary><span class="step-label"><span>5</span><strong>Eszközök</strong></span><span class="summary-hint">lenyitható</span></summary>
-          <div class="detail-content"><div class="chip-grid tool-chips"></div><label class="mt-3">Egyéb eszközök<input class="form-control extra-tools-input" type="text" maxlength="300" placeholder="Vesszővel elválasztva"></label></div>
+          <div class="detail-content"><div class="chip-grid tool-chips"></div><div class="tool-quantities"></div><label class="mt-3">Egyéb eszközök<input class="form-control extra-tools-input" type="text" maxlength="300" placeholder="Vesszővel elválasztva"></label></div>
         </details>
         <details class="task-step expandable" data-detail="materials">
           <summary><span class="step-label"><span>6</span><strong>Anyagok</strong></span><span class="summary-hint">lenyitható</span></summary>
@@ -259,15 +271,22 @@
           <summary><span class="step-label"><span>7</span><strong>Feladatleírások</strong></span><span class="summary-hint">feladatonként szerkeszthető</span></summary>
           <div class="detail-content"><div class="job-workflows"></div><label class="mt-3">Megjegyzés<textarea class="form-control notes-input" rows="2" maxlength="1000" placeholder="Időpont, kapukód, fontos tudnivaló…"></textarea></label></div>
         </details>
+        <details class="task-step expandable expectations" data-detail="expectations">
+          <summary><span class="step-label"><span>8</span><strong>Munkavégzés elvárásai</strong></span><span class="summary-hint">intenzitás és minőség</span></summary>
+          <div class="detail-content expectation-grid">
+            <label>Munkaintenzitás<select class="form-select work-intensity"></select><small class="rating-description intensity-description"></small></label>
+            <label>Munka minősége<select class="form-select work-quality"></select><small class="rating-description quality-description"></small></label>
+          </div>
+        </details>
       </div>
     </article>
   </template>
 
   <template id="materialTemplate">
     <div class="material-row">
-      <input class="form-control material-name" type="text" maxlength="120" aria-label="Anyag neve" placeholder="Anyag">
-      <input class="form-control material-quantity" type="text" maxlength="30" aria-label="Mennyiség" placeholder="Mennyiség">
-      <input class="form-control material-unit" type="text" maxlength="30" aria-label="Mértékegység" placeholder="Egység">
+      <input class="form-control material-source" type="text" maxlength="160" aria-label="Beszerzés helye" placeholder="Beszerzés helye / cím">
+      <input class="form-control material-name" type="text" maxlength="120" aria-label="Anyag megnevezése" placeholder="Megnevezés">
+      <input class="form-control material-quantity" type="text" maxlength="60" aria-label="Mennyiség" placeholder="Mennyiség">
       <button type="button" class="icon-button danger remove-material" aria-label="Anyag törlése">×</button>
     </div>
   </template>
@@ -276,6 +295,6 @@
 
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260922e"></script>
-  <script src="js/app.js?v=20260922t"></script>
+  <script src="js/app.js?v=20260922v"></script>
 </body>
 </html>
