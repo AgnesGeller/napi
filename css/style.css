@@ -168,8 +168,8 @@ button, summary { touch-action: manipulation; }
 .dialog-header h2 { margin: 0; color: var(--forest); font: 700 1.55rem Georgia, serif; }
 .dialog-body, .settings-content { padding: 1rem; overflow: auto; }
 .dialog-footer { display: flex; justify-content: flex-end; gap: .55rem; padding: .8rem 1rem; border-top: 1px solid var(--line); background: #f7f8f4; }
-.settings-tabs { display: flex; gap: .2rem; padding: .55rem .7rem 0; overflow-x: auto; border-bottom: 1px solid var(--line); background: #fff; }
-.settings-tabs button { flex: 0 0 auto; min-height: 42px; padding: .45rem .72rem; color: #49564c; border: 0; border-bottom: 3px solid transparent; background: transparent; font-weight: 750; }
+.settings-tabs { display: flex; flex-wrap: wrap; gap: .25rem; padding: .55rem .7rem; border-bottom: 1px solid var(--line); background: #fff; }
+.settings-tabs button { flex: 1 1 110px; min-height: 42px; padding: .45rem .6rem; color: #49564c; border: 1px solid #dbe2da; border-bottom: 3px solid transparent; background: #f8faf7; font-weight: 750; text-align: center; }
 .settings-tabs button.active { color: var(--forest); border-bottom-color: var(--orange); }
 .settings-list { display: grid; gap: .55rem; }
 .settings-row { display: grid; grid-template-columns: 1fr auto; gap: .65rem; align-items: center; padding: .7rem; border: 1px solid #d4ddd3; background: #fff; }

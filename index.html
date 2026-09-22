@@ -29,7 +29,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="assets/app-icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260922g">
+  <link rel="stylesheet" href="css/style.css?v=20260922h">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -47,7 +47,7 @@
         <button class="btn btn-install-header" id="quickInstallButton" type="button" hidden>📱 App telepítése</button>
         <button class="btn btn-light-outline" id="downloadButton" type="button">⬇ Adatmentések</button>
         <button class="btn btn-light-outline" id="refreshButton" type="button" title="A legújabb appverzió betöltése">⟳ Frissítés</button>
-        <button class="btn btn-light-outline" id="settingsButton" type="button">＋ Új dolgozó</button>
+        <button class="btn btn-light-outline" id="settingsButton" type="button">⚙ Adatok kezelése</button>
       </div>
     </div>
   </header>
@@ -118,7 +118,7 @@
   <dialog id="settingsDialog" class="app-dialog settings-dialog">
     <form method="dialog" class="dialog-frame">
       <header class="dialog-header">
-        <div><p class="section-kicker">Törzsadatok</p><h2 id="settingsDialogTitle">Új dolgozó</h2></div>
+        <div><p class="section-kicker">Törzsadatok</p><h2 id="settingsDialogTitle">Adatok kezelése</h2></div>
         <button class="icon-button" value="cancel" aria-label="Bezárás">×</button>
       </header>
       <nav class="settings-tabs" aria-label="Beállítási kategóriák">
@@ -204,8 +204,8 @@
         <div class="task-number" aria-hidden="true"></div>
         <div class="task-heading-copy">
           <p class="task-overline">Napi feladat <span class="active-badge" hidden>Éppen szerkeszted</span></p>
-          <h3 class="task-summary">Autó kiválasztása</h3>
-          <p class="task-team-summary">Dolgozók kiválasztása</p>
+          <h3 class="task-summary" hidden></h3>
+          <p class="task-team-summary" hidden></p>
           <div class="task-client-summary">
             <span><small>Ügyfél</small><strong class="task-client-name">Nincs kiválasztva</strong></span>
             <span><small>Cím</small><strong class="task-client-address">Nincs megadva</strong></span>
@@ -276,6 +276,6 @@
 
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260922e"></script>
-  <script src="js/app.js?v=20260922j"></script>
+  <script src="js/app.js?v=20260922k"></script>
 </body>
 </html>

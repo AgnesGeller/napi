@@ -455,8 +455,9 @@
   function updateTaskSummary(card, task, index = workingPlan.tasks.indexOf(task)) {
     const { workers, vehicles } = taskPeopleAndVehicle(task);
     card.querySelector(".task-number").textContent = `${index + 1}.`;
-    card.querySelector(".task-summary").textContent = vehicles.join(" + ") || "Autó kiválasztása";
-    card.querySelector(".task-team-summary").textContent = workers.length ? `Dolgozók: ${workers.join(", ")}` : "Dolgozók kiválasztása";
+    const vehicleSummary = card.querySelector(".task-summary"); const workerSummary = card.querySelector(".task-team-summary");
+    vehicleSummary.textContent = vehicles.join(" + "); vehicleSummary.hidden = vehicles.length === 0;
+    workerSummary.textContent = workers.length ? `Dolgozók: ${workers.join(", ")}` : ""; workerSummary.hidden = workers.length === 0;
     card.querySelector(".task-client-name").textContent = task.customerName || "Nincs kiválasztva";
     card.querySelector(".task-client-address").textContent = task.address || "Nincs megadva";
   }
@@ -759,8 +760,7 @@
     return activeSettingsTab === "workers" ? data.workers : activeSettingsTab === "vehicles" ? data.vehicles : activeSettingsTab === "tools" ? data.tools : activeSettingsTab === "materials" ? data.materials : activeSettingsTab === "templates" ? data.templates : data.customers;
   }
   function renderSettings() {
-    const dialogTitles = { workers: "Új dolgozó", vehicles: "Autók kezelése", templates: "Feladatsablonok", tools: "Eszközök kezelése", materials: "Anyagok kezelése", customers: "Ügyféllista", data: "Adatfájl" };
-    $("#settingsDialogTitle").textContent = dialogTitles[activeSettingsTab] || "Törzsadatok";
+    $("#settingsDialogTitle").textContent = "Adatok kezelése";
     document.querySelectorAll("[data-settings-tab]").forEach(button => button.classList.toggle("active", button.dataset.settingsTab === activeSettingsTab));
     const container = $("#settingsContent");
     if (activeSettingsTab === "data") {
