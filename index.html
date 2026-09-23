@@ -30,7 +30,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260923a">
+  <link rel="stylesheet" href="css/style.css?v=20260923c">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -242,15 +242,15 @@
       </header>
       <div class="task-fields">
         <section class="task-step">
-          <div class="step-label"><span>1</span><h4>Autó</h4></div>
+          <div class="step-label"><h4>Autó</h4></div>
           <div class="chip-grid vehicle-chips"></div>
         </section>
         <section class="task-step">
-          <div class="step-label"><span>2</span><h4>Dolgozók</h4></div>
+          <div class="step-label"><h4>Dolgozók</h4></div>
           <div class="chip-grid worker-chips"></div>
         </section>
         <section class="task-step step-customer">
-          <div class="step-label"><span>3</span><h4>Ügyfél és cím</h4></div>
+          <div class="step-label"><h4>Ügyfél és cím</h4></div>
           <div class="customer-picker">
             <span class="customer-field-label">Ügyfél keresése</span><span class="customer-picker-row"><input class="form-control customer-input" type="search" autocomplete="off" aria-label="Ügyfél keresése" placeholder="Írj be legalább két betűt…"><button class="customer-dropdown" type="button" aria-label="Ügyféllista megnyitása" title="Ügyféllista megnyitása"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span>
             <div class="customer-suggestions" hidden></div>
@@ -261,7 +261,7 @@
           <button type="button" class="text-button add-customer">＋ Új ügyfél</button>
         </section>
         <details class="task-step expandable" data-detail="jobs" open>
-          <summary><span class="step-label"><span>4</span><strong>Feladatok</strong></span><span class="summary-hint job-count">Nincs kiválasztva</span></summary>
+          <summary><span class="step-label"><strong>Feladatok</strong></span><span class="summary-hint job-count">Nincs kiválasztva</span></summary>
           <div class="detail-content">
             <p class="field-help">Több feladatot is kiválaszthatsz. A zöld kijelölést ugyanarra kattintva leveheted.</p>
             <div class="chip-grid template-chips"></div>
@@ -272,19 +272,19 @@
           </div>
         </details>
         <details class="task-step expandable" data-detail="tools">
-          <summary><span class="step-label"><span>5</span><strong>Eszközök</strong></span><span class="summary-hint">lenyitható</span></summary>
+          <summary><span class="step-label"><strong>Eszközök</strong></span><span class="summary-hint">lenyitható</span></summary>
           <div class="detail-content"><div class="chip-grid tool-chips"></div><div class="tool-quantities"></div><label class="mt-3">Egyéb eszközök<input class="form-control extra-tools-input" type="text" maxlength="300" placeholder="Vesszővel elválasztva"></label></div>
         </details>
         <details class="task-step expandable" data-detail="materials">
-          <summary><span class="step-label"><span>6</span><strong>Anyagok</strong></span><span class="summary-hint">lenyitható</span></summary>
+          <summary><span class="step-label"><strong>Anyagok</strong></span><span class="summary-hint">lenyitható</span></summary>
           <div class="detail-content"><div class="chip-grid material-chips mb-3"></div><div class="materials-list"></div><button type="button" class="btn btn-soft add-material">＋ Egyedi anyag hozzáadása</button></div>
         </details>
         <details class="task-step expandable" data-detail="workflow">
-          <summary><span class="step-label"><span>7</span><strong>Feladatleírások</strong></span><span class="summary-hint">feladatonként szerkeszthető</span></summary>
+          <summary><span class="step-label"><strong>Feladatleírások</strong></span><span class="summary-hint">feladatonként szerkeszthető</span></summary>
           <div class="detail-content"><div class="job-workflows"></div><label class="mt-3">Megjegyzés<textarea class="form-control notes-input" rows="2" maxlength="1000" placeholder="Időpont, kapukód, fontos tudnivaló…"></textarea></label></div>
         </details>
         <details class="task-step expandable expectations" data-detail="expectations">
-          <summary><span class="step-label"><span>8</span><strong>Munkavégzés elvárásai</strong></span><span class="summary-hint">intenzitás és minőség</span></summary>
+          <summary><span class="step-label"><strong>Munkavégzés elvárásai</strong></span><span class="summary-hint">intenzitás és minőség</span></summary>
           <div class="detail-content expectation-grid">
             <label>Munkaintenzitás<select class="form-select work-intensity"></select><small class="rating-description intensity-description"></small></label>
             <label>Munka minősége<select class="form-select work-quality"></select><small class="rating-description quality-description"></small></label>
@@ -309,6 +309,6 @@
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260922f"></script>
   <script src="js/napi-sync.js?v=20260922b"></script>
-  <script src="js/app.js?v=20260923a"></script>
+  <script src="js/app.js?v=20260923c"></script>
 </body>
 </html>

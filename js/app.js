@@ -353,6 +353,7 @@
     dirty = true;
     $("#saveState").textContent = message;
     try { localStorage.setItem(RECOVERY_KEY, JSON.stringify({ savedAt: new Date().toISOString(), data, workingPlan })); } catch (_) { /* A mappamentés ettől még használható. */ }
+    renderPrintView();
     queueCloudSync();
   }
   function markSaved() {
@@ -609,6 +610,7 @@
     dirty = false;
     $("#saveState").textContent = stored ? "Betöltve • nincs mentetlen módosítás" : "Új napi terv";
     renderTasks();
+    renderPrintView();
     if ($("#weekView").open) renderWeek();
     if ($("#monthView")?.open) renderMonth();
   }
@@ -641,6 +643,7 @@
     return groups;
   }
   function clientIndexInTeam(task) { return tasksByTeam().find(group => group.id === (task.teamId || task.id))?.tasks.indexOf(task) ?? 0; }
+  function clientIndexInDay(task, plan = workingPlan) { return plan.tasks.indexOf(task); }
   function taskJobs(task) { return Array.isArray(task.jobs) ? task.jobs : []; }
   function selectedJobNames(task) { return taskJobs(task).map(job => job.name).filter(Boolean); }
   function cleanStep(value) { return String(value || "").trim().replace(/^\d+[.)]\s*/, ""); }
@@ -666,7 +669,8 @@
     card.querySelector(".task-number").textContent = `${clientIndex + 1}.`;
     updateTaskSummary(card, task, clientIndex);
     const groupTasks = workingPlan.tasks.filter(item => (item.teamId || item.id) === (task.teamId || task.id));
-    card.querySelector(".move-up").disabled = clientIndex === 0; card.querySelector(".move-down").disabled = clientIndex === groupTasks.length - 1;
+    const teamIndex = groupTasks.indexOf(task);
+    card.querySelector(".move-up").disabled = teamIndex === 0; card.querySelector(".move-down").disabled = teamIndex === groupTasks.length - 1;
     card.querySelector(".customer-input").value = task.customerName || ""; card.querySelector(".address-input").value = task.address || "";
     card.querySelector(".start-time-input").value = task.startTime || "";
     card.querySelector(".extra-tools-input").value = task.extraTools || ""; card.querySelector(".notes-input").value = task.notes || "";
@@ -749,7 +753,7 @@
       block.style.cssText = `--team-color:${theme.background};--team-border:${theme.border};--team-accent:${theme.accent}`;
       block.innerHTML = `<header class="team-block-header"><div><h3>${escapeHTML(vehicles.join(" + ") || "Új autó / csapat")}</h3><p>${escapeHTML(workers.length ? `Dolgozók: ${workers.join(", ")}` : "Válaszd ki a dolgozókat")}</p></div><strong>${group.tasks.length} ügyfél</strong></header><div class="task-list-inner"></div><button class="team-add-customer" type="button" data-add-team-customer="${escapeHTML(group.id)}">＋ Új ügyfél ehhez a csapathoz</button>`;
       const inner = block.querySelector(".task-list-inner");
-      group.tasks.forEach((task, clientIndex) => inner.append(renderTask(task, workingPlan.tasks.indexOf(task), clientIndex, clientIndex === 0)));
+      group.tasks.forEach((task, teamIndex) => inner.append(renderTask(task, workingPlan.tasks.indexOf(task), clientIndexInDay(task), teamIndex === 0)));
       list.append(block);
     });
     if (hadCards) list.querySelectorAll(".task-card details").forEach(detail => { detail.open = openDetails.has(`${detail.closest(".task-card").dataset.taskId}:${detail.dataset.detail}`); });
@@ -771,7 +775,7 @@
       vehicles: (task.vehicleIds || []).map(id => byId(data.vehicles, id)?.name).filter(Boolean)
     };
   }
-  function updateTaskSummary(card, task, index = clientIndexInTeam(task)) {
+  function updateTaskSummary(card, task, index = clientIndexInDay(task)) {
     const { workers, vehicles } = taskPeopleAndVehicle(task);
     card.querySelector(".task-number").textContent = `${index + 1}.`;
     const vehicleSummary = card.querySelector(".task-summary"); const workerSummary = card.querySelector(".task-team-summary");
@@ -919,7 +923,7 @@
       toggleInList(target, chip.dataset.id);
       if (chip.dataset.group === "tool") { if (target.includes(chip.dataset.id)) task.toolQuantities[chip.dataset.id] ||= "1"; else delete task.toolQuantities[chip.dataset.id]; }
       if (["worker", "vehicle"].includes(chip.dataset.group)) workingPlan.tasks.filter(item => item.teamId === task.teamId).forEach(item => { item[chip.dataset.group === "worker" ? "workerIds" : "vehicleIds"] = deepCopy(target); });
-      chip.setAttribute("aria-pressed", String(target.includes(chip.dataset.id))); updateTaskSummary(card, task, clientIndex); if (chip.dataset.group === "vehicle") applyTaskVehicleTheme(card, task); if (chip.dataset.group === "tool") renderToolQuantities(card.querySelector(".tool-quantities"), task); markDirty(); renderTasks(); return;
+      chip.setAttribute("aria-pressed", String(target.includes(chip.dataset.id))); updateTaskSummary(card, task); if (chip.dataset.group === "vehicle") applyTaskVehicleTheme(card, task); if (chip.dataset.group === "tool") renderToolQuantities(card.querySelector(".tool-quantities"), task); markDirty(); renderTasks(); return;
     }
     if (chip?.dataset.templateId) { const template = byId(data.templates, chip.dataset.templateId); if (template) toggleTemplate(task, template); return; }
     if (chip?.dataset.materialId) {
@@ -933,7 +937,7 @@
       const customer = byId(customerDirectory, customerChoice.dataset.customerChoice); if (!customer) return;
       task.customerId = customer.customerId; task.locationId = customer.locationId; task.customerName = customer.name; task.address = customer.address || "";
       card.querySelector(".customer-input").value = task.customerName; card.querySelector(".address-input").value = task.address; card.querySelector(".customer-suggestions").hidden = true;
-      updateTaskSummary(card, task, clientIndex); markDirty(); return;
+      updateTaskSummary(card, task); markDirty(); return;
     }
     if (event.target.closest(".customer-dropdown")) { if (!customerDirectory.length) openCustomerAuth(); else showCustomerSuggestions(card, "", true); return; }
     if (event.target.closest(".add-customer")) { if (window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory({ notify: true }); else openCustomerAuth(); return; }
@@ -1036,7 +1040,7 @@
         const lead = group.tasks[0];
         const workers = lead.workerIds.map(id => byId(data.workers, id)?.name).filter(Boolean).join(", ");
         const vehicles = lead.vehicleIds.map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
-        const clients = group.tasks.map((task, index) => `<span><strong>${index + 1}. ${escapeHTML(task.customerName || "Ügyfél nélkül")}</strong>${task.startTime ? `<small>${escapeHTML(task.startTime)}</small>` : ""}${task.address ? `<em>${escapeHTML(task.address)}</em>` : ""}</span>`).join("");
+        const clients = group.tasks.map(task => `<span><strong>${clientIndexInDay(task, plan) + 1}. ${escapeHTML(task.customerName || "Ügyfél nélkül")}</strong>${task.startTime ? `<small>${escapeHTML(task.startTime)}</small>` : ""}${task.address ? `<em>${escapeHTML(task.address)}</em>` : ""}</span>`).join("");
         return `<div class="week-task"><b>${escapeHTML(vehicles || "Autó nélkül")}</b><small class="week-workers">Dolgozók: ${escapeHTML(workers || "nincs kiválasztva")}</small>${clients}</div>`;
       }).join("") : `<p class="week-empty">Nincs elmentett feladat.</p>`;
       const holiday = hungarianHoliday(date);
@@ -1111,9 +1115,9 @@
       const workers = lead.workerIds.map(id => byId(data.workers, id)?.name).filter(Boolean).join(", ");
       const vehicles = lead.vehicleIds.map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
       lines.push(`${vehicles || "Autó nélkül"} – ${workers || "nincs dolgozó kiválasztva"}`, "");
-      group.tasks.forEach((task, index) => {
+      group.tasks.forEach(task => {
         const tools = [...task.toolIds.map(id => { const tool = byId(data.tools, id); return tool ? `${tool.name} – ${task.toolQuantities?.[id] || "1"} db` : ""; }).filter(Boolean), ...String(task.extraTools || "").split(",").map(item => item.trim()).filter(Boolean)];
-        lines.push(`${index + 1}. ${task.customerName || "nincs kiválasztva"}`);
+        lines.push(`${clientIndexInDay(task) + 1}. ${task.customerName || "nincs kiválasztva"}`);
         lines.push(`Cím: ${task.address || "nincs megadva"}${task.startTime ? ` · Kezdés: ${task.startTime}` : ""}`);
         lines.push(task.workLogRequired === false ? "Munkanaplót nem kell írni." : "Munkanaplót meg kell írni.");
         lines.push(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)]);
@@ -1141,21 +1145,23 @@
       const vehicles = lead.vehicleIds.map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
       const printVehicle = (lead.vehicleIds || []).map(id => byId(data.vehicles, id)).find(Boolean);
       const printTheme = printVehicle ? vehicleTheme(printVehicle) : { background: "#edf2eb", border: "#7b8e7e", accent: "#173f2b" };
-      const clients = group.tasks.map((task, index) => {
+      const clients = group.tasks.map(task => {
         const tools = [...task.toolIds.map(id => { const tool = byId(data.tools, id); return tool ? `${tool.name} - ${task.toolQuantities?.[id] || "1"} db` : ""; }).filter(Boolean), ...String(task.extraTools || "").split(",").map(item => item.trim()).filter(Boolean)];
         const materials = task.materials.filter(item => item.name);
         const jobs = jobDescriptions(task).map(item => `<div class="print-job-description"><h4>${escapeHTML(item.name)}</h4>${item.steps.length ? `<ul>${item.steps.map(step => `<li>${escapeHTML(step.replaceAll("–", "-"))}</li>`).join("")}</ul>` : ""}</div>`).join("");
         const expectations = `<section class="print-section wide"><h3>Munkavégzés</h3><p>${task.workLogRequired === false ? "Munkanaplót nem kell írni." : "Munkanaplót meg kell írni."}<br>${escapeHTML(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)].replaceAll("–", "-"))}<br>${escapeHTML(QUALITY_DESCRIPTIONS[validRating(task.workQuality)].replaceAll("–", "-"))}</p></section>`;
-        return `<section class="print-client-block"><div class="print-client-row"><section><small>${index + 1}. Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím${task.startTime ? ` · Kezdés: ${escapeHTML(task.startTime)}` : ""}</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${item.source ? `<strong>${escapeHTML(item.source)}:</strong> ` : ""}${escapeHTML(item.name)}${item.quantity ? ` - ${escapeHTML(item.quantity)}${item.unit ? ` ${escapeHTML(item.unit)}` : ""}` : ""}</li>`).join("")}</ul></section>` : ""}${expectations}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}</div></section>`;
+        return `<section class="print-client-block"><div class="print-client-row"><section><small>${clientIndexInDay(task) + 1}. Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím${task.startTime ? ` · Kezdés: ${escapeHTML(task.startTime)}` : ""}</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${item.source ? `<strong>${escapeHTML(item.source)}:</strong> ` : ""}${escapeHTML(item.name)}${item.quantity ? ` - ${escapeHTML(item.quantity)}${item.unit ? ` ${escapeHTML(item.unit)}` : ""}` : ""}</li>`).join("")}</ul></section>` : ""}${expectations}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}</div></section>`;
       }).join("");
       const printTask = `<article class="print-task" style="--print-task-color:${printTheme.background};--print-task-border:${printTheme.border};--print-task-accent:${printTheme.accent}"><div class="print-task-heading"><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2><div class="print-heading-workers">${workers || `<span>Nincs dolgozó kiválasztva</span>`}</div></div>${clients}</article>`;
       return `${groupIndex ? `<div class="print-divider">Következő csapat</div>` : ""}${printTask}`;
     }).join("");
     $("#printView").innerHTML = `<section class="print-sheet">${printHeader}${departure}${tasks || `<p>Nincs feladat erre a napra.</p>`}${tasks ? `<div class="print-footer-note">${FINAL_NOTE}</div>` : ""}</section>`;
   }
-  window.addEventListener("beforeprint", renderPrintView);
-  $("#printButton").addEventListener("click", () => {
+  window.addEventListener("beforeprint", () => { if (!$("#printView").children.length) renderPrintView(); });
+  $("#printButton").addEventListener("click", async () => {
     renderPrintView();
+    const logo = $("#printView .print-header img");
+    try { if (logo?.decode) await logo.decode(); else if (logo && !logo.complete) await new Promise(resolve => { logo.addEventListener("load", resolve, { once: true }); logo.addEventListener("error", resolve, { once: true }); }); } catch (_) { /* A böngésző a gyorsítótárból is nyomtathat. */ }
     window.print();
   });
   async function copyText() {
@@ -1163,18 +1169,20 @@
     try { await navigator.clipboard.writeText(text); toast("A napi terv szövege a vágólapra került."); }
     catch (_) { const area = document.createElement("textarea"); area.value = text; area.style.position = "fixed"; area.style.opacity = "0"; document.body.append(area); area.select(); document.execCommand("copy"); area.remove(); toast("A napi terv szövege a vágólapra került."); }
   }
-  function copyTextImmediately(text) {
+  async function copyTextImmediately(text) {
+    if (navigator.clipboard?.writeText) {
+      try { await navigator.clipboard.writeText(text); return true; } catch (_) { /* Régebbi böngészőn az alábbi megoldás fut. */ }
+    }
     const area = document.createElement("textarea");
     area.value = text; area.style.position = "fixed"; area.style.opacity = "0"; document.body.append(area); area.select();
-    try { document.execCommand("copy"); } catch (_) { /* A modern vágólapkezelés még sikerülhet. */ }
-    area.remove();
-    navigator.clipboard?.writeText(text).catch(() => {});
+    let copied = false; try { copied = document.execCommand("copy"); } catch (_) { copied = false; }
+    area.remove(); return copied;
   }
   $("#copyTextButton").addEventListener("click", copyText);
   const shareButton = $("#shareButton");
   const isAndroid = /Android/i.test(navigator.userAgent);
-  shareButton.textContent = isAndroid ? "Megosztás" : "Viber megnyitása";
-  shareButton.title = isAndroid ? "A telefon megosztási ablakának megnyitása" : "A napi terv másolása és a Viber megnyitása";
+  shareButton.textContent = isAndroid ? "Megosztás" : "Teljes szöveg Viberhez";
+  shareButton.title = isAndroid ? "A telefon megosztási ablakának megnyitása" : "A teljes napi terv másolása Viberbe illesztéshez";
   shareButton.addEventListener("click", async () => {
     const text = planText();
     if (isAndroid && navigator.share) {
@@ -1183,12 +1191,10 @@
       return;
     }
 
-    // A Viber saját hivatkozása legfeljebb 200 karaktert ad át.
-    // A teljes tervet ezért a vágólapra is tesszük, majd megnyitjuk a Vibert.
-    copyTextImmediately(text);
-    const preview = text.length > 190 ? `${text.slice(0, 187)}...` : text;
-    window.location.href = `viber://forward?text=${encodeURIComponent(preview)}`;
-    toast("A Viber megnyílik. A teljes napi tervet beillesztéshez a vágólapra másoltam.");
+    // A böngésző külső alkalmazást megnyitó ablaka nem fordítható le az appból.
+    // PC-n ezért a teljes tervet másoljuk, így nem jelenik meg angol rendszerüzenet.
+    const copied = await copyTextImmediately(text);
+    toast(copied ? "A teljes napi tervet kimásoltam. Nyisd meg a Vibert, majd illeszd be az üzenetbe." : "A másolás nem sikerült. Használd a Szöveg másolása gombot.", !copied);
   });
 
   function settingsType() {
