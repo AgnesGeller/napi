@@ -477,12 +477,10 @@
   }
   async function saveCurrentPlan() {
     saveDataLocally();
-    let folderSaved = false;
-    if (directoryHandle && await hasWritePermission(directoryHandle, true)) folderSaved = await writeDataFile();
-    if (!folderSaved) markSaved();
-    await pushCurrentState();
+    markSaved();
+    const cloudSaved = await pushCurrentState();
     collapsedTaskIds = new Set(workingPlan.tasks.map(task => task.id)); activeTaskId = null; renderTasks(); renderWeek(); renderMonth();
-    toast(folderSaved ? "A napi terv elmentve az alkalmazásba és az adatmappába." : "A napi terv elmentve. A Heti nézetben is megtalálod.");
+    toast(cloudSaved ? "A napi terv elmentve és minden eszközzel szinkronizálva." : "A napi terv elmentve ezen az eszközön. A közös szinkron internetkapcsolatkor automatikusan folytatódik.");
     return true;
   }
   async function chooseFolder() {
