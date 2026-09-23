@@ -30,7 +30,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260923e">
+  <link rel="stylesheet" href="css/style.css?v=20260923f">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -263,8 +263,8 @@
             <div class="customer-suggestions" hidden></div>
           </div>
           <label>Cím<input class="form-control address-input" type="text" maxlength="240" placeholder="Az ügyfél kiválasztása után automatikusan kitöltődik"></label>
-          <label>Kezdés a címen (nem kötelező)<input class="form-control start-time-input" type="time"></label>
-          <label class="worklog-option"><span><input class="worklog-required" type="checkbox" checked> Munkanaplót meg kell írni</span></label>
+          <label>Kezdés a címen (nem kötelező)<input class="form-control start-time-input" type="time" step="60" title="Az időt óra:perc formában is beírhatod"></label>
+          <label class="worklog-option"><span><input class="worklog-required" type="checkbox" checked> Munkanaplót megírni</span></label>
           <button type="button" class="text-button add-customer">＋ Új ügyfél</button>
         </section>
         <details class="task-step expandable" data-detail="jobs" open>
@@ -316,6 +316,6 @@
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260922f"></script>
   <script src="js/napi-sync.js?v=20260922b"></script>
-  <script src="js/app.js?v=20260923g"></script>
+  <script src="js/app.js?v=20260923h"></script>
 </body>
 </html>

@@ -144,6 +144,7 @@
   let customerDirectoryLastSync = cachedCustomerDirectory.savedAt;
   let customerDirectorySyncing = false;
   let cloudSyncTimer = null;
+  let printRenderTimer = null;
   let cloudSyncing = false;
   let cloudWritePromise = Promise.resolve();
   let cloudConfigDirty = false;
@@ -188,7 +189,7 @@
       const toolIds = Array.isArray(task.toolIds) ? task.toolIds : [];
       const toolQuantities = task.toolQuantities && typeof task.toolQuantities === "object" ? { ...task.toolQuantities } : {};
       toolIds.forEach(id => { if (!toolQuantities[id]) toolQuantities[id] = "1"; });
-      return { ...currentTask, teamId: task.teamId || task.id || uid(), locationId: task.locationId || null, startTime: String(task.startTime || ""), jobs, toolIds, toolQuantities, materials: Array.isArray(task.materials) ? task.materials.map(normalizeMaterialItem) : [], workLogRequired: task.workLogRequired !== false, workIntensity: validRating(task.workIntensity), workQuality: validRating(task.workQuality) };
+      return { ...currentTask, teamId: task.teamId || task.id || uid(), customerName: String(task.customerName || ""), address: String(task.address || ""), locationId: task.locationId || null, startTime: String(task.startTime || ""), workerIds: Array.isArray(task.workerIds) ? task.workerIds : [], vehicleIds: Array.isArray(task.vehicleIds) ? task.vehicleIds : [], jobs, toolIds, toolQuantities, extraTools: String(task.extraTools || ""), materials: Array.isArray(task.materials) ? task.materials.map(normalizeMaterialItem) : [], workLogRequired: task.workLogRequired !== false, workIntensity: validRating(task.workIntensity), workQuality: validRating(task.workQuality), notes: String(task.notes || "") };
     };
     return {
       version: 4,
@@ -398,7 +399,8 @@
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
     $("#saveState").textContent = message;
     try { localStorage.setItem(RECOVERY_KEY, JSON.stringify({ savedAt: new Date().toISOString(), data, workingPlan })); } catch (_) { /* A mappamentés ettől még használható. */ }
-    renderPrintView();
+    clearTimeout(printRenderTimer);
+    printRenderTimer = setTimeout(renderPrintView, 180);
     queueCloudSync();
   }
   function markSaved() {
@@ -691,7 +693,7 @@
     const row = $("#materialTemplate").content.firstElementChild.cloneNode(true); row.dataset.materialIndex = index;
     row.classList.toggle("is-preset", Boolean(material.materialId));
     row.querySelector(".material-source").value = material.source || ""; row.querySelector(".material-name").value = material.name || ""; row.querySelector(".material-quantity").value = material.quantity || ""; row.querySelector(".material-unit").value = material.unit || "";
-    if (material.materialId) [".material-source", ".material-name", ".material-unit"].forEach(selector => { row.querySelector(selector).readOnly = true; });
+    if (material.materialId) [".material-name", ".material-unit"].forEach(selector => { row.querySelector(selector).readOnly = true; });
     container.append(row);
   }
   function tasksByTeam(plan = workingPlan) {
@@ -706,7 +708,6 @@
   }
   function planHasTasks(plan) { return Boolean(plan && Array.isArray(plan.tasks) && plan.tasks.length); }
   function clientIndexInTeam(task) { return tasksByTeam().find(group => group.id === (task.teamId || task.id))?.tasks.indexOf(task) ?? 0; }
-  function clientIndexInDay(task, plan = workingPlan) { return plan.tasks.indexOf(task); }
   function taskJobs(task) { return Array.isArray(task.jobs) ? task.jobs : []; }
   function selectedJobNames(task) { return taskJobs(task).map(job => job.name).filter(Boolean); }
   function cleanStep(value) { return String(value || "").trim().replace(/^\d+[.)]\s*/, ""); }
@@ -805,6 +806,9 @@
   }
   function renderTasks() {
     const list = $("#taskList");
+    const anchorCard = document.activeElement?.closest?.(".task-card") || (activeTaskId ? list.querySelector(`[data-task-id="${CSS.escape(activeTaskId)}"]`) : null);
+    const anchorTaskId = anchorCard?.dataset.taskId || null;
+    const anchorTop = anchorCard?.getBoundingClientRect().top ?? null;
     const hadCards = Boolean(list.querySelector(".task-card"));
     const openDetails = new Map([...list.querySelectorAll(".task-card details[open]")].map(detail => [`${detail.closest(".task-card").dataset.taskId}:${detail.dataset.detail}`, true]));
     list.innerHTML = "";
@@ -816,7 +820,7 @@
       block.style.cssText = `--team-color:${theme.background};--team-border:${theme.border};--team-accent:${theme.accent}`;
       block.innerHTML = `<header class="team-block-header"><div><h3>${escapeHTML(vehicles.join(" + ") || "Új autó / csapat")}</h3><p>${escapeHTML(workers.length ? `Dolgozók: ${workers.join(", ")}` : "Válaszd ki a dolgozókat")}</p></div><div class="team-header-actions"><strong>${group.tasks.length} ügyfél</strong><button type="button" class="team-delete-button" data-remove-team="${escapeHTML(group.id)}">Autó / csapat törlése</button></div></header><div class="task-list-inner"></div><button class="team-add-customer" type="button" data-add-team-customer="${escapeHTML(group.id)}">＋ Új ügyfél ehhez a csapathoz</button>`;
       const inner = block.querySelector(".task-list-inner");
-      group.tasks.forEach((task, teamIndex) => inner.append(renderTask(task, workingPlan.tasks.indexOf(task), clientIndexInDay(task), teamIndex === 0)));
+      group.tasks.forEach((task, teamIndex) => inner.append(renderTask(task, workingPlan.tasks.indexOf(task), teamIndex, teamIndex === 0)));
       list.append(block);
     });
     if (hadCards) list.querySelectorAll(".task-card details").forEach(detail => { detail.open = openDetails.has(`${detail.closest(".task-card").dataset.taskId}:${detail.dataset.detail}`); });
@@ -824,6 +828,10 @@
     $("#addTaskBottomButton").hidden = workingPlan.tasks.length === 0;
     $("#deleteDayButton").hidden = !workingPlan.tasks.length;
     updateCustomerDirectoryButtons();
+    if (anchorTaskId && anchorTop !== null) {
+      const replacement = list.querySelector(`[data-task-id="${CSS.escape(anchorTaskId)}"]`);
+      if (replacement) window.scrollBy(0, replacement.getBoundingClientRect().top - anchorTop);
+    }
   }
   function findTaskFromElement(element) { return workingPlan.tasks.find(task => task.id === element.closest(".task-card")?.dataset.taskId); }
   function setActiveTask(card, task) {
@@ -839,7 +847,7 @@
       vehicles: (task.vehicleIds || []).map(id => byId(data.vehicles, id)?.name).filter(Boolean)
     };
   }
-  function updateTaskSummary(card, task, index = clientIndexInDay(task)) {
+  function updateTaskSummary(card, task, index = clientIndexInTeam(task)) {
     const { workers, vehicles } = taskPeopleAndVehicle(task);
     card.querySelector(".task-number").textContent = `${index + 1}.`;
     const vehicleSummary = card.querySelector(".task-summary"); const workerSummary = card.querySelector(".task-team-summary");
@@ -1056,7 +1064,7 @@
       if (event.target.matches(".material-quantity")) material.quantity = event.target.value;
       if (event.target.matches(".material-unit")) material.unit = event.target.value;
     }
-    updateTaskSummary(card, task, workingPlan.tasks.indexOf(task)); markDirty();
+    updateTaskSummary(card, task, clientIndexInTeam(task)); markDirty();
   });
   $("#taskList").addEventListener("change", event => {
     const card = event.target.closest(".task-card"); if (!card) return; const task = findTaskFromElement(card); if (!task) return;
@@ -1067,6 +1075,7 @@
     event.preventDefault(); const task = findTaskFromElement(event.target); if (task) addCustomJob(task, event.target.value);
   });
   $("#taskList").addEventListener("focusin", event => { const card = event.target.closest(".task-card"); if (card) setActiveTask(card, findTaskFromElement(card)); if (event.target.matches(".customer-input") && searchKey(event.target.value).length >= 2) showCustomerSuggestions(card, event.target.value); });
+  $("#taskList").addEventListener("wheel", event => { if (event.target.closest(".start-time-input")) event.preventDefault(); }, { passive: false });
   document.addEventListener("click", event => { if (!event.target.closest(".customer-picker")) document.querySelectorAll(".customer-suggestions").forEach(box => box.hidden = true); });
 
   function addTask() { const task = blankTask(); workingPlan.tasks.push(task); activeTaskId = task.id; collapsedTaskIds.delete(task.id); markDirty(); renderTasks(); $("#taskList .team-block:last-child")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
@@ -1121,9 +1130,9 @@
       const tasks = plan?.tasks || [];
       const taskHTML = tasks.length ? tasksByTeam(plan).map(group => {
         const lead = group.tasks[0];
-        const workers = lead.workerIds.map(id => byId(data.workers, id)?.name).filter(Boolean).join(", ");
-        const vehicles = lead.vehicleIds.map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
-        const clients = group.tasks.map(task => `<span><strong>${clientIndexInDay(task, plan) + 1}. ${escapeHTML(task.customerName || "Ügyfél nélkül")}</strong>${task.startTime ? `<small>${escapeHTML(task.startTime)}</small>` : ""}${task.address ? `<em>${escapeHTML(task.address)}</em>` : ""}</span>`).join("");
+        const workers = (lead.workerIds || []).map(id => byId(data.workers, id)?.name).filter(Boolean).join(", ");
+        const vehicles = (lead.vehicleIds || []).map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
+        const clients = group.tasks.map((task, teamIndex) => `<span><strong>${teamIndex + 1}. ${escapeHTML(task.customerName || "Ügyfél nélkül")}</strong>${task.startTime ? `<small>${escapeHTML(task.startTime)}</small>` : ""}${task.address ? `<em>${escapeHTML(task.address)}</em>` : ""}</span>`).join("");
         return `<div class="week-task"><b>${escapeHTML(vehicles || "Autó nélkül")}</b><small class="week-workers">Dolgozók: ${escapeHTML(workers || "nincs kiválasztva")}</small>${clients}</div>`;
       }).join("") : `<p class="week-empty">Nincs elmentett feladat.</p>`;
       const holiday = hungarianHoliday(date);
@@ -1211,25 +1220,27 @@
     if (workingPlan.meeting || workingPlan.stops) lines.push("");
     tasksByTeam().forEach(group => {
       const lead = group.tasks[0];
-      const workers = lead.workerIds.map(id => byId(data.workers, id)?.name).filter(Boolean).join(", ");
-      const vehicles = lead.vehicleIds.map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
+      const workers = (lead.workerIds || []).map(id => byId(data.workers, id)?.name).filter(Boolean).join(", ");
+      const vehicles = (lead.vehicleIds || []).map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
       lines.push(`${vehicles || "Autó nélkül"} – ${workers || "nincs dolgozó kiválasztva"}`, "");
-      group.tasks.forEach(task => {
+      group.tasks.forEach((task, teamIndex) => {
         const tools = [...task.toolIds.map(id => { const tool = byId(data.tools, id); return tool ? `${tool.name} – ${task.toolQuantities?.[id] || "1"} db` : ""; }).filter(Boolean), ...String(task.extraTools || "").split(",").map(item => item.trim()).filter(Boolean)];
-        lines.push(`${clientIndexInDay(task) + 1}. ${task.customerName || "nincs kiválasztva"}`);
+        lines.push(`${teamIndex + 1}. ${task.customerName || "nincs kiválasztva"}`);
         lines.push(`Cím: ${task.address || "nincs megadva"}${task.startTime ? ` · Kezdés: ${task.startTime}` : ""}`);
-        lines.push(task.workLogRequired === false ? "Munkanaplót nem kell írni." : "Munkanaplót meg kell írni.");
-        lines.push(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)]);
-        lines.push(QUALITY_DESCRIPTIONS[validRating(task.workQuality)]);
         const descriptions = jobDescriptions(task);
-        if (tools.length) { lines.push("Eszközök:"); tools.forEach(item => lines.push(`- ${item}`)); }
-        const materials = task.materials.filter(item => item.name);
-        if (materials.length) { lines.push("Anyagok:"); materials.forEach(item => lines.push(`- ${item.source ? `${item.source}: ` : ""}${item.name}${item.quantity ? ` – ${item.quantity}${item.unit ? ` ${item.unit}` : ""}` : ""}`)); }
         if (descriptions.length) {
           lines.push("Feladatok:");
           descriptions.forEach(item => { lines.push(`- ${item.name}`); item.steps.forEach(step => lines.push(`  • ${step}`)); });
         }
-        if (task.notes) lines.push(`Megjegyzés: ${task.notes}`); lines.push("");
+        if (tools.length) { lines.push("Szükséges eszközök:"); tools.forEach(item => lines.push(`- ${item}`)); }
+        const materials = task.materials.filter(item => item.name);
+        if (materials.length) { lines.push("Anyagok:"); materials.forEach(item => lines.push(`- ${item.source ? `${item.source}: ` : ""}${item.name}${item.quantity ? ` – ${item.quantity}${item.unit ? ` ${item.unit}` : ""}` : ""}`)); }
+        if (task.notes) lines.push(`Megjegyzés: ${task.notes}`);
+        lines.push("Munkavégzés:");
+        lines.push(task.workLogRequired === false ? "Munkanaplót nem kell megírni." : "Munkanaplót megírni.");
+        lines.push(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)]);
+        lines.push(QUALITY_DESCRIPTIONS[validRating(task.workQuality)]);
+        lines.push("");
       });
     });
     lines.push(FINAL_NOTE); return lines.join("\n");
@@ -1240,23 +1251,23 @@
     const printHeader = `<header class="print-header"><img src="${escapeHTML(logoUrl)}" alt="Díszkertek logó" width="416" height="512"><div><h1>Napi feladatok</h1><div class="print-date">${escapeHTML(formatDate(workingPlan.date))}</div></div></header>`;
     const tasks = tasksByTeam().map((group, groupIndex) => {
       const lead = group.tasks[0];
-      const workers = lead.workerIds.map(id => byId(data.workers, id)).filter(Boolean).map(worker => `<span class="print-worker" style="--print-worker-color:${escapeHTML(worker.color)};--print-worker-text:${bestTextColor(worker.color)}">${escapeHTML(worker.name)}</span>`).join("");
-      const vehicles = lead.vehicleIds.map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
+      const workers = (lead.workerIds || []).map(id => byId(data.workers, id)).filter(Boolean).map(worker => `<span class="print-worker" style="--print-worker-color:${escapeHTML(worker.color)};--print-worker-text:${bestTextColor(worker.color)}">${escapeHTML(worker.name)}</span>`).join("");
+      const vehicles = (lead.vehicleIds || []).map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
       const printVehicle = (lead.vehicleIds || []).map(id => byId(data.vehicles, id)).find(Boolean);
       const printTheme = printVehicle ? vehicleTheme(printVehicle) : { background: "#edf2eb", border: "#7b8e7e", accent: "#173f2b" };
-      const clients = group.tasks.map(task => {
+      const clients = group.tasks.map((task, teamIndex) => {
         const tools = [...task.toolIds.map(id => { const tool = byId(data.tools, id); return tool ? `${tool.name} - ${task.toolQuantities?.[id] || "1"} db` : ""; }).filter(Boolean), ...String(task.extraTools || "").split(",").map(item => item.trim()).filter(Boolean)];
         const materials = task.materials.filter(item => item.name);
         const jobs = jobDescriptions(task).map(item => `<div class="print-job-description"><h4>${escapeHTML(item.name)}</h4>${item.steps.length ? `<ul>${item.steps.map(step => `<li>${escapeHTML(step.replaceAll("–", "-"))}</li>`).join("")}</ul>` : ""}</div>`).join("");
-        const expectations = `<section class="print-section wide"><h3>Munkavégzés</h3><p>${task.workLogRequired === false ? "Munkanaplót nem kell írni." : "Munkanaplót meg kell írni."}<br>${escapeHTML(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)].replaceAll("–", "-"))}<br>${escapeHTML(QUALITY_DESCRIPTIONS[validRating(task.workQuality)].replaceAll("–", "-"))}</p></section>`;
-        return `<section class="print-client-block"><div class="print-client-row"><section><small>${clientIndexInDay(task) + 1}. Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím${task.startTime ? ` · Kezdés: ${escapeHTML(task.startTime)}` : ""}</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${item.source ? `<strong>${escapeHTML(item.source)}:</strong> ` : ""}${escapeHTML(item.name)}${item.quantity ? ` - ${escapeHTML(item.quantity)}${item.unit ? ` ${escapeHTML(item.unit)}` : ""}` : ""}</li>`).join("")}</ul></section>` : ""}${expectations}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}</div></section>`;
+        const expectations = `<section class="print-section wide print-expectations"><h3>Munkavégzés</h3><p>${task.workLogRequired === false ? "Munkanaplót nem kell megírni." : "Munkanaplót megírni."}<br>${escapeHTML(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)].replaceAll("–", "-"))}<br>${escapeHTML(QUALITY_DESCRIPTIONS[validRating(task.workQuality)].replaceAll("–", "-"))}</p></section>`;
+        return `<section class="print-client-block"><div class="print-client-row"><section><small>${teamIndex + 1}. Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím${task.startTime ? ` · Kezdés: ${escapeHTML(task.startTime)}` : ""}</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${item.source ? `<strong>${escapeHTML(item.source)}:</strong> ` : ""}${escapeHTML(item.name)}${item.quantity ? ` - ${escapeHTML(item.quantity)}${item.unit ? ` ${escapeHTML(item.unit)}` : ""}` : ""}</li>`).join("")}</ul></section>` : ""}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}${expectations}</div></section>`;
       }).join("");
       const printTask = `<article class="print-task" style="--print-task-color:${printTheme.background};--print-task-border:${printTheme.border};--print-task-accent:${printTheme.accent}"><div class="print-task-heading"><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2><div class="print-heading-workers">${workers || `<span>Nincs dolgozó kiválasztva</span>`}</div></div>${clients}</article>`;
       return `${groupIndex ? `<div class="print-divider">Következő csapat</div>` : ""}${printTask}`;
     }).join("");
     $("#printView").innerHTML = `<section class="print-sheet">${printHeader}${departure}${tasks || `<p>Nincs feladat erre a napra.</p>`}${tasks ? `<div class="print-footer-note">${FINAL_NOTE}</div>` : ""}</section>`;
   }
-  window.addEventListener("beforeprint", () => { if (!$("#printView").children.length) renderPrintView(); });
+  window.addEventListener("beforeprint", renderPrintView);
   $("#printButton").addEventListener("click", async () => {
     renderPrintView();
     const logo = $("#printView .print-header img");

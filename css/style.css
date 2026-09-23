@@ -204,7 +204,7 @@ button, summary { touch-action: manipulation; }
 .empty-detail { margin: 0; padding: .7rem; color: var(--muted); background: #f6f8f3; }
 .materials-list { display: grid; gap: .5rem; margin-bottom: .65rem; }
 .material-row { display: grid; grid-template-columns: minmax(140px, 1.2fr) minmax(130px, 1fr) minmax(90px, .65fr) minmax(80px, .55fr) 42px; gap: .45rem; }
-.material-row.is-preset .material-source, .material-row.is-preset .material-name, .material-row.is-preset .material-unit { color: #435348; background: #eef2ec; }
+.material-row.is-preset .material-name, .material-row.is-preset .material-unit { color: #435348; background: #eef2ec; }
 .tool-quantities { display: grid; gap: .45rem; margin-top: .75rem; }
 .tool-quantity-row { display: grid !important; grid-template-columns: minmax(120px, 1fr) 100px 28px; gap: .45rem; align-items: center; padding: .45rem .6rem; border-left: 4px solid var(--leaf); background: rgba(255,255,255,.72); }
 .tool-quantity-row input { min-width: 0; }
@@ -308,15 +308,17 @@ button, summary { touch-action: manipulation; }
 @media (max-width: 760px) {
   body { padding-bottom: 78px; }
   body.actions-open { padding-bottom: 225px; }
-  .header-inner { width: min(100% - 1.1rem, 1180px); align-items: flex-start; flex-direction: column; }
+  .header-inner { width: min(1180px, calc(100% - 1.1rem)); align-items: flex-start; flex-direction: column; }
   .brand-lockup img { width: 68px; height: 54px; }
-  .header-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+  .header-actions { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .header-actions .btn { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
   .header-actions .btn:first-child { grid-column: 1 / -1; }
-  .planner-shell { width: min(100% - .8rem, 1040px); margin-top: .55rem; }
+  .planner-shell { width: min(1040px, calc(100% - .8rem)); margin-top: .55rem; }
   .date-bar { padding: .9rem; }
   .date-controls { grid-template-columns: 1fr 1fr; }
   .date-controls label { grid-column: 1 / -1; }
-  .date-controls input { min-width: 0; }
+  .date-controls input, .date-controls button { min-width: 0; }
+  .copy-actions > *, .sync-connection-notice > * { min-width: 0; }
   .departure-details { grid-template-columns: 1fr; }
   .storage-strip { margin: .9rem -.9rem -.9rem; padding: .75rem .9rem; }
   .section-heading { align-items: stretch; flex-direction: column; }
@@ -382,10 +384,10 @@ button, summary { touch-action: manipulation; }
   .print-date { color: #263e2d; font-size: 12pt; font-weight: 800; }
   .print-departure { position: relative; z-index: 1; display: grid; grid-template-columns: .8fr 1.2fr; gap: 4mm; margin: 4mm 0 1mm; padding: 3mm 4mm; border-left: 2mm solid var(--orange); background: #fff5e3; }
   .print-departure p { margin: 0; }
-  .print-divider { position: relative; z-index: 1; margin: 5mm 0 -2mm; color: var(--orange); text-align: center; font-size: 7.5pt; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .print-divider { position: relative; z-index: 1; margin: 5mm 0 -2mm; break-after: avoid-page; color: var(--orange); text-align: center; font-size: 7.5pt; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
   .print-divider::before, .print-divider::after { content: ""; display: inline-block; width: 31%; margin: 0 3mm 2px; border-top: .5mm solid #c67a4d; }
-  .print-task { position: relative; z-index: 1; margin-top: 5mm; padding: 0 4mm 3mm; border: .6mm solid var(--print-task-border, #8fa391); border-left: 2.5mm solid var(--print-task-border, var(--forest)); background: var(--print-task-color, rgba(255,255,255,.96)); }
-  .print-task-heading { display: flex; flex-wrap: wrap; gap: 2mm 3mm; align-items: center; margin: 0 -4mm 3mm; padding: 2.2mm 3mm; color: #fff; background: var(--print-task-accent, var(--forest)); }
+  .print-task { position: relative; z-index: 1; margin-top: 5mm; padding: 0 4mm 3mm; break-inside: avoid-page; border: .6mm solid var(--print-task-border, #8fa391); border-left: 2.5mm solid var(--print-task-border, var(--forest)); background: var(--print-task-color, rgba(255,255,255,.96)); }
+  .print-task-heading { display: flex; flex-wrap: wrap; gap: 2mm 3mm; align-items: center; margin: 0 -4mm 3mm; padding: 2.2mm 3mm; break-after: avoid-page; color: #fff; background: var(--print-task-accent, var(--forest)); }
   .print-heading-workers { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 1mm; }
   .print-index { display: inline-grid; place-items: center; min-width: 8mm; min-height: 8mm; color: #fff; background: var(--orange); font: 800 13pt Georgia, serif; }
   .print-task h2 { margin: 0; color: #fff; font: 700 14pt Georgia, serif; }
