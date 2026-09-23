@@ -1,7 +1,8 @@
 (() => {
   "use strict";
 
-  const DATA_FILE_NAME = "diszkertek-napi-adatok.json";
+  const DATA_FILE_NAME = "diszkertek-napi-adatok.zip";
+  const LEGACY_DATA_FILE_NAME = "diszkertek-napi-adatok.json";
   const LOCAL_DATA_KEY = "diszkertek-napi-adatok-v1";
   const RECOVERY_KEY = "diszkertek-napi-helyreallitas-v1";
   const DB_NAME = "diszkertek-napi-mappakapcsolat";
@@ -35,6 +36,38 @@
   const escapeHTML = value => String(value ?? "").replace(/[&<>"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[character]);
   const searchKey = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("hu-HU").trim();
   const readableError = error => error?.name === "AbortError" ? "A művelet megszakadt." : (error?.message || "Váratlan hiba történt.");
+
+  const CRC_TABLE = Array.from({ length: 256 }, (_, index) => {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : (value >>> 1);
+    return value >>> 0;
+  });
+  function crc32(bytes) {
+    let value = 0xffffffff;
+    bytes.forEach(byte => { value = CRC_TABLE[(value ^ byte) & 0xff] ^ (value >>> 8); });
+    return (value ^ 0xffffffff) >>> 0;
+  }
+  function zipView(size) { return new DataView(new ArrayBuffer(size)); }
+  function joinBytes(parts) {
+    const result = new Uint8Array(parts.reduce((sum, part) => sum + part.byteLength, 0));
+    let offset = 0; parts.forEach(part => { const bytes = part instanceof Uint8Array ? part : new Uint8Array(part.buffer); result.set(bytes, offset); offset += bytes.byteLength; });
+    return result;
+  }
+  function createDataZip(payload, jsonFilename = "diszkertek-napi-adatok.json") {
+    const encoder = new TextEncoder(); const name = encoder.encode(jsonFilename); const content = encoder.encode(JSON.stringify(payload, null, 2)); const checksum = crc32(content);
+    const local = zipView(30); local.setUint32(0, 0x04034b50, true); local.setUint16(4, 20, true); local.setUint16(6, 0x0800, true); local.setUint32(14, checksum, true); local.setUint32(18, content.length, true); local.setUint32(22, content.length, true); local.setUint16(26, name.length, true);
+    const central = zipView(46); central.setUint32(0, 0x02014b50, true); central.setUint16(4, 20, true); central.setUint16(6, 20, true); central.setUint16(8, 0x0800, true); central.setUint32(16, checksum, true); central.setUint32(20, content.length, true); central.setUint32(24, content.length, true); central.setUint16(28, name.length, true);
+    const centralOffset = 30 + name.length + content.length; const end = zipView(22); end.setUint32(0, 0x06054b50, true); end.setUint16(8, 1, true); end.setUint16(10, 1, true); end.setUint32(12, 46 + name.length, true); end.setUint32(16, centralOffset, true);
+    return new Blob([joinBytes([local, name, content, central, name, end])], { type: "application/zip" });
+  }
+  async function readDataArchive(file) {
+    if (!file.name.toLowerCase().endsWith(".zip")) return JSON.parse(await file.text());
+    const bytes = new Uint8Array(await file.arrayBuffer()); const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (bytes.length < 30 || view.getUint32(0, true) !== 0x04034b50) throw new Error("A ZIP-adatmentés sérült vagy nem megfelelő.");
+    if (view.getUint16(8, true) !== 0) throw new Error("Ez a ZIP nem az alkalmazás saját adatmentése.");
+    const size = view.getUint32(18, true); const nameLength = view.getUint16(26, true); const extraLength = view.getUint16(28, true); const start = 30 + nameLength + extraLength;
+    return JSON.parse(new TextDecoder().decode(bytes.slice(start, start + size)));
+  }
 
   const workerSeeds = [
     ["Márk", "#22577a", false], ["Gábor", "#8a4f14", false], ["Attila", "#7a3e65", false],
@@ -455,10 +488,15 @@
     return request && (await handle.requestPermission(options)) === "granted";
   }
   async function readDataFile(handle) {
-    const fileHandle = await handle.getFileHandle(DATA_FILE_NAME, { create: true });
-    const file = await fileHandle.getFile();
-    if (!file.size) return null;
-    return normalizeData(JSON.parse(await file.text()));
+    try {
+      const file = await (await handle.getFileHandle(DATA_FILE_NAME)).getFile();
+      if (file.size) return normalizeData(await readDataArchive(file));
+    } catch (error) { if (error?.name !== "NotFoundError") throw error; }
+    try {
+      const legacy = await (await handle.getFileHandle(LEGACY_DATA_FILE_NAME)).getFile();
+      return legacy.size ? normalizeData(JSON.parse(await legacy.text())) : null;
+    } catch (error) { if (error?.name !== "NotFoundError") throw error; }
+    return null;
   }
   async function writeDataFile() {
     if (!directoryHandle || !(await hasWritePermission(directoryHandle, true))) {
@@ -470,7 +508,7 @@
     $("#saveState").textContent = "Mentés…";
     const fileHandle = await directoryHandle.getFileHandle(DATA_FILE_NAME, { create: true });
     const writable = await fileHandle.createWritable();
-    await writable.write(JSON.stringify(data, null, 2));
+    await writable.write(createDataZip(data));
     await writable.close();
     markSaved();
     return true;
@@ -543,12 +581,10 @@
   }
   function downloadData() {
     upsertWorkingPlan();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = DATA_FILE_NAME; link.click(); URL.revokeObjectURL(link.href);
+    downloadBlob(createDataZip(data), DATA_FILE_NAME);
     markSaved(); toast("Az adatfájl letöltődött.");
   }
-  function downloadJSON(payload, filename) {
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  function downloadBlob(blob, filename) {
     const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = filename; link.click(); URL.revokeObjectURL(link.href);
   }
   function exportPeriod(period) {
@@ -565,7 +601,7 @@
       const year = reference.slice(0, 4); plans = plans.filter(plan => plan.date.startsWith(year)); suffix = `ev-${year}`;
     }
     const payload = { ...deepCopy(data), exportType: period, exportedAt: new Date().toISOString(), plans: deepCopy(plans) };
-    downloadJSON(payload, `diszkertek-napi-${suffix}.json`);
+    downloadBlob(createDataZip(payload, `diszkertek-napi-${suffix}.json`), `diszkertek-napi-${suffix}.zip`);
     toast(`${period === "week" ? "A heti" : period === "month" ? "A havi" : period === "year" ? "Az éves" : "A teljes"} adatfájl letöltődött.`);
   }
   function planMatchesPeriod(plan, period, reference) {
@@ -588,7 +624,7 @@
   }
   async function importDataFile(file) {
     try {
-      const imported = JSON.parse(await file.text());
+      const imported = await readDataArchive(file);
       if (dirty && !confirm("A megnyitott adatfájl módosítja a mostani adatokat. Folytatod?")) return;
       if (imported.exportType && imported.exportType !== "all") {
         const incoming = normalizeData(imported); const mergedPlans = new Map(data.plans.map(plan => [plan.date, plan]));
@@ -1323,7 +1359,7 @@
     document.querySelectorAll("[data-settings-tab]").forEach(button => button.classList.toggle("active", button.dataset.settingsTab === activeSettingsTab));
     const container = $("#settingsContent");
     if (activeSettingsTab === "data") {
-      container.innerHTML = `<div class="settings-editor"><h3>Helyi adatfájl</h3><p>Az alkalmazás minden adatot a <strong>${DATA_FILE_NAME}</strong> fájlba ment. Érdemes erről időnként biztonsági másolatot készíteni.</p><div class="fallback-actions"><button class="btn btn-outline-green" type="button" data-data-action="choose">Mappa kiválasztása</button><button class="btn btn-soft" type="button" data-data-action="download">Biztonsági másolat letöltése</button><label class="btn btn-soft mb-0">Másolat visszatöltése<input type="file" data-data-import accept="application/json,.json" hidden></label></div></div>`;
+      container.innerHTML = `<div class="settings-editor"><h3>Helyi ZIP-adatmentés</h3><p>Az alkalmazás biztonsági másolata a <strong>${DATA_FILE_NAME}</strong> fájl. Érdemes időnként letölteni.</p><div class="fallback-actions"><button class="btn btn-outline-green" type="button" data-data-action="choose">Mappa kiválasztása</button><button class="btn btn-soft" type="button" data-data-action="download">ZIP-adatmentés letöltése</button><label class="btn btn-soft mb-0">ZIP-adatmentés visszatöltése<input type="file" data-data-import accept="application/zip,.zip" hidden></label></div></div>`;
       return;
     }
     if (activeSettingsTab === "recurring") { container.innerHTML = recurringSettingsHTML(); return; }

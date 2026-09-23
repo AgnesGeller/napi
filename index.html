@@ -193,8 +193,8 @@
     <form method="dialog" class="dialog-frame">
       <header class="dialog-header"><div><p class="section-kicker">Helyi adatkezelés</p><h2>Adatfájl kezelése</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
       <div class="dialog-body">
-        <p>A böngésző nem tud közvetlenül mappába írni. Töltsd le az adatfájlt, majd a következő alkalommal nyisd meg itt.</p>
-        <div class="fallback-actions"><button class="btn btn-save" id="downloadDataButton" type="button">Adatfájl letöltése</button><label class="btn btn-outline-green mb-0">Adatfájl megnyitása<input id="openDataInput" type="file" accept="application/json,.json" hidden></label></div>
+        <p>A böngésző nem tud közvetlenül mappába írni. Töltsd le a ZIP-adatmentést, majd a következő alkalommal nyisd meg itt.</p>
+        <div class="fallback-actions"><button class="btn btn-save" id="downloadDataButton" type="button">ZIP-adatmentés letöltése</button><label class="btn btn-outline-green mb-0">ZIP-adatmentés megnyitása<input id="openDataInput" type="file" accept="application/zip,.zip" hidden></label></div>
       </div>
     </form>
   </dialog>
@@ -206,10 +206,10 @@
         <button class="download-option install-option" id="installAppButton" type="button" hidden><strong>📱 App telepítése erre az eszközre</strong><span id="installAppHint">A telepítés készen áll</span></button>
         <p class="download-reference" id="downloadReference"></p>
         <div class="download-options">
-          <button class="download-option" type="button" data-export-period="week"><strong>Heti adatfájl</strong><span>A kiválasztott hét tervei és törzsadatai</span></button>
-          <button class="download-option" type="button" data-export-period="month"><strong>Havi adatfájl</strong><span>A kiválasztott hónap összes terve</span></button>
-          <button class="download-option" type="button" data-export-period="year"><strong>Éves adatfájl</strong><span>A kiválasztott év összes terve</span></button>
-          <button class="download-option" type="button" data-export-period="all"><strong>Teljes adatfájl</strong><span>Minden beállítás, ügyfél és napi terv</span></button>
+          <button class="download-option" type="button" data-export-period="week"><strong>Heti ZIP-adatmentés</strong><span>A kiválasztott hét tervei és törzsadatai</span></button>
+          <button class="download-option" type="button" data-export-period="month"><strong>Havi ZIP-adatmentés</strong><span>A kiválasztott hónap összes terve</span></button>
+          <button class="download-option" type="button" data-export-period="year"><strong>Éves ZIP-adatmentés</strong><span>A kiválasztott év összes terve</span></button>
+          <button class="download-option" type="button" data-export-period="all"><strong>Teljes ZIP-adatmentés</strong><span>Minden beállítás, ügyfél és napi terv</span></button>
           <a class="download-option app-package" href="downloads/diszkertek-napi-app.zip" download><strong>Számítógépes offline ZIP</strong><span>Technikai csomag számítógéphez – telefonos telepítéshez a fenti gombot használd</span></a>
         </div>
         <details class="delete-archive"><summary>Régi tervek törlése</summary><p>Előbb töltsd le a megőrizni kívánt adatmentést. A törlés a törzsadatokat és az ismétlődő beállításokat nem érinti.</p><div class="archive-delete-buttons"><button class="btn btn-soft" type="button" data-delete-period="week">Kiválasztott hét</button><button class="btn btn-soft" type="button" data-delete-period="month">Kiválasztott hónap</button><button class="btn btn-soft" type="button" data-delete-period="year">Kiválasztott év</button><button class="btn btn-danger" type="button" data-delete-period="all">Minden napi terv</button></div></details>
@@ -316,6 +316,6 @@
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260922f"></script>
   <script src="js/napi-sync.js?v=20260922b"></script>
-  <script src="js/app.js?v=20260923j"></script>
+  <script src="js/app.js?v=20260923k"></script>
 </body>
 </html>
