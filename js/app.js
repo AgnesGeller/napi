@@ -145,7 +145,9 @@
   let customerDirectorySyncing = false;
   let cloudSyncTimer = null;
   let cloudSyncing = false;
+  let cloudWritePromise = Promise.resolve();
   let cloudConfigDirty = false;
+  let lastCloudConfigUpdatedAt = "";
   const pendingCloudPlanDates = new Set();
   let storedPendingDeletions = [];
   try { storedPendingDeletions = JSON.parse(localStorage.getItem(PENDING_DELETIONS_KEY)) || []; } catch (_) { /* Üres listával folytatjuk. */ }
@@ -246,8 +248,7 @@
   }
   function activeSorted(collection) { return collection.filter(item => item.active !== false).sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name, "hu")); }
   function byId(collection, id) { return collection.find(item => item.id === id); }
-  function currentStoredPlan() { return data.plans.find(plan => plan.date === workingPlan.date); }
-
+  function timestampValue(value) { const parsed = Date.parse(value || ""); return Number.isFinite(parsed) ? parsed : 0; }
   function sharedConfigPayload() {
     return { version: data.version, workers: data.workers, vehicles: data.vehicles, tools: data.tools, materials: data.materials, templates: data.templates, customers: data.customers, recurrences: data.recurrences };
   }
@@ -291,7 +292,12 @@
     cloudSyncing = true;
     try {
       const remote = await window.NapiCloudSync.pull();
-      if (remote.config && !cloudConfigDirty) applySharedConfig(remote.config.payload);
+      let dataChanged = false;
+      if (remote.config && !cloudConfigDirty && timestampValue(remote.config.updated_at) > timestampValue(lastCloudConfigUpdatedAt)) {
+        applySharedConfig(remote.config.payload);
+        lastCloudConfigUpdatedAt = remote.config.updated_at || "";
+        dataChanged = true;
+      }
       else if (initial && !remote.config) await window.NapiCloudSync.pushConfig(sharedConfigPayload());
       const remoteDates = new Set(); let currentChanged = false;
       remote.plans.forEach(row => {
@@ -299,15 +305,28 @@
           remoteDates.add(row.plan_date);
           const index = data.plans.findIndex(item => item.date === row.plan_date);
           const local = data.plans[index];
-          if (index >= 0 && String(row.updated_at || "") >= String(local?.updatedAt || "")) data.plans.splice(index, 1);
-          if (row.plan_date === workingPlan.date && !dirty) currentChanged = true;
+          const localTimestamps = [local?.updatedAt];
+          if (row.plan_date === workingPlan.date) localTimestamps.push(workingPlan.updatedAt);
+          const sortedLocalTimestamps = localTimestamps.filter(Boolean).sort();
+          const newestLocalTimestamp = sortedLocalTimestamps[sortedLocalTimestamps.length - 1] || "";
+          const remoteDeleteIsCurrent = timestampValue(row.updated_at) >= timestampValue(newestLocalTimestamp);
+          if (remoteDeleteIsCurrent) {
+            if (index >= 0) { data.plans.splice(index, 1); dataChanged = true; }
+            pendingCloudPlanDates.delete(row.plan_date);
+            if (row.plan_date === workingPlan.date) {
+              localStorage.removeItem(RECOVERY_KEY);
+              dirty = false;
+              currentChanged = true;
+            }
+          }
           return;
         }
         const plan = normalizedRemotePlan(row.payload); if (!plan?.date) return;
         remoteDates.add(plan.date); plan.updatedAt = row.updated_at || plan.updatedAt;
         const index = data.plans.findIndex(item => item.date === plan.date); const local = data.plans[index];
-        if (!local || String(row.updated_at || "") > String(local.updatedAt || "")) {
+        if (!local || timestampValue(row.updated_at) > timestampValue(local.updatedAt)) {
           if (index >= 0) data.plans[index] = plan; else data.plans.push(plan);
+          dataChanged = true;
           if (plan.date === workingPlan.date && !dirty) currentChanged = true;
         }
       });
@@ -316,7 +335,9 @@
         for (const plan of missingPlans) await window.NapiCloudSync.pushPlan(plan);
       }
       data.plans.sort((a, b) => b.date.localeCompare(a.date)); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
-      if (currentChanged) loadPlan(workingPlan.date); else { if (!dirty) renderTasks(); renderWeek(); renderMonth(); }
+      const taskEditorActive = Boolean(document.activeElement?.closest?.("#taskList .task-card"));
+      if (currentChanged && !taskEditorActive) loadPlan(workingPlan.date);
+      else if (dataChanged) { if (!dirty && !taskEditorActive) renderTasks(); renderWeek(); renderMonth(); }
       return true;
     } catch (error) {
       console.warn("A háttérszinkron most nem érhető el.", error);
@@ -328,15 +349,28 @@
   async function pushCurrentState({ throwOnError = false } = {}) {
     if (!navigator.onLine || !window.NapiCloudSync || !window.NapiCustomerDirectory?.hasSession?.()) return false;
     try {
-      const hasPlanContent = workingPlan.tasks.length || workingPlan.meeting !== DEFAULT_MEETING || workingPlan.stops !== DEFAULT_STOPS;
-      if (hasPlanContent && (dirty || currentStoredPlan())) { upsertWorkingPlan(); pendingCloudPlanDates.add(workingPlan.date); }
-      data.updatedAt = new Date().toISOString(); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
-      for (const date of pendingCloudPlanDates) {
-        const plan = data.plans.find(item => item.date === date); if (plan) await window.NapiCloudSync.pushPlan(plan);
-      }
-      pendingCloudPlanDates.clear();
-      if (pendingCloudDeletedDates.size) { await window.NapiCloudSync.deletePlans([...pendingCloudDeletedDates]); pendingCloudDeletedDates.clear(); localStorage.removeItem(PENDING_DELETIONS_KEY); }
-      if (cloudConfigDirty) { await window.NapiCloudSync.pushConfig(sharedConfigPayload()); cloudConfigDirty = false; }
+      const write = async () => {
+        const hasPlanContent = workingPlan.tasks.length || workingPlan.meeting !== DEFAULT_MEETING || workingPlan.stops !== DEFAULT_STOPS;
+        if (hasPlanContent && dirty && !pendingCloudDeletedDates.has(workingPlan.date)) { upsertWorkingPlan(); pendingCloudPlanDates.add(workingPlan.date); }
+        data.updatedAt = new Date().toISOString(); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+        for (const date of [...pendingCloudPlanDates]) {
+          if (pendingCloudDeletedDates.has(date)) { pendingCloudPlanDates.delete(date); continue; }
+          const plan = data.plans.find(item => item.date === date);
+          if (plan) await window.NapiCloudSync.pushPlan(plan);
+          pendingCloudPlanDates.delete(date);
+        }
+        if (pendingCloudDeletedDates.size) {
+          const deletedDates = [...pendingCloudDeletedDates];
+          await window.NapiCloudSync.deletePlans(deletedDates);
+          deletedDates.forEach(date => pendingCloudDeletedDates.delete(date));
+          if (pendingCloudDeletedDates.size) localStorage.setItem(PENDING_DELETIONS_KEY, JSON.stringify([...pendingCloudDeletedDates]));
+          else localStorage.removeItem(PENDING_DELETIONS_KEY);
+        }
+        if (cloudConfigDirty) { await window.NapiCloudSync.pushConfig(sharedConfigPayload()); cloudConfigDirty = false; }
+      };
+      const queuedWrite = cloudWritePromise.catch(() => {}).then(write);
+      cloudWritePromise = queuedWrite;
+      await queuedWrite;
       return true;
     } catch (error) {
       console.warn("A háttérszinkron most nem érhető el.", error);
@@ -344,23 +378,24 @@
       return false;
     }
   }
-  function queueCloudSync() {
+  function queueCloudSync(delay = 1200) {
     clearTimeout(cloudSyncTimer);
-    cloudSyncTimer = setTimeout(() => pushCurrentState(), 1200);
+    cloudSyncTimer = setTimeout(() => pushCurrentState(), delay);
   }
   function syncDeletedDates(dates) {
-    dates.forEach(date => pendingCloudDeletedDates.add(date));
+    dates.forEach(date => { pendingCloudDeletedDates.add(date); pendingCloudPlanDates.delete(date); });
     localStorage.setItem(PENDING_DELETIONS_KEY, JSON.stringify([...pendingCloudDeletedDates]));
-    window.NapiCloudSync?.deletePlans?.(dates).then(() => {
-      dates.forEach(date => pendingCloudDeletedDates.delete(date));
-      if (pendingCloudDeletedDates.size) localStorage.setItem(PENDING_DELETIONS_KEY, JSON.stringify([...pendingCloudDeletedDates]));
-      else localStorage.removeItem(PENDING_DELETIONS_KEY);
-    }).catch(error => console.warn("A felhős törlés később újrapróbálható.", error));
-    queueCloudSync();
+    queueCloudSync(0);
   }
 
   function markDirty(message = "Mentetlen módosítás") {
     dirty = true;
+    workingPlan.updatedAt = new Date().toISOString();
+    const hasPlanContent = workingPlan.tasks.length || workingPlan.meeting !== DEFAULT_MEETING || workingPlan.stops !== DEFAULT_STOPS;
+    if (hasPlanContent) upsertWorkingPlan();
+    else data.plans = data.plans.filter(plan => plan.date !== workingPlan.date);
+    data.updatedAt = workingPlan.updatedAt;
+    localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
     $("#saveState").textContent = message;
     try { localStorage.setItem(RECOVERY_KEY, JSON.stringify({ savedAt: new Date().toISOString(), data, workingPlan })); } catch (_) { /* A mappamentés ettől még használható. */ }
     renderPrintView();
@@ -373,6 +408,7 @@
   }
   function saveDataLocally() {
     upsertWorkingPlan();
+    pendingCloudPlanDates.add(workingPlan.date);
     data.updatedAt = new Date().toISOString();
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
   }
@@ -491,14 +527,14 @@
     try {
       if (!navigator.onLine) throw new Error("Nincs internetkapcsolat. Kapcsolódj az internethez, majd próbáld újra.");
       if (window.NapiCustomerDirectory?.hasSession?.()) {
+        await syncCustomerDirectory();
+        await waitForCurrentCloudSync();
+        await pullSharedData({ initial: true, throwOnError: true });
         if (dirty) {
           saveDataLocally();
           await pushCurrentState({ throwOnError: true });
           markSaved();
         }
-        await syncCustomerDirectory();
-        await waitForCurrentCloudSync();
-        await pullSharedData({ initial: true, throwOnError: true });
       }
       if ("serviceWorker" in navigator) {
         const registration = await navigator.serviceWorker.getRegistration();
@@ -777,7 +813,7 @@
       const theme = vehicle ? vehicleTheme(vehicle) : { background: "#edf2eb", border: "#7b8e7e", accent: "#173f2b" };
       const block = document.createElement("section"); block.className = "team-block"; block.dataset.teamId = group.id;
       block.style.cssText = `--team-color:${theme.background};--team-border:${theme.border};--team-accent:${theme.accent}`;
-      block.innerHTML = `<header class="team-block-header"><div><h3>${escapeHTML(vehicles.join(" + ") || "Új autó / csapat")}</h3><p>${escapeHTML(workers.length ? `Dolgozók: ${workers.join(", ")}` : "Válaszd ki a dolgozókat")}</p></div><strong>${group.tasks.length} ügyfél</strong></header><div class="task-list-inner"></div><button class="team-add-customer" type="button" data-add-team-customer="${escapeHTML(group.id)}">＋ Új ügyfél ehhez a csapathoz</button>`;
+      block.innerHTML = `<header class="team-block-header"><div><h3>${escapeHTML(vehicles.join(" + ") || "Új autó / csapat")}</h3><p>${escapeHTML(workers.length ? `Dolgozók: ${workers.join(", ")}` : "Válaszd ki a dolgozókat")}</p></div><div class="team-header-actions"><strong>${group.tasks.length} ügyfél</strong><button type="button" class="team-delete-button" data-remove-team="${escapeHTML(group.id)}">Autó / csapat törlése</button></div></header><div class="task-list-inner"></div><button class="team-add-customer" type="button" data-add-team-customer="${escapeHTML(group.id)}">＋ Új ügyfél ehhez a csapathoz</button>`;
       const inner = block.querySelector(".task-list-inner");
       group.tasks.forEach((task, teamIndex) => inner.append(renderTask(task, workingPlan.tasks.indexOf(task), clientIndexInDay(task), teamIndex === 0)));
       list.append(block);
@@ -785,6 +821,7 @@
     if (hadCards) list.querySelectorAll(".task-card details").forEach(detail => { detail.open = openDetails.has(`${detail.closest(".task-card").dataset.taskId}:${detail.dataset.detail}`); });
     $("#emptyState").hidden = workingPlan.tasks.length > 0;
     $("#addTaskBottomButton").hidden = workingPlan.tasks.length === 0;
+    $("#deleteDayButton").hidden = !workingPlan.tasks.length && !data.plans.some(plan => plan.date === workingPlan.date);
     updateCustomerDirectoryButtons();
   }
   function findTaskFromElement(element) { return workingPlan.tasks.find(task => task.id === element.closest(".task-card")?.dataset.taskId); }
@@ -836,11 +873,12 @@
     markDirty("Az új feladat megjegyezve • mentés szükséges"); renderTasks();
   }
   function updateCustomerDirectoryButtons() {
-    const connected = customerDirectory.length > 0 || ["ready", "loading", "cache"].includes(customerDirectoryState);
+    const connected = Boolean(window.NapiCustomerDirectory?.hasSession?.());
     document.querySelectorAll(".add-customer").forEach(button => {
       button.hidden = connected;
-      button.textContent = "🔒 Ügyféllista csatlakoztatása";
+      button.textContent = "🔒 Közös adatok csatlakoztatása";
     });
+    $("#syncConnectionNotice").hidden = connected;
   }
   function openCustomerAuth() {
     const api = window.NapiCustomerDirectory;
@@ -888,7 +926,8 @@
       customerDirectoryLastSync = new Date().toISOString();
       const snapshotsChanged = reconcileCustomerSnapshots();
       if (snapshotsChanged) markDirty("Az ügyféladatok frissültek • mentés szükséges");
-      renderTasks();
+      if (snapshotsChanged && !document.activeElement?.closest?.("#taskList .task-card")) renderTasks();
+      else updateCustomerDirectoryButtons();
       if (activeSettingsTab === "customers" && $("#settingsDialog").open) renderSettings();
       if (notify) toast(`Az ügyféllista frissült: ${customerDirectory.length} cím elérhető.`);
       return true;
@@ -924,6 +963,20 @@
   }
 
   $("#taskList").addEventListener("click", event => {
+    const teamRemove = event.target.closest("[data-remove-team]");
+    if (teamRemove) {
+      const group = tasksByTeam().find(item => item.id === teamRemove.dataset.removeTeam); if (!group) return;
+      const label = taskPeopleAndVehicle(group.tasks[0]).vehicles.join(" + ") || "autó nélküli csapat";
+      if (!confirm(`Biztosan törlöd a(z) ${label} csapatot és a hozzá tartozó ${group.tasks.length} ügyfelet?`)) return;
+      const removedIds = new Set(group.tasks.map(task => task.id));
+      workingPlan.tasks = workingPlan.tasks.filter(task => !removedIds.has(task.id));
+      activeTaskId = workingPlan.tasks[0]?.id || null;
+      markDirty("Az autó / csapat törölve • szinkronizálás folyamatban");
+      if (!workingPlan.tasks.length && workingPlan.meeting === DEFAULT_MEETING && workingPlan.stops === DEFAULT_STOPS) syncDeletedDates([workingPlan.date]);
+      renderTasks(); renderWeek(); renderMonth();
+      toast("Az autó / csapat törölve.");
+      return;
+    }
     const teamAdd = event.target.closest("[data-add-team-customer]");
     if (teamAdd) {
       const group = tasksByTeam().find(item => item.id === teamAdd.dataset.addTeamCustomer); if (!group) return;
@@ -972,7 +1025,7 @@
     const materialRow = event.target.closest(".material-row");
     if (event.target.closest(".remove-material") && materialRow) { task.materials.splice(Number(materialRow.dataset.materialIndex), 1); markDirty(); renderTasks(); return; }
     if (event.target.closest(".duplicate-task")) { const duplicate = deepCopy(task); duplicate.id = uid(); workingPlan.tasks.splice(index + 1, 0, duplicate); markDirty(); renderTasks(); return; }
-    if (event.target.closest(".remove-task")) { if (confirm("Eltávolítod ezt a napi feladatot?")) { workingPlan.tasks.splice(index, 1); activeTaskId = workingPlan.tasks[Math.min(index, workingPlan.tasks.length - 1)]?.id || null; markDirty(); renderTasks(); } return; }
+    if (event.target.closest(".remove-task")) { if (confirm("Eltávolítod ezt az ügyfelet a napi tervből?")) { workingPlan.tasks.splice(index, 1); activeTaskId = workingPlan.tasks[Math.min(index, workingPlan.tasks.length - 1)]?.id || null; markDirty("Az ügyfél törölve • szinkronizálás folyamatban"); if (!workingPlan.tasks.length && workingPlan.meeting === DEFAULT_MEETING && workingPlan.stops === DEFAULT_STOPS) syncDeletedDates([workingPlan.date]); renderTasks(); renderWeek(); renderMonth(); toast("Az ügyfél törölve."); } return; }
     const groupTasks = workingPlan.tasks.filter(item => item.teamId === task.teamId);
     if (event.target.closest(".move-up") && clientIndex > 0) { const other = workingPlan.tasks.indexOf(groupTasks[clientIndex - 1]); [workingPlan.tasks[other], workingPlan.tasks[index]] = [workingPlan.tasks[index], workingPlan.tasks[other]]; markDirty(); renderTasks(); return; }
     if (event.target.closest(".move-down") && clientIndex < groupTasks.length - 1) { const other = workingPlan.tasks.indexOf(groupTasks[clientIndex + 1]); [workingPlan.tasks[other], workingPlan.tasks[index]] = [workingPlan.tasks[index], workingPlan.tasks[other]]; markDirty(); renderTasks(); }
@@ -1018,6 +1071,7 @@
   function addTask() { const task = blankTask(); workingPlan.tasks.push(task); activeTaskId = task.id; collapsedTaskIds.delete(task.id); markDirty(); renderTasks(); $("#taskList .team-block:last-child")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
   $("#addTaskButton").addEventListener("click", addTask);
   $("#addTaskBottomButton").addEventListener("click", addTask);
+  $("#connectSyncButton").addEventListener("click", openCustomerAuth);
   $("#customerAuthForm").addEventListener("submit", async event => {
     event.preventDefault();
     const form = event.currentTarget; const button = form.querySelector("button[value='default']");
@@ -1027,7 +1081,7 @@
       await window.NapiCustomerDirectory.signIn(pin);
       if (!(await syncCustomerDirectory())) throw new Error("A belépés sikerült, de az ügyféllista nem tölthető be.");
       await pullSharedData({ initial: true });
-      form.elements.pin.value = ""; $("#customerAuthDialog").close(); toast(`Az ügyféllista csatlakoztatva: ${customerDirectory.length} cím elérhető.`);
+      form.elements.pin.value = ""; $("#customerAuthDialog").close(); updateCustomerDirectoryButtons(); toast("A közös adatok szinkronizálása bekapcsolva ezen az eszközön.");
     } catch (error) { $("#customerAuthMessage").textContent = readableError(error); }
     finally { button.disabled = false; }
   });
@@ -1070,8 +1124,17 @@
         return `<div class="week-task"><b>${escapeHTML(vehicles || "Autó nélkül")}</b><small class="week-workers">Dolgozók: ${escapeHTML(workers || "nincs kiválasztva")}</small>${clients}</div>`;
       }).join("") : `<p class="week-empty">Nincs elmentett feladat.</p>`;
       const holiday = hungarianHoliday(date);
-      return `<article class="week-day${date === isoToday() ? " today" : ""}${holiday ? " holiday" : ""}"><header><div><p class="week-day-name">${escapeHTML(formatDate(date, { weekday: "long" }))}</p><p class="week-day-date">${escapeHTML(formatDate(date, { month: "short", day: "numeric" }))}</p></div>${holiday ? `<span class="holiday-label">${escapeHTML(holiday)}</span>` : ""}</header><div class="week-day-tasks">${taskHTML}</div><div class="week-day-actions"><button class="week-open" type="button" data-open-date="${date}">${tasks.length ? "Nap megnyitása" : "Terv készítése"}</button>${plan ? `<button class="week-delete" type="button" data-delete-date="${date}">Törlés</button>` : ""}</div></article>`;
+      return `<article class="week-day${date === isoToday() ? " today" : ""}${holiday ? " holiday" : ""}"><header><div><p class="week-day-name">${escapeHTML(formatDate(date, { weekday: "long" }))}</p><p class="week-day-date">${escapeHTML(formatDate(date, { month: "short", day: "numeric" }))}</p></div>${holiday ? `<span class="holiday-label">${escapeHTML(holiday)}</span>` : ""}</header><div class="week-day-tasks">${taskHTML}</div><div class="week-day-actions"><button class="week-open" type="button" data-open-date="${date}">${tasks.length ? "Nap megnyitása" : "Terv készítése"}</button>${plan ? `<button class="week-delete" type="button" data-delete-date="${date}">Teljes nap törlése</button>` : ""}</div></article>`;
     }).join("");
+  }
+  function deleteDay(date) {
+    if (!confirm(`Biztosan törlöd a(z) ${formatDate(date)} teljes napi tervét? Előtte tölts le adatmentést, ha meg szeretnéd őrizni.`)) return false;
+    data.plans = data.plans.filter(plan => plan.date !== date);
+    localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+    syncDeletedDates([date]);
+    if (workingPlan.date === date) { localStorage.removeItem(RECOVERY_KEY); dirty = false; loadPlan(date); }
+    renderWeek(); renderMonth(); toast("A teljes napi terv törölve.");
+    return true;
   }
   function renderMonth() {
     const first = `${monthAnchor}-01`;
@@ -1103,11 +1166,7 @@
     const deleteButton = event.target.closest("[data-delete-date]");
     if (deleteButton) {
       const date = deleteButton.dataset.deleteDate;
-      if (!confirm(`Biztosan törlöd a(z) ${formatDate(date)} napi tervet? Előtte tölts le heti, havi vagy éves adatmentést, ha meg szeretnéd őrizni.`)) return;
-      data.plans = data.plans.filter(plan => plan.date !== date); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
-      syncDeletedDates([date]);
-      if (workingPlan.date === date) { localStorage.removeItem(RECOVERY_KEY); dirty = false; loadPlan(date); }
-      renderWeek(); renderMonth(); toast("A napi terv törölve."); return;
+      deleteDay(date); return;
     }
     const button = event.target.closest("[data-open-date]"); if (!button) return; loadPlan(button.dataset.openDate); switchView("day");
   });
@@ -1404,6 +1463,7 @@
   $("#installAppButton").addEventListener("click", installApplication);
   $("#quickInstallButton").addEventListener("click", installApplication);
   $("#saveButton").addEventListener("click", async () => { try { await saveCurrentPlan(); } catch (error) { $("#saveState").textContent = "Mentési hiba"; toast(`A mentés nem sikerült: ${readableError(error)}`, true); } });
+  $("#deleteDayButton").addEventListener("click", () => deleteDay(workingPlan.date));
   $("#downloadDataButton").addEventListener("click", downloadData); $("#openDataInput").addEventListener("change", event => importDataFile(event.target.files[0]));
   document.addEventListener("pointerdown", event => { const button = event.target.closest("[data-tooltip]"); if (button && event.pointerType !== "mouse") button.dataset.tooltipVisible = "true"; });
   ["pointerup", "pointercancel"].forEach(type => document.addEventListener(type, () => document.querySelectorAll("[data-tooltip-visible]").forEach(button => button.removeAttribute("data-tooltip-visible"))));
@@ -1411,14 +1471,14 @@
   window.addEventListener("beforeunload", event => { if (!dirty || allowPageReload) return; event.preventDefault(); event.returnValue = ""; });
   window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; localStorage.removeItem(INSTALLED_KEY); updateInstallButtons(); });
   window.addEventListener("appinstalled", () => { installPrompt = null; localStorage.setItem(INSTALLED_KEY, "true"); updateInstallButtons(); toast("A Napi feladatok app telepítése sikerült."); });
-  function refreshSharedDataSilently() {
+  function refreshSharedDataSilently({ includeCustomers = false } = {}) {
     if (document.hidden || !navigator.onLine || !window.NapiCustomerDirectory?.hasSession?.()) return;
-    syncCustomerDirectory();
+    if (includeCustomers) syncCustomerDirectory();
     pullSharedData();
   }
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshSharedDataSilently(); });
-  window.addEventListener("focus", refreshSharedDataSilently);
-  window.addEventListener("pageshow", refreshSharedDataSilently);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshSharedDataSilently({ includeCustomers: true }); });
+  window.addEventListener("focus", () => refreshSharedDataSilently({ includeCustomers: true }));
+  window.addEventListener("pageshow", () => refreshSharedDataSilently({ includeCustomers: true }));
   window.addEventListener("online", () => { if (window.NapiCustomerDirectory?.hasSession?.()) { syncCustomerDirectory(); pullSharedData({ initial: true }).then(() => pushCurrentState()); } });
   setInterval(() => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory(); }, 120000);
   setInterval(refreshSharedDataSilently, 5000);
@@ -1461,6 +1521,8 @@
         if (reloadingForUpdate) return;
         reloadingForUpdate = true;
         if (dirty && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) {
+          await waitForCurrentCloudSync();
+          await pullSharedData();
           saveDataLocally();
           await pushCurrentState();
         }

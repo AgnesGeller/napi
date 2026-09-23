@@ -51,6 +51,8 @@ button, summary { touch-action: manipulation; }
 .btn-outline-green { color: var(--forest); border: 1px solid var(--leaf); background: #fff; }
 .btn-outline-green:hover { color: #fff; background: var(--leaf); }
 .copy-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: .75rem; }
+.sync-connection-notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; margin-top: .8rem; padding: .65rem .75rem; color: #6f211d; border: 2px solid #bd625b; background: #fff0ee; }
+.sync-connection-notice[hidden] { display: none; }
 .btn-soft { min-height: 40px; color: var(--forest); border: 1px solid #c3d0c4; background: var(--leaf-light); }
 .btn-soft:hover { background: #d3e4d5; }
 .tasks-section { margin-top: 1.3rem; }
@@ -113,11 +115,17 @@ button, summary { touch-action: manipulation; }
 .team-block-header h3, .team-block-header p { margin: 0; }
 .team-block-header h3 { font: 800 1.12rem Georgia, serif; }
 .team-block-header p { margin-top: .12rem; font-size: .86rem; font-weight: 750; }
+.team-header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .5rem; }
+.team-delete-button { min-height: 38px; padding: .35rem .65rem; color: #fff; border: 1px solid rgba(255,255,255,.8); background: #8f2924; font-size: .8rem; font-weight: 850; }
+.team-delete-button:hover, .team-delete-button:focus-visible { background: #6f1e1a; outline: 3px solid rgba(255,255,255,.28); }
 .team-block .task-list-inner { display: grid; gap: 1.4rem; }
 .team-add-customer { width: 100%; min-height: 48px; color: var(--forest); border: 2px dashed var(--team-border, var(--leaf)); background: rgba(255,255,255,.78); font-weight: 850; }
 .team-block .task-card + .task-card::before { content: "Következő ügyfél"; top: -1.2rem; }
 .btn-add-bottom { width: 100%; margin-top: 1rem; min-height: 52px; }
-.task-save-button { width: 100%; margin-top: .7rem; min-height: 62px; }
+.task-primary-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .7rem; margin-top: .7rem; }
+.task-save-button { width: 100%; min-height: 62px; }
+.task-delete-day-button { min-height: 62px; padding-inline: 1.2rem; color: #fff; border: 2px solid #7b1d19; background: #a92f28; font-weight: 850; }
+.task-delete-day-button:hover, .task-delete-day-button:focus-visible { color: #fff; background: #7f211c; outline: 3px solid rgba(169,47,40,.22); }
 .task-card { position: relative; background: var(--task-color, var(--paper)); border: 2px solid var(--task-border-color, #9fb0a1); border-left: 9px solid var(--task-border-color, var(--forest)); box-shadow: 0 9px 28px rgba(25,57,37,.12); transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease; }
 .task-card + .task-card::before { content: "Következő napi feladat"; position: absolute; left: -7px; top: -1.72rem; padding: .2rem .65rem; color: #fff; background: var(--orange); font-size: .72rem; font-weight: 850; letter-spacing: .075em; text-transform: uppercase; }
 .task-card.is-active { background: #fff; border-color: var(--forest); border-left-color: var(--orange); box-shadow: 0 0 0 5px rgba(168,74,22,.2), 0 18px 40px rgba(25,57,37,.2); }
@@ -313,6 +321,7 @@ button, summary { touch-action: manipulation; }
   .week-grid { grid-template-columns: 1fr; }
   .week-day { min-height: 0; }
   .btn-add { width: 100%; }
+  .task-primary-actions { grid-template-columns: 1fr; }
   .task-card { border-left-width: 3px; }
   .task-card-header { grid-template-columns: 1fr; }
   .task-number { width: 38px; height: 38px; }

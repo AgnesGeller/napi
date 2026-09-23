@@ -30,7 +30,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260923c">
+  <link rel="stylesheet" href="css/style.css?v=20260923d">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -77,6 +77,10 @@
         <button class="btn btn-soft" id="copyYesterdayButton" type="button">Tegnapi nap másolása</button>
         <button class="btn btn-soft" id="copyEarlierButton" type="button">Korábbi terv másolása</button>
       </div>
+      <div class="sync-connection-notice" id="syncConnectionNotice" hidden>
+        <strong>A közös szinkron nincs csatlakoztatva ezen az eszközön.</strong>
+        <button class="btn btn-outline-green" id="connectSyncButton" type="button">Csatlakoztatás</button>
+      </div>
     </section>
 
     <section class="tasks-section" id="dayView" aria-labelledby="tasksHeading">
@@ -94,7 +98,10 @@
       </div>
       <div id="taskList" class="task-list"></div>
       <button class="btn btn-add btn-add-bottom" id="addTaskBottomButton" type="button" hidden>＋ Új autó / csapat</button>
-      <button class="btn btn-save task-save-button" id="saveButton" type="button"><span aria-hidden="true">✓</span> Mentés</button>
+      <div class="task-primary-actions">
+        <button class="btn btn-save task-save-button" id="saveButton" type="button"><span aria-hidden="true">✓</span> Mentés</button>
+        <button class="btn task-delete-day-button" id="deleteDayButton" type="button" hidden>Teljes nap törlése</button>
+      </div>
     </section>
     <details class="week-section weekly-overview" id="weekView" open>
       <summary class="weekly-overview-summary"><span><strong id="weekHeading">Heti áttekintés</strong><small>Péntektől csütörtökig · lenyitható</small></span><span class="weekly-chevron" aria-hidden="true">⌄</span></summary>
@@ -164,9 +171,9 @@
 
   <dialog id="customerAuthDialog" class="app-dialog compact-dialog">
     <form method="dialog" id="customerAuthForm" class="dialog-frame">
-      <header class="dialog-header"><div><p class="section-kicker">Közös ügyféllista</p><h2>Ügyféllista csatlakoztatása</h2></div><button class="icon-button" type="button" data-close-customer-auth aria-label="Bezárás">×</button></header>
+      <header class="dialog-header"><div><p class="section-kicker">Közös adatok</p><h2>Az eszköz csatlakoztatása</h2></div><button class="icon-button" type="button" data-close-customer-auth aria-label="Bezárás">×</button></header>
       <div class="dialog-body">
-        <p class="directory-intro">A Napi feladatok a Munkalap jóváhagyott ügyfeleit és címeit csak olvassa. A napi tervek továbbra is a helyi adatfájlban maradnak.</p>
+        <p class="directory-intro">Ezt egyszer kell megadni ezen az eszközön. Ezután a napi tervek és a törlések automatikusan megjelennek a többi csatlakoztatott PC-n és Android-telefonon is.</p>
         <p><strong>Felhasználó: Tamás</strong></p>
         <label>PIN-kód<input class="form-control" name="pin" type="password" inputmode="numeric" autocomplete="current-password" required></label>
         <p class="directory-message" id="customerAuthMessage" role="status"></p>
@@ -237,7 +244,7 @@
           <button type="button" class="icon-button move-up" aria-label="Feladat mozgatása felfelé" data-tooltip="Mozgatás felfelé">↑</button>
           <button type="button" class="icon-button move-down" aria-label="Feladat mozgatása lefelé" data-tooltip="Mozgatás lefelé">↓</button>
           <button type="button" class="icon-button duplicate-task" aria-label="Feladat másolása" data-tooltip="Feladat másolása">⧉</button>
-          <button type="button" class="icon-button danger remove-task" aria-label="Feladat törlése" data-tooltip="Feladat törlése">×</button>
+          <button type="button" class="icon-button danger remove-task" aria-label="Ügyfél törlése" data-tooltip="Ügyfél törlése">×</button>
         </div>
       </header>
       <div class="task-fields">
@@ -309,6 +316,6 @@
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260922f"></script>
   <script src="js/napi-sync.js?v=20260922b"></script>
-  <script src="js/app.js?v=20260923d"></script>
+  <script src="js/app.js?v=20260923f"></script>
 </body>
 </html>
