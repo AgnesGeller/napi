@@ -300,25 +300,18 @@
         dataChanged = true;
       }
       else if (initial && !remote.config) await window.NapiCloudSync.pushConfig(sharedConfigPayload());
-      const remoteDates = new Set(); let currentChanged = false;
+      const remoteDates = new Set(); let currentChanged = false; let currentDeleted = false;
       remote.plans.forEach(row => {
         if (row.payload?.deleted) {
           remoteDates.add(row.plan_date);
           const index = data.plans.findIndex(item => item.date === row.plan_date);
-          const local = data.plans[index];
-          const localTimestamps = [local?.updatedAt];
-          if (row.plan_date === workingPlan.date) localTimestamps.push(workingPlan.updatedAt);
-          const sortedLocalTimestamps = localTimestamps.filter(Boolean).sort();
-          const newestLocalTimestamp = sortedLocalTimestamps[sortedLocalTimestamps.length - 1] || "";
-          const remoteDeleteIsCurrent = timestampValue(row.updated_at) >= timestampValue(newestLocalTimestamp);
-          if (remoteDeleteIsCurrent) {
-            if (index >= 0) { data.plans.splice(index, 1); dataChanged = true; }
-            pendingCloudPlanDates.delete(row.plan_date);
-            if (row.plan_date === workingPlan.date) {
-              localStorage.removeItem(RECOVERY_KEY);
-              dirty = false;
-              currentChanged = true;
-            }
+          if (index >= 0) { data.plans.splice(index, 1); dataChanged = true; }
+          pendingCloudPlanDates.delete(row.plan_date);
+          if (row.plan_date === workingPlan.date) {
+            localStorage.removeItem(RECOVERY_KEY);
+            dirty = false;
+            currentChanged = true;
+            currentDeleted = true;
           }
           return;
         }
@@ -337,7 +330,7 @@
       }
       data.plans.sort((a, b) => b.date.localeCompare(a.date)); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
       const taskEditorActive = Boolean(document.activeElement?.closest?.("#taskList .task-card"));
-      if (currentChanged && !taskEditorActive) loadPlan(workingPlan.date);
+      if (currentDeleted || (currentChanged && !taskEditorActive)) loadPlan(workingPlan.date);
       else if (dataChanged) { if (!dirty && !taskEditorActive) renderTasks(); renderWeek(); renderMonth(); }
       return true;
     } catch (error) {
@@ -386,7 +379,8 @@
   function syncDeletedDates(dates) {
     dates.forEach(date => { pendingCloudDeletedDates.add(date); pendingCloudPlanDates.delete(date); });
     localStorage.setItem(PENDING_DELETIONS_KEY, JSON.stringify([...pendingCloudDeletedDates]));
-    queueCloudSync(0);
+    clearTimeout(cloudSyncTimer);
+    return pushCurrentState();
   }
 
   function markDirty(message = "Mentetlen módosítás") {
@@ -1143,9 +1137,13 @@
     if (!confirm(`Biztosan törlöd a(z) ${formatDate(date)} teljes napi tervét? Előtte tölts le adatmentést, ha meg szeretnéd őrizni.`)) return false;
     data.plans = data.plans.filter(plan => plan.date !== date);
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
-    syncDeletedDates([date]);
+    const syncPromise = syncDeletedDates([date]);
     if (workingPlan.date === date) { localStorage.removeItem(RECOVERY_KEY); dirty = false; loadPlan(date); }
-    renderWeek(); renderMonth(); toast("A teljes napi terv törölve.");
+    renderWeek(); renderMonth(); toast("A teljes napi terv törölve • szinkronizálás folyamatban.");
+    syncPromise.then(synced => {
+      if (synced) toast("A teljes napi terv minden eszközről törölve.");
+      else toast("A törlés ezen az eszközön megtörtént. A közös törlés internetkapcsolatkor automatikusan befejeződik.", true);
+    });
     return true;
   }
   function renderMonth() {
