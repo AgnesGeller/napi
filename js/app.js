@@ -286,8 +286,8 @@
   function normalizedRemotePlan(payload) {
     return normalizeData({ ...data, plans: [payload] }).plans[0];
   }
-  async function pullSharedData({ initial = false } = {}) {
-    if (cloudSyncing || !navigator.onLine || !window.NapiCloudSync || !window.NapiCustomerDirectory?.hasSession?.()) return;
+  async function pullSharedData({ initial = false, throwOnError = false } = {}) {
+    if (cloudSyncing || !navigator.onLine || !window.NapiCloudSync || !window.NapiCustomerDirectory?.hasSession?.()) return false;
     cloudSyncing = true;
     try {
       const remote = await window.NapiCloudSync.pull();
@@ -316,12 +316,17 @@
         for (const plan of missingPlans) await window.NapiCloudSync.pushPlan(plan);
       }
       data.plans.sort((a, b) => b.date.localeCompare(a.date)); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
-      if (currentChanged) loadPlan(workingPlan.date); else { if (!dirty) renderTasks(); renderWeek(); }
-    } catch (error) { console.warn("A háttérszinkron most nem érhető el.", error); }
+      if (currentChanged) loadPlan(workingPlan.date); else { if (!dirty) renderTasks(); renderWeek(); renderMonth(); }
+      return true;
+    } catch (error) {
+      console.warn("A háttérszinkron most nem érhető el.", error);
+      if (throwOnError) throw error;
+      return false;
+    }
     finally { cloudSyncing = false; }
   }
-  async function pushCurrentState() {
-    if (!navigator.onLine || !window.NapiCloudSync || !window.NapiCustomerDirectory?.hasSession?.()) return;
+  async function pushCurrentState({ throwOnError = false } = {}) {
+    if (!navigator.onLine || !window.NapiCloudSync || !window.NapiCustomerDirectory?.hasSession?.()) return false;
     try {
       const hasPlanContent = workingPlan.tasks.length || workingPlan.meeting !== DEFAULT_MEETING || workingPlan.stops !== DEFAULT_STOPS;
       if (hasPlanContent && (dirty || currentStoredPlan())) { upsertWorkingPlan(); pendingCloudPlanDates.add(workingPlan.date); }
@@ -332,7 +337,12 @@
       pendingCloudPlanDates.clear();
       if (pendingCloudDeletedDates.size) { await window.NapiCloudSync.deletePlans([...pendingCloudDeletedDates]); pendingCloudDeletedDates.clear(); localStorage.removeItem(PENDING_DELETIONS_KEY); }
       if (cloudConfigDirty) { await window.NapiCloudSync.pushConfig(sharedConfigPayload()); cloudConfigDirty = false; }
-    } catch (error) { console.warn("A háttérszinkron most nem érhető el.", error); }
+      return true;
+    } catch (error) {
+      console.warn("A háttérszinkron most nem érhető el.", error);
+      if (throwOnError) throw error;
+      return false;
+    }
   }
   function queueCloudSync() {
     clearTimeout(cloudSyncTimer);
@@ -470,19 +480,35 @@
       $("#folderButton").title = "Külön biztonsági másolat mappájának kiválasztása";
     }
   }
+  async function waitForCurrentCloudSync() {
+    for (let attempt = 0; cloudSyncing && attempt < 40; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+  }
   async function refreshApplication() {
     const button = $("#refreshButton");
     button.disabled = true; button.textContent = "⟳ Frissítés…";
     try {
-      allowPageReload = true;
+      if (!navigator.onLine) throw new Error("Nincs internetkapcsolat. Kapcsolódj az internethez, majd próbáld újra.");
+      if (window.NapiCustomerDirectory?.hasSession?.()) {
+        if (dirty) {
+          saveDataLocally();
+          await pushCurrentState({ throwOnError: true });
+          markSaved();
+        }
+        await syncCustomerDirectory();
+        await waitForCurrentCloudSync();
+        await pullSharedData({ initial: true, throwOnError: true });
+      }
       if ("serviceWorker" in navigator) {
         const registration = await navigator.serviceWorker.getRegistration();
         if (registration) await registration.update();
       }
-      window.location.reload();
-    } catch (_) {
       allowPageReload = true;
       window.location.reload();
+    } catch (error) {
+      button.disabled = false; button.textContent = "⟳ Frissítés";
+      toast(`A frissítés nem sikerült: ${readableError(error)}`, true);
     }
   }
   function downloadData() {
@@ -1385,10 +1411,17 @@
   window.addEventListener("beforeunload", event => { if (!dirty || allowPageReload) return; event.preventDefault(); event.returnValue = ""; });
   window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; localStorage.removeItem(INSTALLED_KEY); updateInstallButtons(); });
   window.addEventListener("appinstalled", () => { installPrompt = null; localStorage.setItem(INSTALLED_KEY, "true"); updateInstallButtons(); toast("A Napi feladatok app telepítése sikerült."); });
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) { syncCustomerDirectory(); pullSharedData(); } });
+  function refreshSharedDataSilently() {
+    if (document.hidden || !navigator.onLine || !window.NapiCustomerDirectory?.hasSession?.()) return;
+    syncCustomerDirectory();
+    pullSharedData();
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshSharedDataSilently(); });
+  window.addEventListener("focus", refreshSharedDataSilently);
+  window.addEventListener("pageshow", refreshSharedDataSilently);
   window.addEventListener("online", () => { if (window.NapiCustomerDirectory?.hasSession?.()) { syncCustomerDirectory(); pullSharedData({ initial: true }).then(() => pushCurrentState()); } });
   setInterval(() => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory(); }, 120000);
-  setInterval(() => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) pullSharedData(); }, 15000);
+  setInterval(refreshSharedDataSilently, 5000);
 
   async function initialize() {
     $("#planDate").value = isoToday();
@@ -1424,10 +1457,20 @@
     updateInstallButtons();
     if ("serviceWorker" in navigator) {
       let reloadingForUpdate = false;
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        if (reloadingForUpdate) return; reloadingForUpdate = true; window.location.reload();
+      navigator.serviceWorker.addEventListener("controllerchange", async () => {
+        if (reloadingForUpdate) return;
+        reloadingForUpdate = true;
+        if (dirty && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) {
+          saveDataLocally();
+          await pushCurrentState();
+        }
+        allowPageReload = true;
+        window.location.reload();
       });
-      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(registration => registration.update()).catch(() => {});
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(registration => {
+        registration.update();
+        setInterval(() => { if (!document.hidden && navigator.onLine) registration.update(); }, 60000);
+      }).catch(() => {});
     }
   }
   initialize();
