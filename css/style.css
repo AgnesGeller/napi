@@ -94,14 +94,18 @@ button, summary { touch-action: manipulation; }
 .month-weekdays, .month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .45rem; padding: 0 1rem; }
 .month-weekdays { padding-top: .8rem; color: var(--muted); font-size: .78rem; font-weight: 850; text-align: center; text-transform: uppercase; }
 .month-grid { padding-bottom: 1rem; }
-.month-day { min-height: 116px; display: grid; align-content: start; gap: .3rem; padding: .55rem; color: #26382b; border: 1px solid #bcc9bd; background: #fff; text-align: left; }
+.month-day { min-height: 132px; display: grid; grid-template-rows: 1fr auto; color: #26382b; border: 1px solid #bcc9bd; background: #fff; text-align: left; }
 .month-day.outside { opacity: .42; background: #f0f2ee; }
 .month-day.today { border: 3px solid var(--orange); }
 .month-day.holiday { background: #fff1ef; }
+.month-day-open { min-width: 0; display: grid; align-content: start; gap: .3rem; padding: .55rem; color: inherit; border: 0; background: transparent; text-align: left; }
+.month-day-open:hover, .month-day-open:focus-visible { background: rgba(47,105,68,.08); outline: 3px solid rgba(47,105,68,.2); outline-offset: -3px; }
 .month-day-number { color: var(--forest); font: 800 1rem Georgia, serif; }
 .month-day small, .month-day strong { display: block; }
-.month-day small { color: #8a312a; font-size: .68rem; }
+.month-day small { color: #6f2924; font-size: .68rem; overflow-wrap: anywhere; }
 .month-day strong { color: var(--forest); font-size: .78rem; }
+.month-day-delete { min-height: 36px; margin: 0 .4rem .4rem; padding: .25rem .35rem; color: #fff; border: 1px solid #7b1d19; background: #a92f28; font-size: .72rem; font-weight: 850; }
+.month-day-delete:hover, .month-day-delete:focus-visible { background: #7f211c; outline: 3px solid rgba(169,47,40,.22); }
 .section-heading { display: flex; gap: 1rem; align-items: end; justify-content: space-between; margin: 0 .2rem .8rem; }
 .btn-add, .btn-save { color: #fff; background: var(--forest); border-color: var(--forest); }
 .btn-add:hover, .btn-save:hover { color: #fff; background: #0e3020; }
@@ -335,9 +339,11 @@ button, summary { touch-action: manipulation; }
   .material-unit { grid-column: 1; grid-row: 3; }
   .material-row .remove-material { grid-column: 3; grid-row: 2; }
   .month-weekdays, .month-grid { gap: .2rem; padding-left: .45rem; padding-right: .45rem; }
-  .month-day { min-height: 82px; padding: .32rem; }
+  .month-day { min-height: 108px; }
+  .month-day-open { padding: .32rem; }
   .month-day strong { font-size: .68rem; }
   .month-day small { font-size: .6rem; }
+  .month-day-delete { min-height: 32px; margin: 0 .2rem .2rem; padding: .15rem; font-size: .6rem; }
   .expectation-grid { grid-template-columns: 1fr; }
   .action-dock { left: auto; right: max(.65rem, env(safe-area-inset-right)); bottom: calc(.65rem + env(safe-area-inset-bottom)); width: auto; padding: 0; border: 0; background: transparent; box-shadow: none; backdrop-filter: none; }
   .dock-toggle { min-width: 116px; min-height: 50px; display: block; padding: .65rem 1rem; color: #fff; border: 2px solid #dca06b; border-radius: 8px; background: var(--forest); box-shadow: 0 8px 24px rgba(0,0,0,.24); font-weight: 850; }

@@ -704,6 +704,7 @@
     });
     return groups;
   }
+  function planHasTasks(plan) { return Boolean(plan && Array.isArray(plan.tasks) && plan.tasks.length); }
   function clientIndexInTeam(task) { return tasksByTeam().find(group => group.id === (task.teamId || task.id))?.tasks.indexOf(task) ?? 0; }
   function clientIndexInDay(task, plan = workingPlan) { return plan.tasks.indexOf(task); }
   function taskJobs(task) { return Array.isArray(task.jobs) ? task.jobs : []; }
@@ -821,7 +822,7 @@
     if (hadCards) list.querySelectorAll(".task-card details").forEach(detail => { detail.open = openDetails.has(`${detail.closest(".task-card").dataset.taskId}:${detail.dataset.detail}`); });
     $("#emptyState").hidden = workingPlan.tasks.length > 0;
     $("#addTaskBottomButton").hidden = workingPlan.tasks.length === 0;
-    $("#deleteDayButton").hidden = !workingPlan.tasks.length && !data.plans.some(plan => plan.date === workingPlan.date);
+    $("#deleteDayButton").hidden = !workingPlan.tasks.length;
     updateCustomerDirectoryButtons();
   }
   function findTaskFromElement(element) { return workingPlan.tasks.find(task => task.id === element.closest(".task-card")?.dataset.taskId); }
@@ -1105,7 +1106,7 @@
   }
   $("#copyYesterdayButton").addEventListener("click", () => copyPlanFrom(dateOffset(workingPlan.date, -1)));
   $("#copyEarlierButton").addEventListener("click", () => {
-    const plans = data.plans.filter(plan => plan.date !== workingPlan.date).sort((a, b) => b.date.localeCompare(a.date));
+    const plans = data.plans.filter(plan => plan.date !== workingPlan.date && planHasTasks(plan)).sort((a, b) => b.date.localeCompare(a.date));
     $("#historyList").innerHTML = plans.length ? plans.map(plan => `<button class="history-item" type="button" data-copy-date="${plan.date}"><span><b>${escapeHTML(formatDate(plan.date))}</b><span>${plan.tasks.length} feladat</span></span><strong>Másolás →</strong></button>`).join("") : `<p>Még nincs másolható korábbi terv.</p>`;
     $("#historyDialog").showModal();
   });
@@ -1115,7 +1116,9 @@
     const start = startOfWeek(weekAnchor); const days = Array.from({ length: 7 }, (_, index) => dateOffset(start, index));
     $("#weekRange").textContent = `${formatDate(days[0], { year: "numeric", month: "long", day: "numeric" })} – ${formatDate(days[6], { year: "numeric", month: "long", day: "numeric" })}`;
     $("#weekGrid").innerHTML = days.map(date => {
-      const plan = data.plans.find(item => item.date === date); const tasks = plan?.tasks || [];
+      const savedPlan = data.plans.find(item => item.date === date);
+      const plan = planHasTasks(savedPlan) ? savedPlan : null;
+      const tasks = plan?.tasks || [];
       const taskHTML = tasks.length ? tasksByTeam(plan).map(group => {
         const lead = group.tasks[0];
         const workers = lead.workerIds.map(id => byId(data.workers, id)?.name).filter(Boolean).join(", ");
@@ -1144,11 +1147,18 @@
     const days = Array.from({ length: 42 }, (_, index) => dateOffset(gridStart, index));
     $("#monthTitle").textContent = new Intl.DateTimeFormat("hu-HU", { year: "numeric", month: "long" }).format(firstDate);
     $("#monthGrid").innerHTML = days.map(date => {
-      const plan = data.plans.find(item => item.date === date);
+      const savedPlan = data.plans.find(item => item.date === date);
+      const plan = planHasTasks(savedPlan) ? savedPlan : null;
       const holiday = hungarianHoliday(date);
       const clients = plan?.tasks.length || 0;
-      const teams = plan ? tasksByTeam(plan).length : 0;
-      return `<button class="month-day${date.slice(0, 7) !== monthAnchor ? " outside" : ""}${date === isoToday() ? " today" : ""}${holiday ? " holiday" : ""}" type="button" data-month-date="${date}" aria-label="${escapeHTML(formatDate(date))}${clients ? `, ${clients} ügyfél` : ""}"><span class="month-day-number">${Number(date.slice(8, 10))}</span>${holiday ? `<strong>${escapeHTML(holiday)}</strong>` : ""}${clients ? `<small>${teams} csapat<br>${clients} ügyfél</small>` : ""}</button>`;
+      const details = plan ? tasksByTeam(plan).map(group => {
+        const lead = group.tasks[0];
+        const vehicle = (lead.vehicleIds || []).map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ") || "Autó nélkül";
+        const customers = group.tasks.map(task => task.customerName || "Ügyfél nélkül").join(", ");
+        return `${vehicle}: ${customers}`;
+      }).join(" • ") : "";
+      const classes = `month-day${date.slice(0, 7) !== monthAnchor ? " outside" : ""}${date === isoToday() ? " today" : ""}${holiday ? " holiday" : ""}`;
+      return `<article class="${classes}"><button class="month-day-open" type="button" data-month-date="${date}" aria-label="${escapeHTML(formatDate(date))}${clients ? `, ${clients} ügyfél` : ""}"><span class="month-day-number">${Number(date.slice(8, 10))}</span>${holiday ? `<strong>${escapeHTML(holiday)}</strong>` : ""}${clients ? `<small>${escapeHTML(details)}</small>` : ""}</button>${clients ? `<button class="month-day-delete" type="button" data-month-delete="${date}" aria-label="${escapeHTML(formatDate(date))} teljes napi tervének törlése">Törlés</button>` : ""}</article>`;
     }).join("");
   }
   function switchView(view) {
@@ -1178,7 +1188,11 @@
   $("#previousMonthButton").addEventListener("click", () => { monthAnchor = monthOffset(monthAnchor, -1); renderMonth(); });
   $("#nextMonthButton").addEventListener("click", () => { monthAnchor = monthOffset(monthAnchor, 1); renderMonth(); });
   $("#currentMonthButton").addEventListener("click", () => { monthAnchor = isoToday().slice(0, 7); renderMonth(); });
-  $("#monthGrid").addEventListener("click", event => { const day = event.target.closest("[data-month-date]"); if (!day) return; loadPlan(day.dataset.monthDate); switchView("day"); });
+  $("#monthGrid").addEventListener("click", event => {
+    const deleteButton = event.target.closest("[data-month-delete]");
+    if (deleteButton) { deleteDay(deleteButton.dataset.monthDelete); return; }
+    const day = event.target.closest("[data-month-date]"); if (!day) return; loadPlan(day.dataset.monthDate); switchView("day");
+  });
 
   function jobDescriptions(task) {
     const seen = new Set();
