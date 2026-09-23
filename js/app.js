@@ -9,6 +9,8 @@
   const DB_STORE = "handles";
   const INSTALLED_KEY = "diszkertek-napi-installed-v1";
   const PENDING_DELETIONS_KEY = "diszkertek-napi-fuggo-torlesek-v1";
+  const WEEK_ANCHOR_KEY = "diszkertek-napi-heti-pozicio-v1";
+  const MONTH_ANCHOR_KEY = "diszkertek-napi-havi-pozicio-v1";
   const FINAL_NOTE = "A nap végén mindenki vegye ki a szemetét az autóból és hagyjon rendet maga után!";
   const DEFAULT_MEETING = "telephely, 6:30";
   const DEFAULT_STOPS = "Vizeshűtő, Lidl, Dohánybolt";
@@ -33,6 +35,10 @@
     const now = new Date();
     return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   };
+  function storedCalendarPosition(key, fallback, pattern) {
+    try { const value = sessionStorage.getItem(key); return pattern.test(value || "") ? value : fallback; }
+    catch (_) { return fallback; }
+  }
   const escapeHTML = value => String(value ?? "").replace(/[&<>"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[character]);
   const searchKey = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("hu-HU").trim();
   const readableError = error => error?.name === "AbortError" ? "A művelet megszakadt." : (error?.message || "Váratlan hiba történt.");
@@ -165,8 +171,8 @@
   let activeSettingsTab = "workers";
   let editingSettingsId = null;
   let pendingCustomerTaskId = null;
-  let weekAnchor = isoToday();
-  let monthAnchor = isoToday().slice(0, 7);
+  let weekAnchor = storedCalendarPosition(WEEK_ANCHOR_KEY, isoToday(), /^\d{4}-\d{2}-\d{2}$/);
+  let monthAnchor = storedCalendarPosition(MONTH_ANCHOR_KEY, isoToday().slice(0, 7), /^\d{4}-\d{2}$/);
   let installPrompt = null;
   let allowPageReload = false;
   let activeTaskId = null;
@@ -363,7 +369,7 @@
       }
       data.plans.sort((a, b) => b.date.localeCompare(a.date)); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
       const taskEditorActive = Boolean(document.activeElement?.closest?.("#taskList .task-card"));
-      if (currentDeleted || (currentChanged && !taskEditorActive)) loadPlan(workingPlan.date);
+      if (currentDeleted || (currentChanged && !taskEditorActive)) loadPlan(workingPlan.date, { preserveCalendarPosition: true });
       else if (dataChanged) { if (!dirty && !taskEditorActive) renderTasks(); renderWeek(); renderMonth(); }
       return true;
     } catch (error) {
@@ -618,7 +624,7 @@
     const dates = new Set(matching.map(plan => plan.date)); data.plans = data.plans.filter(plan => !dates.has(plan.date));
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
     syncDeletedDates([...dates]);
-    if (dates.has(workingPlan.date)) { localStorage.removeItem(RECOVERY_KEY); dirty = false; loadPlan(workingPlan.date); }
+    if (dates.has(workingPlan.date)) { localStorage.removeItem(RECOVERY_KEY); dirty = false; loadPlan(workingPlan.date, { preserveCalendarPosition: true }); }
     else { renderWeek(); renderMonth(); }
     toast(`${matching.length} napi terv törölve.`); $("#downloadsDialog").close();
   }
@@ -689,7 +695,9 @@
     });
     data.plans = data.plans.filter(plan => plan.tasks.length || plan.meeting !== DEFAULT_MEETING || plan.stops !== DEFAULT_STOPS);
   }
-  function loadPlan(date) {
+  function setWeekAnchor(date) { weekAnchor = date; try { sessionStorage.setItem(WEEK_ANCHOR_KEY, date); } catch (_) { /* A nézet ettől még használható. */ } }
+  function setMonthAnchor(month) { monthAnchor = month; try { sessionStorage.setItem(MONTH_ANCHOR_KEY, month); } catch (_) { /* A nézet ettől még használható. */ } }
+  function loadPlan(date, { preserveCalendarPosition = false } = {}) {
     const stored = data.plans.find(plan => plan.date === date);
     workingPlan = stored ? deepCopy(stored) : blankPlan(date);
     activeTaskId = stored ? null : (workingPlan.tasks[0]?.id || null);
@@ -697,8 +705,7 @@
     $("#planDate").value = date;
     $("#meetingInput").value = workingPlan.meeting ?? DEFAULT_MEETING;
     $("#stopsInput").value = workingPlan.stops ?? DEFAULT_STOPS;
-    weekAnchor = date;
-    monthAnchor = date.slice(0, 7);
+    if (!preserveCalendarPosition) { setWeekAnchor(date); setMonthAnchor(date.slice(0, 7)); }
     dirty = false;
     $("#saveState").textContent = stored ? "Betöltve • nincs mentetlen módosítás" : "Új napi terv";
     renderTasks();
@@ -1172,7 +1179,7 @@
     data.plans = data.plans.filter(plan => plan.date !== date);
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
     const syncPromise = syncDeletedDates([date]);
-    if (workingPlan.date === date) { localStorage.removeItem(RECOVERY_KEY); dirty = false; loadPlan(date); }
+    if (workingPlan.date === date) { localStorage.removeItem(RECOVERY_KEY); dirty = false; loadPlan(date, { preserveCalendarPosition: true }); }
     renderWeek(); renderMonth(); toast("A teljes napi terv törölve • szinkronizálás folyamatban.");
     syncPromise.then(synced => {
       if (synced) toast("A teljes napi terv minden eszközről törölve.");
@@ -1222,13 +1229,13 @@
     const button = event.target.closest("[data-open-date]"); if (!button) return; loadPlan(button.dataset.openDate); switchView("day");
   });
   $("#weekView").addEventListener("toggle", () => { if ($("#weekView").open) renderWeek(); });
-  $("#previousWeekButton").addEventListener("click", () => { weekAnchor = dateOffset(weekAnchor, -7); renderWeek(); });
-  $("#nextWeekButton").addEventListener("click", () => { weekAnchor = dateOffset(weekAnchor, 7); renderWeek(); });
-  $("#currentWeekButton").addEventListener("click", () => { weekAnchor = isoToday(); renderWeek(); });
+  $("#previousWeekButton").addEventListener("click", () => { setWeekAnchor(dateOffset(weekAnchor, -7)); renderWeek(); });
+  $("#nextWeekButton").addEventListener("click", () => { setWeekAnchor(dateOffset(weekAnchor, 7)); renderWeek(); });
+  $("#currentWeekButton").addEventListener("click", () => { setWeekAnchor(isoToday()); renderWeek(); });
   $("#monthView").addEventListener("toggle", () => { if ($("#monthView").open) renderMonth(); });
-  $("#previousMonthButton").addEventListener("click", () => { monthAnchor = monthOffset(monthAnchor, -1); renderMonth(); });
-  $("#nextMonthButton").addEventListener("click", () => { monthAnchor = monthOffset(monthAnchor, 1); renderMonth(); });
-  $("#currentMonthButton").addEventListener("click", () => { monthAnchor = isoToday().slice(0, 7); renderMonth(); });
+  $("#previousMonthButton").addEventListener("click", () => { setMonthAnchor(monthOffset(monthAnchor, -1)); renderMonth(); });
+  $("#nextMonthButton").addEventListener("click", () => { setMonthAnchor(monthOffset(monthAnchor, 1)); renderMonth(); });
+  $("#currentMonthButton").addEventListener("click", () => { setMonthAnchor(isoToday().slice(0, 7)); renderMonth(); });
   $("#monthGrid").addEventListener("click", event => {
     const deleteButton = event.target.closest("[data-month-delete]");
     if (deleteButton) { deleteDay(deleteButton.dataset.monthDelete); return; }
@@ -1566,7 +1573,7 @@
       } catch (_) { /* Hibás helyreállítási adatot figyelmen kívül hagyunk. */ }
     }
     updateStorageStatus();
-    if (!dirty) loadPlan($("#planDate").value); else { renderTasks(); $("#saveState").textContent = "Helyreállított piszkozat • mentés szükséges"; }
+    if (!dirty) loadPlan($("#planDate").value, { preserveCalendarPosition: true }); else { renderTasks(); $("#saveState").textContent = "Helyreállított piszkozat • mentés szükséges"; }
     renderWeek();
     renderMonth();
     if (navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) { await syncCustomerDirectory(); await pullSharedData({ initial: true }); if (pendingCloudDeletedDates.size) await pushCurrentState(); }
