@@ -30,7 +30,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260922x">
+  <link rel="stylesheet" href="css/style.css?v=20260923a">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -58,6 +58,7 @@
       <div class="view-switch" role="group" aria-label="Nézet kiválasztása">
         <button class="active" id="dayViewButton" type="button" aria-pressed="true">Napi nézet</button>
         <button id="weekViewButton" type="button" aria-pressed="false">Heti nézet</button>
+        <button id="monthViewButton" type="button" aria-pressed="false">Havi nézet</button>
       </div>
       <div>
         <p class="section-kicker">Napi munkaterv</p>
@@ -84,15 +85,15 @@
           <p class="section-kicker">Autók, dolgozók és helyszínek</p>
           <h2 id="tasksHeading">A nap feladatai</h2>
         </div>
-        <button class="btn btn-add" id="addTaskButton" type="button">＋ Napi feladat hozzáadása</button>
+        <button class="btn btn-add" id="addTaskButton" type="button">＋ Új autó / csapat</button>
       </div>
       <div id="emptyState" class="empty-state">
         <span aria-hidden="true">✦</span>
         <h3>Még nincs feladat ezen a napon</h3>
-        <p>Kezdd az autó és az első napi feladat hozzáadásával.</p>
+        <p>Kezdd az első autó, a dolgozók és az első ügyfél hozzáadásával.</p>
       </div>
       <div id="taskList" class="task-list"></div>
-      <button class="btn btn-add btn-add-bottom" id="addTaskBottomButton" type="button" hidden>＋ Napi feladat hozzáadása</button>
+      <button class="btn btn-add btn-add-bottom" id="addTaskBottomButton" type="button" hidden>＋ Új autó / csapat</button>
       <button class="btn btn-save task-save-button" id="saveButton" type="button"><span aria-hidden="true">✓</span> Mentés</button>
     </section>
     <details class="week-section weekly-overview" id="weekView" open>
@@ -102,6 +103,15 @@
         <div class="week-nav"><button class="btn btn-soft" id="previousWeekButton" type="button">← Előző hét</button><button class="btn btn-soft" id="currentWeekButton" type="button">Aktuális hét</button><button class="btn btn-soft" id="nextWeekButton" type="button">Következő hét →</button></div>
       </div>
       <div class="week-grid" id="weekGrid"></div>
+    </details>
+    <details class="week-section monthly-overview" id="monthView">
+      <summary class="weekly-overview-summary"><span><strong id="monthHeading">Havi áttekintés</strong><small>Teljes hónap · lenyitható</small></span><span class="weekly-chevron" aria-hidden="true">⌄</span></summary>
+      <div class="section-heading week-heading-content">
+        <div><p class="section-kicker">Havi munkaterv</p><h2 id="monthTitle">Havi áttekintés</h2></div>
+        <div class="week-nav"><button class="btn btn-soft" id="previousMonthButton" type="button">← Előző hónap</button><button class="btn btn-soft" id="currentMonthButton" type="button">Aktuális hónap</button><button class="btn btn-soft" id="nextMonthButton" type="button">Következő hónap →</button></div>
+      </div>
+      <div class="month-weekdays" aria-hidden="true"><span>H</span><span>K</span><span>Sze</span><span>Cs</span><span>P</span><span>Szo</span><span>V</span></div>
+      <div class="month-grid" id="monthGrid"></div>
     </details>
   </main>
 
@@ -246,6 +256,7 @@
             <div class="customer-suggestions" hidden></div>
           </div>
           <label>Cím<input class="form-control address-input" type="text" maxlength="240" placeholder="Az ügyfél kiválasztása után automatikusan kitöltődik"></label>
+          <label>Kezdés a címen (nem kötelező)<input class="form-control start-time-input" type="time"></label>
           <label class="worklog-option"><span><input class="worklog-required" type="checkbox" checked> Munkanaplót meg kell írni</span></label>
           <button type="button" class="text-button add-customer">＋ Új ügyfél</button>
         </section>
@@ -288,6 +299,7 @@
       <input class="form-control material-source" type="text" maxlength="160" aria-label="Beszerzés helye" placeholder="Beszerzés helye / cím">
       <input class="form-control material-name" type="text" maxlength="120" aria-label="Anyag megnevezése" placeholder="Megnevezés">
       <input class="form-control material-quantity" type="text" maxlength="60" aria-label="Mennyiség" placeholder="Mennyiség">
+      <input class="form-control material-unit" type="text" maxlength="40" aria-label="Mértékegység" placeholder="Mértékegység">
       <button type="button" class="icon-button danger remove-material" aria-label="Anyag törlése">×</button>
     </div>
   </template>
@@ -297,6 +309,6 @@
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260922f"></script>
   <script src="js/napi-sync.js?v=20260922b"></script>
-  <script src="js/app.js?v=20260922ab"></script>
+  <script src="js/app.js?v=20260923a"></script>
 </body>
 </html>

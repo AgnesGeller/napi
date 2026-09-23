@@ -62,6 +62,7 @@ button, summary { touch-action: manipulation; }
 .weekly-overview-summary small { margin-top: .12rem; color: var(--muted); }
 .weekly-chevron { font-size: 1.7rem; transition: transform .2s ease; }
 .weekly-overview[open] .weekly-chevron { transform: rotate(180deg); }
+.monthly-overview[open] .weekly-chevron { transform: rotate(180deg); }
 .week-heading-content { padding: 1rem 1rem 0; }
 .weekly-overview .week-grid { padding: 1rem; }
 .week-range { margin: .35rem 0 0; color: var(--muted); }
@@ -88,6 +89,17 @@ button, summary { touch-action: manipulation; }
 .week-open { color: var(--forest); border: 1px solid var(--leaf); background: #fff; }
 .week-delete { width: 100%; color: #fff; border: 2px solid #7b1d19; background: #a92f28; box-shadow: 0 2px 7px rgba(104,24,20,.22); }
 .week-delete:hover, .week-delete:focus-visible { color: #fff; background: #7f211c; outline: 3px solid rgba(169,47,40,.22); }
+.month-weekdays, .month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .45rem; padding: 0 1rem; }
+.month-weekdays { padding-top: .8rem; color: var(--muted); font-size: .78rem; font-weight: 850; text-align: center; text-transform: uppercase; }
+.month-grid { padding-bottom: 1rem; }
+.month-day { min-height: 116px; display: grid; align-content: start; gap: .3rem; padding: .55rem; color: #26382b; border: 1px solid #bcc9bd; background: #fff; text-align: left; }
+.month-day.outside { opacity: .42; background: #f0f2ee; }
+.month-day.today { border: 3px solid var(--orange); }
+.month-day.holiday { background: #fff1ef; }
+.month-day-number { color: var(--forest); font: 800 1rem Georgia, serif; }
+.month-day small, .month-day strong { display: block; }
+.month-day small { color: #8a312a; font-size: .68rem; }
+.month-day strong { color: var(--forest); font-size: .78rem; }
 .section-heading { display: flex; gap: 1rem; align-items: end; justify-content: space-between; margin: 0 .2rem .8rem; }
 .btn-add, .btn-save { color: #fff; background: var(--forest); border-color: var(--forest); }
 .btn-add:hover, .btn-save:hover { color: #fff; background: #0e3020; }
@@ -96,6 +108,14 @@ button, summary { touch-action: manipulation; }
 .empty-state h3 { margin: .35rem 0; color: var(--forest); font: 700 1.2rem Georgia, serif; }
 .empty-state p { margin: 0; color: var(--muted); }
 .task-list { display: grid; gap: 2.4rem; }
+.team-block { display: grid; gap: .75rem; padding: .75rem; border: 3px solid var(--team-border, #6f866f); background: var(--team-color, #eef3ec); box-shadow: 0 10px 28px rgba(25,57,37,.12); }
+.team-block-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .7rem; padding: .6rem .7rem; color: #fff; background: var(--team-accent, var(--forest)); }
+.team-block-header h3, .team-block-header p { margin: 0; }
+.team-block-header h3 { font: 800 1.12rem Georgia, serif; }
+.team-block-header p { margin-top: .12rem; font-size: .86rem; font-weight: 750; }
+.team-block .task-list-inner { display: grid; gap: 1.4rem; }
+.team-add-customer { width: 100%; min-height: 48px; color: var(--forest); border: 2px dashed var(--team-border, var(--leaf)); background: rgba(255,255,255,.78); font-weight: 850; }
+.team-block .task-card + .task-card::before { content: "Következő ügyfél"; top: -1.2rem; }
 .btn-add-bottom { width: 100%; margin-top: 1rem; min-height: 52px; }
 .task-save-button { width: 100%; margin-top: .7rem; min-height: 62px; }
 .task-card { position: relative; background: var(--task-color, var(--paper)); border: 2px solid var(--task-border-color, #9fb0a1); border-left: 9px solid var(--task-border-color, var(--forest)); box-shadow: 0 9px 28px rgba(25,57,37,.12); transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease; }
@@ -171,7 +191,8 @@ button, summary { touch-action: manipulation; }
 .job-workflow textarea { min-height: 108px; resize: vertical; }
 .empty-detail { margin: 0; padding: .7rem; color: var(--muted); background: #f6f8f3; }
 .materials-list { display: grid; gap: .5rem; margin-bottom: .65rem; }
-.material-row { display: grid; grid-template-columns: minmax(150px, 1.3fr) minmax(130px, 1fr) minmax(100px, .7fr) 42px; gap: .45rem; }
+.material-row { display: grid; grid-template-columns: minmax(140px, 1.2fr) minmax(130px, 1fr) minmax(90px, .65fr) minmax(80px, .55fr) 42px; gap: .45rem; }
+.material-row.is-preset .material-source, .material-row.is-preset .material-name, .material-row.is-preset .material-unit { color: #435348; background: #eef2ec; }
 .tool-quantities { display: grid; gap: .45rem; margin-top: .75rem; }
 .tool-quantity-row { display: grid !important; grid-template-columns: minmax(120px, 1fr) 100px 28px; gap: .45rem; align-items: center; padding: .45rem .6rem; border-left: 4px solid var(--leaf); background: rgba(255,255,255,.72); }
 .tool-quantity-row input { min-width: 0; }
@@ -302,7 +323,12 @@ button, summary { touch-action: manipulation; }
   .detail-content { padding-left: 0; }
   .material-row { grid-template-columns: 1fr 1fr 42px; }
   .material-source { grid-column: 1 / -1; }
+  .material-unit { grid-column: 1; grid-row: 3; }
   .material-row .remove-material { grid-column: 3; grid-row: 2; }
+  .month-weekdays, .month-grid { gap: .2rem; padding-left: .45rem; padding-right: .45rem; }
+  .month-day { min-height: 82px; padding: .32rem; }
+  .month-day strong { font-size: .68rem; }
+  .month-day small { font-size: .6rem; }
   .expectation-grid { grid-template-columns: 1fr; }
   .action-dock { left: auto; right: max(.65rem, env(safe-area-inset-right)); bottom: calc(.65rem + env(safe-area-inset-bottom)); width: auto; padding: 0; border: 0; background: transparent; box-shadow: none; backdrop-filter: none; }
   .dock-toggle { min-width: 116px; min-height: 50px; display: block; padding: .65rem 1rem; color: #fff; border: 2px solid #dca06b; border-radius: 8px; background: var(--forest); box-shadow: 0 8px 24px rgba(0,0,0,.24); font-weight: 850; }
@@ -343,7 +369,7 @@ button, summary { touch-action: manipulation; }
   .print-departure p { margin: 0; }
   .print-divider { position: relative; z-index: 1; margin: 5mm 0 -2mm; color: var(--orange); text-align: center; font-size: 7.5pt; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
   .print-divider::before, .print-divider::after { content: ""; display: inline-block; width: 31%; margin: 0 3mm 2px; border-top: .5mm solid #c67a4d; }
-  .print-task { position: relative; z-index: 1; break-inside: avoid; margin-top: 5mm; padding: 0 4mm 3mm; border: .6mm solid var(--print-task-border, #8fa391); border-left: 2.5mm solid var(--print-task-border, var(--forest)); background: var(--print-task-color, rgba(255,255,255,.96)); }
+  .print-task { position: relative; z-index: 1; margin-top: 5mm; padding: 0 4mm 3mm; border: .6mm solid var(--print-task-border, #8fa391); border-left: 2.5mm solid var(--print-task-border, var(--forest)); background: var(--print-task-color, rgba(255,255,255,.96)); }
   .print-task-heading { display: flex; flex-wrap: wrap; gap: 2mm 3mm; align-items: center; margin: 0 -4mm 3mm; padding: 2.2mm 3mm; color: #fff; background: var(--print-task-accent, var(--forest)); }
   .print-heading-workers { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 1mm; }
   .print-index { display: inline-grid; place-items: center; min-width: 8mm; min-height: 8mm; color: #fff; background: var(--orange); font: 800 13pt Georgia, serif; }
@@ -353,6 +379,8 @@ button, summary { touch-action: manipulation; }
   .print-client-row small, .print-client-row strong { display: block; }
   .print-client-row small { color: var(--orange); font-size: 7.5pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
   .print-client-row strong { color: #203627; font-size: 10pt; overflow-wrap: anywhere; }
+  .print-client-block { break-inside: avoid; padding-top: 2mm; }
+  .print-client-block + .print-client-block { margin-top: 3mm; padding-top: 4mm; border-top: .5mm dashed var(--print-task-border, #8fa391); }
   .print-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5mm 7mm; }
   .print-section { margin: 2mm 0; break-inside: avoid; }
   .print-section.wide { grid-column: 1 / -1; }
