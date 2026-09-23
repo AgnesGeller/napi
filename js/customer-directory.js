@@ -8,6 +8,8 @@
   const SESSION_KEY = "diszkertek-napi-customer-session-v1";
   const CACHE_KEY = "diszkertek-napi-customer-directory-v1";
   const NAPI_ACCOUNT_EMAIL = "tamas@napi.diszkertek.hu";
+  const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+  const isClockSkewError = result => /jwt issued at future/i.test(String(result?.msg || result?.message || ""));
 
   function readJSON(key) {
     try {
@@ -33,17 +35,20 @@
   }
 
   async function authRequest(path, body) {
-    let response;
-    try {
-      response = await fetch(`${CONFIG.url}/auth/v1/${path}`, {
-        method: "POST",
-        headers: { "apikey": CONFIG.publishableKey, "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-    } catch (_) { throw new Error("A belépéshez internetkapcsolat szükséges."); }
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw authError(result, "A belépés nem sikerült.");
-    return result;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      let response;
+      try {
+        response = await fetch(`${CONFIG.url}/auth/v1/${path}`, {
+          method: "POST",
+          headers: { "apikey": CONFIG.publishableKey, "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+      } catch (_) { throw new Error("A belépéshez internetkapcsolat szükséges."); }
+      const result = await response.json().catch(() => ({}));
+      if (response.ok) return result;
+      if (isClockSkewError(result) && attempt < 2) { await wait(attempt ? 2500 : 1200); continue; }
+      throw authError(result, "A belépés nem sikerült.");
+    }
   }
 
   async function activeSession() {
@@ -62,24 +67,25 @@
   }
 
   async function restPage(resource, query, accessToken, from, pageSize) {
-    let response;
-    try {
-      response = await fetch(`${CONFIG.url}/rest/v1/${resource}?${query}`, {
-        headers: {
-          "apikey": CONFIG.publishableKey,
-          "Authorization": `Bearer ${accessToken}`,
-          "Accept-Profile": "munkalap",
-          "Accept": "application/json",
-          "Range": `${from}-${from + pageSize - 1}`
-        }
-      });
-    } catch (_) { throw new Error("Az ügyféllista frissítéséhez internetkapcsolat szükséges."); }
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      if (response.status === 401) localStorage.removeItem(SESSION_KEY);
-      throw new Error(result?.message || "Az ügyféllista nem tölthető be.");
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      let response;
+      try {
+        response = await fetch(`${CONFIG.url}/rest/v1/${resource}?${query}`, {
+          headers: {
+            "apikey": CONFIG.publishableKey,
+            "Authorization": `Bearer ${accessToken}`,
+            "Accept-Profile": "munkalap",
+            "Accept": "application/json",
+            "Range": `${from}-${from + pageSize - 1}`
+          }
+        });
+      } catch (_) { throw new Error("Az ügyféllista frissítéséhez internetkapcsolat szükséges."); }
+      const result = await response.json().catch(() => ({}));
+      if (response.ok) return Array.isArray(result) ? result : [];
+      if (isClockSkewError(result) && attempt < 2) { await wait(attempt ? 2500 : 1200); continue; }
+      if (response.status === 401 && !isClockSkewError(result)) localStorage.removeItem(SESSION_KEY);
+      throw new Error(isClockSkewError(result) ? "Az időellenőrzés miatt a kapcsolat késett. Próbáld meg újra a frissítést." : (result?.message || "Az ügyféllista nem tölthető be."));
     }
-    return Array.isArray(result) ? result : [];
   }
 
   async function restRows(resource, query, accessToken) {

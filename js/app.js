@@ -41,7 +41,12 @@
   }
   const escapeHTML = value => String(value ?? "").replace(/[&<>"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[character]);
   const searchKey = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("hu-HU").trim();
-  const readableError = error => error?.name === "AbortError" ? "A művelet megszakadt." : (error?.message || "Váratlan hiba történt.");
+  const readableError = error => {
+    if (error?.name === "AbortError") return "A művelet megszakadt.";
+    const message = error?.message || "Váratlan hiba történt.";
+    if (/jwt issued at future/i.test(message)) return "Az időellenőrzés miatt a kapcsolat késett. Kérlek, nyomd meg újra a Frissítés gombot.";
+    return message;
+  };
 
   const CRC_TABLE = Array.from({ length: 256 }, (_, index) => {
     let value = index;
@@ -174,6 +179,8 @@
   let weekAnchor = storedCalendarPosition(WEEK_ANCHOR_KEY, isoToday(), /^\d{4}-\d{2}-\d{2}$/);
   let monthAnchor = storedCalendarPosition(MONTH_ANCHOR_KEY, isoToday().slice(0, 7), /^\d{4}-\d{2}$/);
   let installPrompt = null;
+  let activePrintPlans = null;
+  let previousDocumentTitle = "";
   let allowPageReload = false;
   let activeTaskId = null;
   let collapsedTaskIds = new Set();
@@ -1284,11 +1291,11 @@
     });
     lines.push(FINAL_NOTE); return lines.join("\n");
   }
-  function renderPrintView() {
-    const departure = workingPlan.meeting || workingPlan.stops ? `<div class="print-departure">${workingPlan.meeting ? `<p><strong>Találkozó:</strong> ${escapeHTML(workingPlan.meeting)}</p>` : ""}${workingPlan.stops ? `<p><strong>Megálló:</strong> ${escapeHTML(workingPlan.stops)}</p>` : ""}</div>` : "";
+  function printPlanHTML(plan) {
+    const departure = plan.meeting || plan.stops ? `<div class="print-departure">${plan.meeting ? `<p><strong>Találkozó:</strong> ${escapeHTML(plan.meeting)}</p>` : ""}${plan.stops ? `<p><strong>Megálló:</strong> ${escapeHTML(plan.stops)}</p>` : ""}</div>` : "";
     const logoUrl = new URL("assets/diszkertek-logo.png", document.baseURI).href;
-    const printHeader = `<header class="print-header"><img src="${escapeHTML(logoUrl)}" alt="Díszkertek logó" width="416" height="512"><div><h1>Napi feladatok</h1><div class="print-date">${escapeHTML(formatDate(workingPlan.date))}</div></div></header>`;
-    const tasks = tasksByTeam().map((group, groupIndex) => {
+    const printHeader = `<header class="print-header"><img src="${escapeHTML(logoUrl)}" alt="Díszkertek logó" width="416" height="512"><div><h1>Napi feladatok</h1><div class="print-date">${escapeHTML(formatDate(plan.date))}</div></div></header>`;
+    const tasks = tasksByTeam(plan).map((group, groupIndex) => {
       const lead = group.tasks[0];
       const workers = (lead.workerIds || []).map(id => byId(data.workers, id)).filter(Boolean).map(worker => `<span class="print-worker" style="--print-worker-color:${escapeHTML(worker.color)};--print-worker-text:${bestTextColor(worker.color)}">${escapeHTML(worker.name)}</span>`).join("");
       const vehicles = (lead.vehicleIds || []).map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
@@ -1304,15 +1311,46 @@
       const printTask = `<article class="print-task" style="--print-task-color:${printTheme.background};--print-task-border:${printTheme.border};--print-task-accent:${printTheme.accent}"><div class="print-task-heading"><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2><div class="print-heading-workers">${workers || `<span>Nincs dolgozó kiválasztva</span>`}</div></div>${clients}</article>`;
       return `${groupIndex ? `<div class="print-divider">Következő csapat</div>` : ""}${printTask}`;
     }).join("");
-    $("#printView").innerHTML = `<section class="print-sheet">${printHeader}${departure}${tasks || `<p>Nincs feladat erre a napra.</p>`}${tasks ? `<div class="print-footer-note">${FINAL_NOTE}</div>` : ""}</section>`;
+    return `<section class="print-sheet">${printHeader}${departure}${tasks || `<p>Nincs feladat erre a napra.</p>`}${tasks ? `<div class="print-footer-note">${FINAL_NOTE}</div>` : ""}</section>`;
   }
-  window.addEventListener("beforeprint", renderPrintView);
-  $("#printButton").addEventListener("click", async () => {
-    renderPrintView();
-    const logo = $("#printView .print-header img");
-    try { if (logo?.decode) await logo.decode(); else if (logo && !logo.complete) await new Promise(resolve => { logo.addEventListener("load", resolve, { once: true }); logo.addEventListener("error", resolve, { once: true }); }); } catch (_) { /* A böngésző a gyorsítótárból is nyomtathat. */ }
+  function renderPrintView(plans = activePrintPlans || [workingPlan]) {
+    $("#printView").innerHTML = plans.map(printPlanHTML).join("");
+  }
+  async function waitForPrintLogos() {
+    const logos = [...document.querySelectorAll("#printView .print-header img")];
+    await Promise.all(logos.map(async logo => {
+      try { if (logo.decode) await logo.decode(); else if (!logo.complete) await new Promise(resolve => { logo.addEventListener("load", resolve, { once: true }); logo.addEventListener("error", resolve, { once: true }); }); } catch (_) { /* A böngésző a gyorsítótárból is nyomtathat. */ }
+    }));
+  }
+  async function openPrintPreview(plans, title) {
+    activePrintPlans = plans;
+    previousDocumentTitle = document.title;
+    document.title = title;
+    renderPrintView(plans);
+    await waitForPrintLogos();
     window.print();
+  }
+  function periodPlans(period) {
+    if (dirty) upsertWorkingPlan();
+    const reference = workingPlan.date;
+    return data.plans.filter(plan => planHasTasks(plan) && planMatchesPeriod(plan, period, reference)).sort((a, b) => a.date.localeCompare(b.date));
+  }
+  async function printPeriod(period) {
+    const plans = periodPlans(period);
+    if (!plans.length) { toast("Ebben az időszakban nincs letölthető napi feladat.", true); return; }
+    const reference = workingPlan.date;
+    const suffix = period === "week" ? `het-${startOfWeek(reference)}` : period === "month" ? `honap-${reference.slice(0, 7)}` : `ev-${reference.slice(0, 4)}`;
+    $("#downloadsDialog").close();
+    await openPrintPreview(plans, `napi-feladatok-${suffix}`);
+  }
+  window.addEventListener("beforeprint", () => renderPrintView(activePrintPlans || [workingPlan]));
+  window.addEventListener("afterprint", () => {
+    activePrintPlans = null;
+    if (previousDocumentTitle) document.title = previousDocumentTitle;
+    previousDocumentTitle = "";
+    renderPrintView([workingPlan]);
   });
+  $("#printButton").addEventListener("click", () => openPrintPreview([workingPlan], `napi-feladatok-${workingPlan.date}`));
   async function copyText() {
     const text = planText();
     try { await navigator.clipboard.writeText(text); toast("A napi terv szövege a vágólapra került."); }
@@ -1503,19 +1541,21 @@
     $("#downloadsDialog").showModal();
   });
   $("#downloadsDialog").addEventListener("click", event => {
-    const exportButton = event.target.closest("[data-export-period]"); if (exportButton) { exportPeriod(exportButton.dataset.exportPeriod); return; }
-    const deleteButton = event.target.closest("[data-delete-period]"); if (deleteButton) deletePeriod(deleteButton.dataset.deletePeriod);
+    const printPeriodButton = event.target.closest("[data-print-period]");
+    if (printPeriodButton) printPeriod(printPeriodButton.dataset.printPeriod);
   });
   function appRunsStandalone() { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; }
   function updateInstallButtons() {
     const installed = appRunsStandalone() || localStorage.getItem(INSTALLED_KEY) === "true";
     const available = Boolean(installPrompt);
     $("#quickInstallButton").hidden = installed || !available;
-    $("#installAppButton").hidden = installed || !available;
+    $("#installAppButton").hidden = installed;
+    $("#installAppButton").disabled = !available;
+    $("#installAppHint").textContent = available ? "Telepítés erre az eszközre" : "A telepítési lehetőség betöltése folyamatban";
   }
   async function installApplication() {
     if (appRunsStandalone()) { toast("Az alkalmazás már telepítve van ezen az eszközön."); return; }
-    if (!installPrompt) { updateInstallButtons(); return; }
+    if (!installPrompt) { updateInstallButtons(); toast("A telepítés még nem érhető el. Frissítsd az oldalt, majd nyisd meg újra a Letöltések ablakot.", true); return; }
     if ($("#downloadsDialog").open) $("#downloadsDialog").close();
     await installPrompt.prompt(); const choice = await installPrompt.userChoice; installPrompt = null;
     if (choice.outcome === "accepted") localStorage.setItem(INSTALLED_KEY, "true");

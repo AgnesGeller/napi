@@ -3,6 +3,8 @@
 
   const SUPABASE_URL = "https://wojgdfojupnfldrmqaht.supabase.co";
   const PUBLISHABLE_KEY = "sb_publishable_sN7FyjIcTYuhQIMomkzkjA_v4xp3N78";
+  const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+  const isClockSkewError = result => /jwt issued at future/i.test(String(result?.msg || result?.message || ""));
 
   async function sessionDetails() {
     const session = await window.NapiCustomerDirectory?.session?.();
@@ -14,21 +16,24 @@
 
   async function request(resource, { method = "GET", body, prefer = "" } = {}) {
     const { accessToken } = await sessionDetails();
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/${resource}`, {
-      method,
-      headers: {
-        apikey: PUBLISHABLE_KEY,
-        Authorization: `Bearer ${accessToken}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        ...(prefer ? { Prefer: prefer } : {})
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) })
-    });
-    const text = await response.text();
-    const result = text ? JSON.parse(text) : null;
-    if (!response.ok) throw new Error(result?.message || "A közös mentés most nem érhető el.");
-    return result;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${resource}`, {
+        method,
+        headers: {
+          apikey: PUBLISHABLE_KEY,
+          Authorization: `Bearer ${accessToken}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          ...(prefer ? { Prefer: prefer } : {})
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) })
+      });
+      const text = await response.text();
+      const result = text ? JSON.parse(text) : null;
+      if (response.ok) return result;
+      if (isClockSkewError(result) && attempt < 2) { await wait(attempt ? 2500 : 1200); continue; }
+      throw new Error(isClockSkewError(result) ? "Az időellenőrzés miatt a kapcsolat késett. Próbáld meg újra a frissítést." : (result?.message || "A közös mentés most nem érhető el."));
+    }
   }
 
   async function pull() {

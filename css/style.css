@@ -289,6 +289,7 @@ button, summary { touch-action: manipulation; }
 .download-option strong, .download-option span { display: block; }
 .download-option span { color: var(--muted); font-size: .86rem; font-weight: 400; }
 .download-option.app-package { border-left-color: #102a43; }
+.download-option.install-option { border-left-color: #2f6944; }
 .install-option { margin-bottom: .9rem; color: #fff; border-color: var(--forest); border-left-color: var(--orange); background: var(--forest); }
 .install-option:hover, .install-option:focus-visible { color: #fff; background: #0e3020; }
 .install-option span { color: #e6efe8; }
@@ -375,6 +376,7 @@ button, summary { touch-action: manipulation; }
   .skip-link, .app-header, .planner-shell, .action-dock, dialog, .toast-region { display: none !important; }
   .print-view { display: block; color: #19221b; font: 10.5pt/1.4 Arial, sans-serif; }
   .print-sheet { position: relative; box-sizing: border-box; width: 210mm; min-height: 296mm; padding: 10mm 12mm 12mm; overflow: visible; }
+  .print-sheet + .print-sheet { break-before: page; page-break-before: always; }
   .print-sheet::before, .print-sheet::after { content: ""; position: absolute; width: 52mm; height: 52mm; background: url("../assets/botanical.svg") center/contain no-repeat; opacity: .055; pointer-events: none; }
   .print-sheet::before { top: -13mm; right: -10mm; transform: rotate(18deg); }
   .print-sheet::after { bottom: -15mm; left: -12mm; transform: rotate(205deg); }

@@ -30,7 +30,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260923f">
+  <link rel="stylesheet" href="css/style.css?v=20260923g">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -46,7 +46,7 @@
       <div class="header-actions">
         <button class="btn btn-cream" id="folderButton" type="button" hidden>📁 Biztonsági adatmappa</button>
         <button class="btn btn-install-header" id="quickInstallButton" type="button" hidden>📱 App telepítése</button>
-        <button class="btn btn-light-outline" id="downloadButton" type="button">⬇ App és régi tervek</button>
+        <button class="btn btn-light-outline" id="downloadButton" type="button">⬇ Letöltések</button>
         <button class="btn btn-light-outline" id="refreshButton" type="button" title="A legújabb adatok és appverzió betöltése">⟳ Frissítés</button>
         <button class="btn btn-light-outline" id="settingsButton" type="button">⚙ Adatok kezelése</button>
       </div>
@@ -199,13 +199,14 @@
 
   <dialog id="downloadsDialog" class="app-dialog compact-dialog">
     <form method="dialog" class="dialog-frame">
-      <header class="dialog-header"><div><p class="section-kicker">Telefon, tablet és számítógép</p><h2>App és régi tervek</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
+      <header class="dialog-header"><div><p class="section-kicker">Heti, havi vagy éves összesítés</p><h2>Napi feladatok letöltése</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
       <div class="dialog-body">
-        <button class="download-option install-option" id="installAppButton" type="button" hidden><strong>📱 App telepítése erre az eszközre</strong><span id="installAppHint">A telepítés készen áll</span></button>
         <div class="download-options">
-          <a class="download-option app-package" href="downloads/diszkertek-napi-app.zip" download><strong>Számítógépes offline ZIP</strong><span>Technikai csomag számítógéphez – telefonos telepítéshez a fenti gombot használd</span></a>
+          <button class="download-option" type="button" data-print-period="week"><strong>Heti napi feladatok</strong><span>A dátumnál kiválasztott péntektől csütörtökig</span></button>
+          <button class="download-option" type="button" data-print-period="month"><strong>Havi napi feladatok</strong><span>A dátumnál kiválasztott teljes hónap</span></button>
+          <button class="download-option" type="button" data-print-period="year"><strong>Éves napi feladatok</strong><span>A dátumnál kiválasztott teljes év</span></button>
+          <button class="download-option install-option" id="installAppButton" type="button"><strong>App telepítése erre az eszközre</strong><span id="installAppHint">Új számítógépen vagy Android-eszközön</span></button>
         </div>
-        <details class="delete-archive"><summary>Régi tervek törlése</summary><p>A megőrizni kívánt napi feladatokat előtte mentsd le PDF-ként. A törlés a törzsadatokat és az ismétlődő beállításokat nem érinti.</p><div class="archive-delete-buttons"><button class="btn btn-soft" type="button" data-delete-period="week">Kiválasztott hét</button><button class="btn btn-soft" type="button" data-delete-period="month">Kiválasztott hónap</button><button class="btn btn-soft" type="button" data-delete-period="year">Kiválasztott év</button><button class="btn btn-danger" type="button" data-delete-period="all">Minden napi terv</button></div></details>
       </div>
     </form>
   </dialog>
@@ -307,8 +308,8 @@
   <section id="printView" class="print-view" aria-hidden="true"></section>
 
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
-  <script src="js/customer-directory.js?v=20260922f"></script>
-  <script src="js/napi-sync.js?v=20260922b"></script>
-  <script src="js/app.js?v=20260923m"></script>
+  <script src="js/customer-directory.js?v=20260923g"></script>
+  <script src="js/napi-sync.js?v=20260923c"></script>
+  <script src="js/app.js?v=20260923n"></script>
 </body>
 </html>
