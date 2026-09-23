@@ -44,9 +44,9 @@
         </div>
       </div>
       <div class="header-actions">
-        <button class="btn btn-cream" id="folderButton" type="button">📁 Biztonsági adatmappa</button>
+        <button class="btn btn-cream" id="folderButton" type="button" hidden>📁 Biztonsági adatmappa</button>
         <button class="btn btn-install-header" id="quickInstallButton" type="button" hidden>📱 App telepítése</button>
-        <button class="btn btn-light-outline" id="downloadButton" type="button">⬇ Adatmentések</button>
+        <button class="btn btn-light-outline" id="downloadButton" type="button">⬇ App és régi tervek</button>
         <button class="btn btn-light-outline" id="refreshButton" type="button" title="A legújabb adatok és appverzió betöltése">⟳ Frissítés</button>
         <button class="btn btn-light-outline" id="settingsButton" type="button">⚙ Adatok kezelése</button>
       </div>
@@ -148,11 +148,9 @@
         <button type="button" data-settings-tab="materials">Anyagok</button>
         <button type="button" data-settings-tab="customers">Ügyfelek</button>
         <button type="button" data-settings-tab="recurring">Ismétlődő tervek</button>
-        <button type="button" data-settings-tab="data">Adatfájl</button>
       </nav>
       <div id="settingsContent" class="settings-content"></div>
       <footer class="dialog-footer">
-        <button class="btn btn-save" id="settingsSaveButton" value="default">Mentés</button>
         <button class="btn btn-secondary" value="cancel">Bezárás</button>
       </footer>
     </form>
@@ -201,18 +199,13 @@
 
   <dialog id="downloadsDialog" class="app-dialog compact-dialog">
     <form method="dialog" class="dialog-frame">
-      <header class="dialog-header"><div><p class="section-kicker">Telefon, tablet és számítógép</p><h2>Telepítés és letöltések</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
+      <header class="dialog-header"><div><p class="section-kicker">Telefon, tablet és számítógép</p><h2>App és régi tervek</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
       <div class="dialog-body">
         <button class="download-option install-option" id="installAppButton" type="button" hidden><strong>📱 App telepítése erre az eszközre</strong><span id="installAppHint">A telepítés készen áll</span></button>
-        <p class="download-reference" id="downloadReference"></p>
         <div class="download-options">
-          <button class="download-option" type="button" data-export-period="week"><strong>Heti ZIP-adatmentés</strong><span>A kiválasztott hét tervei és törzsadatai</span></button>
-          <button class="download-option" type="button" data-export-period="month"><strong>Havi ZIP-adatmentés</strong><span>A kiválasztott hónap összes terve</span></button>
-          <button class="download-option" type="button" data-export-period="year"><strong>Éves ZIP-adatmentés</strong><span>A kiválasztott év összes terve</span></button>
-          <button class="download-option" type="button" data-export-period="all"><strong>Teljes ZIP-adatmentés</strong><span>Minden beállítás, ügyfél és napi terv</span></button>
           <a class="download-option app-package" href="downloads/diszkertek-napi-app.zip" download><strong>Számítógépes offline ZIP</strong><span>Technikai csomag számítógéphez – telefonos telepítéshez a fenti gombot használd</span></a>
         </div>
-        <details class="delete-archive"><summary>Régi tervek törlése</summary><p>Előbb töltsd le a megőrizni kívánt adatmentést. A törlés a törzsadatokat és az ismétlődő beállításokat nem érinti.</p><div class="archive-delete-buttons"><button class="btn btn-soft" type="button" data-delete-period="week">Kiválasztott hét</button><button class="btn btn-soft" type="button" data-delete-period="month">Kiválasztott hónap</button><button class="btn btn-soft" type="button" data-delete-period="year">Kiválasztott év</button><button class="btn btn-danger" type="button" data-delete-period="all">Minden napi terv</button></div></details>
+        <details class="delete-archive"><summary>Régi tervek törlése</summary><p>A megőrizni kívánt napi feladatokat előtte mentsd le PDF-ként. A törlés a törzsadatokat és az ismétlődő beállításokat nem érinti.</p><div class="archive-delete-buttons"><button class="btn btn-soft" type="button" data-delete-period="week">Kiválasztott hét</button><button class="btn btn-soft" type="button" data-delete-period="month">Kiválasztott hónap</button><button class="btn btn-soft" type="button" data-delete-period="year">Kiválasztott év</button><button class="btn btn-danger" type="button" data-delete-period="all">Minden napi terv</button></div></details>
       </div>
     </form>
   </dialog>
@@ -316,6 +309,6 @@
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260922f"></script>
   <script src="js/napi-sync.js?v=20260922b"></script>
-  <script src="js/app.js?v=20260923l"></script>
+  <script src="js/app.js?v=20260923m"></script>
 </body>
 </html>

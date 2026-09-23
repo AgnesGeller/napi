@@ -1494,15 +1494,12 @@
       $("[data-recurring-custom]").hidden = frequency !== "custom";
     }
   });
-  $("#settingsSaveButton").addEventListener("click", async event => { event.preventDefault(); try { if (await saveCurrentPlan()) $("#settingsDialog").close(); } catch (error) { $("#saveState").textContent = "Mentési hiba"; toast(`A mentés nem sikerült: ${readableError(error)}`, true); } });
-
   $("#planDate").addEventListener("change", event => changeDate(event.target.value));
   $("#meetingInput").addEventListener("input", event => { workingPlan.meeting = event.target.value; markDirty(); });
   $("#stopsInput").addEventListener("input", event => { workingPlan.stops = event.target.value; markDirty(); });
   $("#todayButton").addEventListener("click", () => changeDate(isoToday()));
   $("#folderButton").addEventListener("click", chooseFolder); $("#refreshButton").addEventListener("click", refreshApplication);
   $("#downloadButton").addEventListener("click", () => {
-    $("#downloadReference").textContent = `A heti, havi és éves mentés alapdátuma: ${formatDate(workingPlan.date)}.`;
     $("#downloadsDialog").showModal();
   });
   $("#downloadsDialog").addEventListener("click", event => {
@@ -1553,12 +1550,6 @@
       const storedData = JSON.parse(localStorage.getItem(LOCAL_DATA_KEY));
       if (storedData) data = normalizeData(storedData);
     } catch (_) { /* Hibás helyi mentést figyelmen kívül hagyunk. */ }
-    try {
-      if ("showDirectoryPicker" in window) {
-        const stored = await readStoredDirectoryHandle();
-        if (stored && await hasWritePermission(stored, false)) { directoryHandle = stored; const loaded = await readDataFile(stored); if (loaded) data = loaded; }
-      }
-    } catch (_) { directoryHandle = null; }
     if (!directoryHandle) {
       try {
         const recovery = JSON.parse(localStorage.getItem(RECOVERY_KEY));
