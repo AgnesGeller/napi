@@ -136,8 +136,9 @@
       active: true,
       updatedAt: customer.updated_at || ""
     }));
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: new Date().toISOString(), directory }));
-    return directory;
+    const uniqueDirectory = [...new Map(directory.map(item => [`${item.customerId}|${String(item.address || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("hu-HU").trim()}`, item])).values()];
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: new Date().toISOString(), directory: uniqueDirectory }));
+    return uniqueDirectory;
   }
 
   function cached() {

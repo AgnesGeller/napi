@@ -1030,8 +1030,10 @@
     }
     const teamAdd = event.target.closest("[data-add-team-customer]");
     if (teamAdd) {
+      if (teamAdd.disabled) return;
+      teamAdd.disabled = true;
       const group = tasksByTeam().find(item => item.id === teamAdd.dataset.addTeamCustomer); if (!group) return;
-      const task = blankTask(); const representative = group.tasks[0]; task.teamId = group.id; task.vehicleIds = deepCopy(representative.vehicleIds); task.workerIds = deepCopy(representative.workerIds);
+      const task = blankTask(); const representative = group.tasks[0]; task.teamId = group.id; task.vehicleIds = deepCopy(representative.vehicleIds); task.workerIds = deepCopy(representative.workerIds); task.workLogRequired = true;
       const insertAt = Math.max(...group.tasks.map(item => workingPlan.tasks.indexOf(item))) + 1; workingPlan.tasks.splice(insertAt, 0, task);
       activeTaskId = task.id; collapsedTaskIds.delete(task.id); markDirty("Új ügyfél hozzáadva • mentés szükséges"); renderTasks();
       $("#taskList").querySelector(`[data-task-id="${CSS.escape(task.id)}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" }); return;
@@ -1120,7 +1122,7 @@
   $("#taskList").addEventListener("wheel", event => { if (event.target.closest(".start-time-input")) event.preventDefault(); }, { passive: false });
   document.addEventListener("click", event => { if (!event.target.closest(".customer-picker")) document.querySelectorAll(".customer-suggestions").forEach(box => box.hidden = true); });
 
-  function addTask() { const task = blankTask(); workingPlan.tasks.push(task); activeTaskId = task.id; collapsedTaskIds.delete(task.id); markDirty(); renderTasks(); $("#taskList .team-block:last-child")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
+  function addTask(event) { const button = event?.currentTarget; if (button?.disabled) return; if (button) button.disabled = true; const task = blankTask(); task.workLogRequired = true; workingPlan.tasks.push(task); activeTaskId = task.id; collapsedTaskIds.delete(task.id); markDirty(); renderTasks(); $("#taskList .team-block:last-child")?.scrollIntoView({ behavior: "smooth", block: "start" }); if (button) button.disabled = false; }
   $("#addTaskButton").addEventListener("click", addTask);
   $("#addTaskBottomButton").addEventListener("click", addTask);
   $("#connectSyncButton").addEventListener("click", openCustomerAuth);
