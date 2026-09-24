@@ -89,7 +89,7 @@
           <p class="section-kicker">Autók, dolgozók és helyszínek</p>
           <h2 id="tasksHeading">A nap feladatai</h2>
         </div>
-        <button class="btn btn-add" id="addTaskButton" type="button">＋ Új autó / csapat</button>
+        <button class="btn btn-add" id="addTaskButton" type="button">＋ Új autó / külön csapat</button>
       </div>
       <div id="emptyState" class="empty-state">
         <span aria-hidden="true">✦</span>
@@ -97,7 +97,7 @@
         <p>Kezdd az első autó, a dolgozók és az első ügyfél hozzáadásával.</p>
       </div>
       <div id="taskList" class="task-list"></div>
-      <button class="btn btn-add btn-add-bottom" id="addTaskBottomButton" type="button" hidden>＋ Új autó / csapat</button>
+      <button class="btn btn-add btn-add-bottom" id="addTaskBottomButton" type="button" hidden>＋ Új autó / külön csapat</button>
       <div class="task-primary-actions">
         <button class="btn btn-save task-save-button" id="saveButton" type="button"><span aria-hidden="true">✓</span> Mentés</button>
         <button class="btn task-delete-day-button" id="deleteDayButton" type="button" hidden>Teljes nap törlése</button>
@@ -202,9 +202,9 @@
       <header class="dialog-header"><div><p class="section-kicker">Heti, havi vagy éves összesítés</p><h2>Napi feladatok letöltése</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
       <div class="dialog-body">
         <div class="download-options">
-          <button class="download-option" type="button" data-print-period="week"><strong>Heti napi feladatok</strong><span>A dátumnál kiválasztott péntektől csütörtökig</span></button>
-          <button class="download-option" type="button" data-print-period="month"><strong>Havi napi feladatok</strong><span>A dátumnál kiválasztott teljes hónap</span></button>
-          <button class="download-option" type="button" data-print-period="year"><strong>Éves napi feladatok</strong><span>A dátumnál kiválasztott teljes év</span></button>
+          <button class="download-option" type="button" data-print-period="week"><strong>Heti napi feladatok</strong><span id="downloadWeekRange"></span></button>
+          <button class="download-option" type="button" data-print-period="month"><strong>Havi napi feladatok</strong><span id="downloadMonthRange"></span></button>
+          <button class="download-option" type="button" data-print-period="year"><strong>Éves napi feladatok</strong><span id="downloadYearRange"></span></button>
           <button class="download-option install-option" id="installAppButton" type="button"><strong>App telepítése erre az eszközre</strong><span id="installAppHint">Új számítógépen vagy Android-eszközön</span></button>
         </div>
       </div>
@@ -310,6 +310,6 @@
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260923h"></script>
   <script src="js/napi-sync.js?v=20260923c"></script>
-  <script src="js/app.js?v=20260923o"></script>
+  <script src="js/app.js?v=20260924p"></script>
 </body>
 </html>

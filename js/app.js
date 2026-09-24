@@ -749,6 +749,18 @@
     return groups;
   }
   function planHasTasks(plan) { return Boolean(plan && Array.isArray(plan.tasks) && plan.tasks.length); }
+  function vehicleNumberingKey(task) {
+    const vehicles = [...(task.vehicleIds || [])].filter(Boolean).sort();
+    return vehicles.length ? `vehicle:${vehicles.join("|")}` : `team:${task.teamId || task.id}`;
+  }
+  function clientNumberForVehicle(task, plan = workingPlan) {
+    const key = vehicleNumberingKey(task); let number = 0;
+    for (const item of plan.tasks) {
+      if (vehicleNumberingKey(item) === key) number += 1;
+      if (item === task) return number || 1;
+    }
+    return 1;
+  }
   function clientIndexInTeam(task) { return tasksByTeam().find(group => group.id === (task.teamId || task.id))?.tasks.indexOf(task) ?? 0; }
   function taskJobs(task) { return Array.isArray(task.jobs) ? task.jobs : []; }
   function selectedJobNames(task) { return taskJobs(task).map(job => job.name).filter(Boolean); }
@@ -860,9 +872,9 @@
       const theme = vehicle ? vehicleTheme(vehicle) : { background: "#edf2eb", border: "#7b8e7e", accent: "#173f2b" };
       const block = document.createElement("section"); block.className = "team-block"; block.dataset.teamId = group.id;
       block.style.cssText = `--team-color:${theme.background};--team-border:${theme.border};--team-accent:${theme.accent}`;
-      block.innerHTML = `<header class="team-block-header"><div><h3>${escapeHTML(vehicles.join(" + ") || "Új autó / csapat")}</h3><p>${escapeHTML(workers.length ? `Dolgozók: ${workers.join(", ")}` : "Válaszd ki a dolgozókat")}</p></div><div class="team-header-actions"><strong>${group.tasks.length} ügyfél</strong><button type="button" class="team-delete-button" data-remove-team="${escapeHTML(group.id)}">Autó / csapat törlése</button></div></header><div class="task-list-inner"></div><button class="team-add-customer" type="button" data-add-team-customer="${escapeHTML(group.id)}">＋ Új ügyfél ehhez a csapathoz</button>`;
+      block.innerHTML = `<header class="team-block-header"><div><h3>${escapeHTML(vehicles.join(" + ") || "Új autó / csapat")}</h3><p>${escapeHTML(workers.length ? `Dolgozók: ${workers.join(", ")}` : "Válaszd ki a dolgozókat")}</p></div><div class="team-header-actions"><strong>${group.tasks.length} ügyfél</strong><button type="button" class="team-delete-button" data-remove-team="${escapeHTML(group.id)}">Autó / csapat törlése</button></div></header><div class="task-list-inner"></div><button class="team-add-customer" type="button" data-add-team-customer="${escapeHTML(group.id)}">＋ Következő ügyfél ehhez az autóhoz</button>`;
       const inner = block.querySelector(".task-list-inner");
-      group.tasks.forEach((task, teamIndex) => inner.append(renderTask(task, workingPlan.tasks.indexOf(task), teamIndex, teamIndex === 0)));
+      group.tasks.forEach((task, teamIndex) => inner.append(renderTask(task, workingPlan.tasks.indexOf(task), clientNumberForVehicle(task) - 1, teamIndex === 0)));
       list.append(block);
     });
     if (hadCards) list.querySelectorAll(".task-card details").forEach(detail => { detail.open = openDetails.has(`${detail.closest(".task-card").dataset.taskId}:${detail.dataset.detail}`); });
@@ -889,7 +901,7 @@
       vehicles: (task.vehicleIds || []).map(id => byId(data.vehicles, id)?.name).filter(Boolean)
     };
   }
-  function updateTaskSummary(card, task, index = clientIndexInTeam(task)) {
+  function updateTaskSummary(card, task, index = clientNumberForVehicle(task) - 1) {
     const { workers, vehicles } = taskPeopleAndVehicle(task);
     card.querySelector(".task-number").textContent = `${index + 1}.`;
     const vehicleSummary = card.querySelector(".task-summary"); const workerSummary = card.querySelector(".task-team-summary");
@@ -1108,7 +1120,7 @@
       if (event.target.matches(".material-quantity")) material.quantity = event.target.value;
       if (event.target.matches(".material-unit")) material.unit = event.target.value;
     }
-    updateTaskSummary(card, task, clientIndexInTeam(task)); markDirty();
+    updateTaskSummary(card, task, clientNumberForVehicle(task) - 1); markDirty();
   });
   $("#taskList").addEventListener("change", event => {
     const card = event.target.closest(".task-card"); if (!card) return; const task = findTaskFromElement(card); if (!task) return;
@@ -1176,7 +1188,7 @@
         const lead = group.tasks[0];
         const workers = (lead.workerIds || []).map(id => byId(data.workers, id)?.name).filter(Boolean).join(", ");
         const vehicles = (lead.vehicleIds || []).map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
-        const clients = group.tasks.map((task, teamIndex) => `<span><strong>${teamIndex + 1}. ${escapeHTML(task.customerName || "Ügyfél nélkül")}</strong>${task.startTime ? `<small>${escapeHTML(task.startTime)}</small>` : ""}${task.address ? `<em>${escapeHTML(task.address)}</em>` : ""}</span>`).join("");
+        const clients = group.tasks.map(task => `<span><strong>${clientNumberForVehicle(task, plan)}. ${escapeHTML(task.customerName || "Ügyfél nélkül")}</strong>${task.startTime ? `<small>${escapeHTML(task.startTime)}</small>` : ""}${task.address ? `<em>${escapeHTML(task.address)}</em>` : ""}</span>`).join("");
         return `<div class="week-task"><b>${escapeHTML(vehicles || "Autó nélkül")}</b><small class="week-workers">Dolgozók: ${escapeHTML(workers || "nincs kiválasztva")}</small>${clients}</div>`;
       }).join("") : `<p class="week-empty">Nincs elmentett feladat.</p>`;
       const holiday = hungarianHoliday(date);
@@ -1273,7 +1285,7 @@
       lines.push(`${vehicles || "Autó nélkül"} – ${workers || "nincs dolgozó kiválasztva"}`, "");
       group.tasks.forEach((task, teamIndex) => {
         const tools = [...task.toolIds.map(id => { const tool = byId(data.tools, id); return tool ? `${tool.name} – ${task.toolQuantities?.[id] || "1"} db` : ""; }).filter(Boolean), ...String(task.extraTools || "").split(",").map(item => item.trim()).filter(Boolean)];
-        lines.push(`${teamIndex + 1}. ${task.customerName || "nincs kiválasztva"}`);
+        lines.push(`${clientNumberForVehicle(task)}. ${task.customerName || "nincs kiválasztva"}`);
         lines.push(`Cím: ${task.address || "nincs megadva"}${task.startTime ? ` · Kezdés: ${task.startTime}` : ""}`);
         const descriptions = jobDescriptions(task);
         if (descriptions.length) {
@@ -1308,7 +1320,7 @@
         const materials = task.materials.filter(item => item.name);
         const jobs = jobDescriptions(task).map(item => `<div class="print-job-description"><h4>${escapeHTML(item.name)}</h4>${item.steps.length ? `<ul>${item.steps.map(step => `<li>${escapeHTML(step.replaceAll("–", "-"))}</li>`).join("")}</ul>` : ""}</div>`).join("");
         const expectations = `<section class="print-section wide print-expectations"><h3>Munkavégzés</h3><p>${task.workLogRequired === false ? "Munkanaplót nem kell megírni." : "Munkanaplót megírni."}<br>${escapeHTML(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)].replaceAll("–", "-"))}<br>${escapeHTML(QUALITY_DESCRIPTIONS[validRating(task.workQuality)].replaceAll("–", "-"))}</p></section>`;
-        return `<section class="print-client-block"><div class="print-client-row"><section><small>${teamIndex + 1}. Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím${task.startTime ? ` · Kezdés: ${escapeHTML(task.startTime)}` : ""}</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${item.source ? `<strong>${escapeHTML(item.source)}:</strong> ` : ""}${escapeHTML(item.name)}${item.quantity ? ` - ${escapeHTML(item.quantity)}${item.unit ? ` ${escapeHTML(item.unit)}` : ""}` : ""}</li>`).join("")}</ul></section>` : ""}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}${expectations}</div></section>`;
+        return `<section class="print-client-block"><div class="print-client-row"><section><small>${clientNumberForVehicle(task, plan)}. Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím${task.startTime ? ` · Kezdés: ${escapeHTML(task.startTime)}` : ""}</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${item.source ? `<strong>${escapeHTML(item.source)}:</strong> ` : ""}${escapeHTML(item.name)}${item.quantity ? ` - ${escapeHTML(item.quantity)}${item.unit ? ` ${escapeHTML(item.unit)}` : ""}` : ""}</li>`).join("")}</ul></section>` : ""}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}${expectations}</div></section>`;
       }).join("");
       const printTask = `<article class="print-task" style="--print-task-color:${printTheme.background};--print-task-border:${printTheme.border};--print-task-accent:${printTheme.accent}"><div class="print-task-heading"><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2><div class="print-heading-workers">${workers || `<span>Nincs dolgozó kiválasztva</span>`}</div></div>${clients}</article>`;
       return `${groupIndex ? `<div class="print-divider">Következő csapat</div>` : ""}${printTask}`;
@@ -1539,7 +1551,14 @@
   $("#stopsInput").addEventListener("input", event => { workingPlan.stops = event.target.value; markDirty(); });
   $("#todayButton").addEventListener("click", () => changeDate(isoToday()));
   $("#folderButton").addEventListener("click", chooseFolder); $("#refreshButton").addEventListener("click", refreshApplication);
+  function updateDownloadPeriodLabels() {
+    const reference = workingPlan.date; const weekStart = startOfWeek(reference); const weekEnd = dateOffset(weekStart, 6);
+    $("#downloadWeekRange").textContent = `${formatDate(weekStart, { year: "numeric", month: "long", day: "numeric" })} – ${formatDate(weekEnd, { year: "numeric", month: "long", day: "numeric" })}`;
+    $("#downloadMonthRange").textContent = formatDate(reference, { year: "numeric", month: "long" });
+    $("#downloadYearRange").textContent = `${reference.slice(0, 4)}. év`;
+  }
   $("#downloadButton").addEventListener("click", () => {
+    updateDownloadPeriodLabels();
     $("#downloadsDialog").showModal();
   });
   $("#downloadsDialog").addEventListener("click", event => {
