@@ -388,7 +388,8 @@ button, summary { touch-action: manipulation; }
   .print-departure p { margin: 0; }
   .print-divider { position: relative; z-index: 1; margin: 5mm 0 -2mm; break-after: avoid-page; color: var(--orange); text-align: center; font-size: 7.5pt; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
   .print-divider::before, .print-divider::after { content: ""; display: inline-block; width: 31%; margin: 0 3mm 2px; border-top: .5mm solid #c67a4d; }
-  .print-task { position: relative; z-index: 1; margin-top: 5mm; padding: 0 4mm 3mm; break-inside: avoid-page; border: .6mm solid var(--print-task-border, #8fa391); border-left: 2.5mm solid var(--print-task-border, var(--forest)); background: var(--print-task-color, rgba(255,255,255,.96)); }
+  .print-task { position: relative; z-index: 1; margin-top: 5mm; padding: 0 4mm 3mm; break-inside: auto; box-decoration-break: clone; -webkit-box-decoration-break: clone; border: .6mm solid var(--print-task-border, #8fa391); border-left: 2.5mm solid var(--print-task-border, var(--forest)); background: var(--print-task-color, rgba(255,255,255,.96)); }
+  .print-task-start { break-inside: avoid-page; }
   .print-task-heading { display: flex; flex-wrap: wrap; gap: 2mm 3mm; align-items: center; margin: 0 -4mm 3mm; padding: 2.2mm 3mm; break-after: avoid-page; color: #fff; background: var(--print-task-accent, var(--forest)); }
   .print-heading-workers { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 1mm; }
   .print-index { display: inline-grid; place-items: center; min-width: 8mm; min-height: 8mm; color: #fff; background: var(--orange); font: 800 13pt Georgia, serif; }

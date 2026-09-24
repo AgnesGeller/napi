@@ -66,7 +66,12 @@
     const uniqueDates = [...new Set(dates)].filter(Boolean);
     if (!uniqueDates.length) return;
     const deletedAt = new Date().toISOString();
-    return Promise.all(uniqueDates.map(date => pushPlan({ date, deleted: true, updatedAt: deletedAt })));
+    await Promise.all(uniqueDates.map(date => pushPlan({ date, deleted: true, updatedAt: deletedAt })));
+    const filter = uniqueDates.map(date => encodeURIComponent(date)).join(",");
+    const rows = await request(`napi_daily_plans?select=plan_date,payload&plan_date=in.(${filter})`);
+    const confirmed = new Set((rows || []).filter(row => row.payload?.deleted).map(row => row.plan_date));
+    if (uniqueDates.some(date => !confirmed.has(date))) throw new Error("A teljes nap törlésének közös megerősítése nem sikerült.");
+    return rows;
   }
 
   window.NapiCloudSync = { pull, pushConfig, pushPlan, deletePlans };
