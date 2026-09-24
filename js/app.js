@@ -753,8 +753,7 @@
   }
   function planHasTasks(plan) { return Boolean(plan && Array.isArray(plan.tasks) && plan.tasks.length); }
   function vehicleNumberingKey(task) {
-    const vehicles = [...(task.vehicleIds || [])].filter(Boolean).sort();
-    return vehicles.length ? `vehicle:${vehicles.join("|")}` : `team:${task.teamId || task.id}`;
+    return `team:${task.teamId || task.id}`;
   }
   function clientNumberForVehicle(task, plan = workingPlan) {
     const key = vehicleNumberingKey(task); let number = 0;
@@ -1199,7 +1198,7 @@
     }).join("");
   }
   function deleteDay(date) {
-    if (!confirm(`Biztosan törlöd a(z) ${formatDate(date)} teljes napi tervét? Előtte tölts le adatmentést, ha meg szeretnéd őrizni.`)) return false;
+    if (!confirm(`Biztosan törlöd a(z) ${formatDate(date)} teljes napi tervét? Előtte mentsd le PDF-ként, ha meg szeretnéd őrizni.`)) return false;
     data.plans = data.plans.filter(plan => plan.date !== date);
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
     const syncPromise = syncDeletedDates([date]);
