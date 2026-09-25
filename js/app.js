@@ -1377,7 +1377,7 @@
       }).join("") : "";
       const dayContent = workHTML || taskHTML ? `${workHTML}${taskHTML}` : `<p class="week-empty">Nincs elmentett feladat.</p>`;
       const holiday = hungarianHoliday(date);
-      return `<article class="week-day${date === isoToday() ? " today" : ""}${holiday ? " holiday" : ""}"><header><div><p class="week-day-name">${escapeHTML(formatDate(date, { weekday: "long" }))}</p><p class="week-day-date">${escapeHTML(formatDate(date, { month: "short", day: "numeric" }))}</p></div>${holiday ? `<span class="holiday-label">${escapeHTML(holiday)}</span>` : ""}</header><div class="week-day-tasks">${dayContent}</div><div class="week-day-actions"><button class="week-open" type="button" data-open-date="${date}">${plan ? "Nap megnyitása" : "Terv készítése"}</button>${plan ? `<button class="week-delete" type="button" data-delete-date="${date}">Teljes nap törlése</button>` : ""}</div></article>`;
+      return `<article class="week-day${date === isoToday() ? " today" : ""}${holiday ? " holiday" : ""}${workItems.length ? " has-work-items" : ""}"><header><div><p class="week-day-name">${escapeHTML(formatDate(date, { weekday: "long" }))}</p><p class="week-day-date">${escapeHTML(formatDate(date, { month: "short", day: "numeric" }))}</p></div>${holiday ? `<span class="holiday-label">${escapeHTML(holiday)}</span>` : ""}</header><div class="week-day-tasks">${dayContent}</div><div class="week-day-actions"><button class="week-open" type="button" data-open-date="${date}">${plan ? "Nap megnyitása" : "Terv készítése"}</button>${plan ? `<button class="week-delete" type="button" data-delete-date="${date}">Teljes nap törlése</button>` : ""}</div></article>`;
     }).join("");
   }
   function deleteDay(date) {
@@ -1423,7 +1423,7 @@
         return `${vehicle}: ${customers}`;
       }).join(" • ") : "";
       const workDetails = workItems.map(item => `${WORK_ITEM_TYPES[item.type]?.label || "Munka"}: ${item.customerName || "Nincs megadva"}`).join(" • ");
-      const classes = `month-day${date.slice(0, 7) !== monthAnchor ? " outside" : ""}${date === isoToday() ? " today" : ""}${holiday ? " holiday" : ""}`;
+      const classes = `month-day${date.slice(0, 7) !== monthAnchor ? " outside" : ""}${date === isoToday() ? " today" : ""}${holiday ? " holiday" : ""}${workItems.length ? " has-work-items" : ""}`;
       return `<article class="${classes}"><button class="month-day-open" type="button" data-month-date="${date}" aria-label="${escapeHTML(formatDate(date))}${clients ? `, ${clients} ügyfél` : ""}${workItems.length ? `, ${workItems.length} előjegyzés` : ""}"><span class="month-day-number">${Number(date.slice(8, 10))}</span>${holiday ? `<strong>${escapeHTML(holiday)}</strong>` : ""}${workItems.length ? `<small class="month-work-count">${escapeHTML(workDetails)}</small>` : ""}${clients ? `<small>${escapeHTML(details)}</small>` : ""}</button>${plan ? `<button class="month-day-delete" type="button" data-month-delete="${date}" aria-label="${escapeHTML(formatDate(date))} teljes napi tervének törlése">Törlés</button>` : ""}</article>`;
     }).join("");
   }
