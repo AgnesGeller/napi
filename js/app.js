@@ -373,6 +373,7 @@
           const index = data.plans.findIndex(item => item.date === row.plan_date);
           if (index >= 0) { data.plans.splice(index, 1); dataChanged = true; }
           pendingCloudPlanDates.delete(row.plan_date);
+          pendingCloudDeletedDates.delete(row.plan_date);
           if (row.plan_date === workingPlan.date) {
             localStorage.removeItem(RECOVERY_KEY);
             dirty = false;
@@ -394,6 +395,7 @@
         }
       });
       persistPendingPlanDates();
+      persistPendingDeletionDates();
       if (initial) {
         const missingPlans = data.plans.filter(plan => !remoteDates.has(plan.date));
         for (const plan of missingPlans) await window.NapiCloudSync.pushPlan(plan);
@@ -417,6 +419,12 @@
         const hasPlanContent = planHasContent(workingPlan);
         if (hasPlanContent && dirty && !pendingCloudDeletedDates.has(workingPlan.date)) { upsertWorkingPlan(); pendingCloudPlanDates.add(workingPlan.date); }
         data.updatedAt = new Date().toISOString(); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+        if (pendingCloudDeletedDates.size) {
+          const deletedDates = [...pendingCloudDeletedDates];
+          await window.NapiCloudSync.deletePlans(deletedDates);
+          deletedDates.forEach(date => pendingCloudDeletedDates.delete(date));
+          persistPendingDeletionDates();
+        }
         for (const date of [...pendingCloudPlanDates]) {
           if (pendingCloudDeletedDates.has(date)) { pendingCloudPlanDates.delete(date); continue; }
           const plan = data.plans.find(item => item.date === date);
@@ -424,13 +432,6 @@
           pendingCloudPlanDates.delete(date);
         }
         persistPendingPlanDates();
-        if (pendingCloudDeletedDates.size) {
-          const deletedDates = [...pendingCloudDeletedDates];
-          await window.NapiCloudSync.deletePlans(deletedDates);
-          deletedDates.forEach(date => pendingCloudDeletedDates.delete(date));
-          if (pendingCloudDeletedDates.size) localStorage.setItem(PENDING_DELETIONS_KEY, JSON.stringify([...pendingCloudDeletedDates]));
-          else localStorage.removeItem(PENDING_DELETIONS_KEY);
-        }
         if (cloudConfigDirty) { await window.NapiCloudSync.pushConfig(sharedConfigPayload()); cloudConfigDirty = false; }
       };
       const queuedWrite = cloudWritePromise.catch(() => {}).then(write);
@@ -451,10 +452,14 @@
     if (pendingCloudPlanDates.size) localStorage.setItem(PENDING_PLANS_KEY, JSON.stringify([...pendingCloudPlanDates]));
     else localStorage.removeItem(PENDING_PLANS_KEY);
   }
+  function persistPendingDeletionDates() {
+    if (pendingCloudDeletedDates.size) localStorage.setItem(PENDING_DELETIONS_KEY, JSON.stringify([...pendingCloudDeletedDates]));
+    else localStorage.removeItem(PENDING_DELETIONS_KEY);
+  }
   function syncDeletedDates(dates) {
     dates.forEach(date => { pendingCloudDeletedDates.add(date); pendingCloudPlanDates.delete(date); });
     persistPendingPlanDates();
-    localStorage.setItem(PENDING_DELETIONS_KEY, JSON.stringify([...pendingCloudDeletedDates]));
+    persistPendingDeletionDates();
     clearTimeout(cloudSyncTimer);
     return pushCurrentState();
   }
@@ -1158,9 +1163,12 @@
     const directoryMatch = customerDirectory.find(customer => searchKey(customer.name) === searchKey(customerName) && (!address || searchKey(customer.address) === searchKey(address))) || customerDirectory.find(customer => searchKey(customer.name) === searchKey(customerName));
     targetPlan.workItems.push({ id: existing?.id || uid(), type: $("#workItemType").value, customerId: directoryMatch?.customerId || null, locationId: directoryMatch?.locationId || null, customerName, address, note: $("#workItemNote").value.trim() });
     persistWorkPlans([sourcePlan, targetPlan]);
+    setWeekAnchor(targetDate); setMonthAnchor(targetDate.slice(0, 7));
+    $("#weekView").open = true;
     renderWorkItems(); renderTasks(); renderWeek(); renderMonth();
     const moved = sourceDate && sourceDate !== targetDate;
     closeWorkItemDialog();
+    $("#weekView").scrollIntoView({ behavior: "smooth", block: "start" });
     toast(moved ? "A bejegyzés átkerült a kiválasztott napra." : "A bejegyzés elmentve és szinkronizálásra került.");
   });
   $("#workInboxList").addEventListener("click", event => {
@@ -1371,7 +1379,17 @@
   function deleteDay(date) {
     if (!confirm(`Biztosan törlöd a(z) ${formatDate(date)} teljes napi tervét? Előtte mentsd le PDF-ként, ha meg szeretnéd őrizni.`)) return false;
     data.plans = data.plans.filter(plan => plan.date !== date);
+    data.updatedAt = new Date().toISOString();
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+    try {
+      const recovery = JSON.parse(localStorage.getItem(RECOVERY_KEY));
+      if (recovery?.workingPlan?.date === date) localStorage.removeItem(RECOVERY_KEY);
+      else if (recovery?.data?.plans) {
+        recovery.data.plans = recovery.data.plans.filter(plan => plan.date !== date);
+        recovery.data.updatedAt = data.updatedAt;
+        localStorage.setItem(RECOVERY_KEY, JSON.stringify(recovery));
+      }
+    } catch (_) { localStorage.removeItem(RECOVERY_KEY); }
     const syncPromise = syncDeletedDates([date]);
     if (workingPlan.date === date) { localStorage.removeItem(RECOVERY_KEY); dirty = false; loadPlan(date, { preserveCalendarPosition: true }); }
     renderWeek(); renderMonth(); toast("A teljes napi terv törölve • szinkronizálás folyamatban.");
