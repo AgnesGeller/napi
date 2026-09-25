@@ -101,7 +101,7 @@ button, summary { touch-action: manipulation; }
 .weekly-overview .week-grid { padding: 1rem; }
 .week-range { margin: .35rem 0 0; color: var(--muted); }
 .week-nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .45rem; }
-.week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .55rem; }
+.week-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .7rem; }
 .week-day { min-height: 240px; display: flex; flex-direction: column; border: 1px solid #b9c7ba; border-top: 4px solid var(--forest); background: var(--paper); box-shadow: 0 6px 18px rgba(25,57,37,.07); }
 .week-day.today { border-top-color: var(--orange); }
 .week-day header { display: flex; align-items: flex-start; justify-content: space-between; gap: .45rem; padding: .65rem; border-bottom: 1px solid var(--line); background: #f7f9f5; }
@@ -337,6 +337,10 @@ button, summary { touch-action: manipulation; }
 .app-toast { padding: .8rem 1rem; color: #fff; background: var(--forest); border-left: 5px solid #dca06b; box-shadow: var(--shadow); }
 .app-toast.error { background: #722622; }
 .print-view { display: none; }
+
+@media (min-width: 761px) and (max-width: 980px) {
+  .week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 @media (max-width: 760px) {
   body { padding-bottom: 78px; }
