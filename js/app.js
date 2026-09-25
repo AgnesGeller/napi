@@ -1106,7 +1106,7 @@
   function openWorkItemDialog(item = null, date = workingPlan.date) {
     editingWorkItemId = item?.id || null;
     editingWorkItemDate = item ? date : null;
-    $("#workItemDialogTitle").textContent = item ? "Bejegyzés szerkesztése" : "Új bejegyzés";
+    $("#workItemDialogTitle").textContent = item ? "Előjegyzés szerkesztése" : "Új előjegyzés";
     $("#workItemDate").value = item ? date : workingPlan.date;
     $("#workItemType").value = item?.type || "work";
     $("#workItemCustomer").value = item?.customerName || "";

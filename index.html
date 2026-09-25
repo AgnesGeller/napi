@@ -30,7 +30,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260925c">
+  <link rel="stylesheet" href="css/style.css?v=20260925d">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -89,7 +89,7 @@
           <p class="section-kicker">Előjegyzések a kiválasztott napra</p>
           <h2 id="workInboxHeading">Munkák</h2>
         </div>
-        <button class="btn btn-add" id="addWorkItemButton" type="button">＋ Új bejegyzés</button>
+        <button class="btn work-alert-button" id="addWorkItemButton" type="button">＋ Új előjegyzés</button>
       </div>
       <p class="work-inbox-help">Ide írd fel gyorsan a munkát, felmérést vagy megbeszélést. Autót és dolgozót később is választhatsz.</p>
       <div class="work-inbox-empty" id="workInboxEmpty">Erre a napra még nincs előjegyzés.</div>
@@ -182,7 +182,7 @@
 
   <dialog id="workItemDialog" class="app-dialog compact-dialog">
     <form id="workItemForm" class="dialog-frame">
-      <header class="dialog-header"><div><p class="section-kicker">Gyors előjegyzés</p><h2 id="workItemDialogTitle">Új bejegyzés</h2></div><button class="icon-button" type="button" data-close-work-item aria-label="Bezárás">×</button></header>
+      <header class="dialog-header"><div><p class="section-kicker">Gyors előjegyzés</p><h2 id="workItemDialogTitle">Új előjegyzés</h2></div><button class="icon-button" type="button" data-close-work-item aria-label="Bezárás">×</button></header>
       <div class="dialog-body form-grid">
         <label>Dátum<input class="form-control" id="workItemDate" name="date" type="date" required></label>
         <label>Típus<select class="form-select" id="workItemType" name="type" required><option value="work">Munka</option><option value="survey">Felmérés</option><option value="meeting">Megbeszélés</option></select></label>
@@ -349,6 +349,6 @@
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260923h"></script>
   <script src="js/napi-sync.js?v=20260924a"></script>
-  <script src="js/app.js?v=20260925c"></script>
+  <script src="js/app.js?v=20260925d"></script>
 </body>
 </html>
