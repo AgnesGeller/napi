@@ -30,7 +30,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260925b">
+  <link rel="stylesheet" href="css/style.css?v=20260925c">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -191,7 +191,7 @@
         <label class="wide">Cím<input class="form-control" id="workItemAddress" name="address" type="text" maxlength="240" required placeholder="A helyszín címe"></label>
         <label class="wide">Megjegyzés<textarea class="form-control" id="workItemNote" name="note" rows="4" maxlength="1000" placeholder="Mit kell elvégezni vagy miről lesz szó?"></textarea></label>
       </div>
-      <footer class="dialog-footer"><button class="btn btn-save" type="submit">Mentés</button><button class="btn btn-secondary" type="button" data-close-work-item>Mégse</button></footer>
+      <footer class="dialog-footer"><button class="btn btn-save" type="submit">Mentés</button><button class="btn btn-danger" id="deleteWorkItemButton" type="button" hidden>Törlés</button><button class="btn btn-secondary" type="button" data-close-work-item>Mégse</button></footer>
     </form>
   </dialog>
 
@@ -349,6 +349,6 @@
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260923h"></script>
   <script src="js/napi-sync.js?v=20260924a"></script>
-  <script src="js/app.js?v=20260925b"></script>
+  <script src="js/app.js?v=20260925c"></script>
 </body>
 </html>

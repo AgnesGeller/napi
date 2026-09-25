@@ -72,9 +72,11 @@ button, summary { touch-action: manipulation; }
 .work-inbox-actions .btn { min-height: 38px; padding: .3rem .6rem; font-size: .82rem; }
 .work-inbox-actions .work-remove { color: #8d2722; border-color: #d5aaa7; background: #fff5f4; }
 .week-work-item { padding: .4rem; border-left: 3px solid var(--work-type-color, var(--orange)); background: #fff7e9; font-size: .75rem; }
+.week-work-open { width: 100%; padding: 0; color: inherit; border: 0; background: transparent; text-align: left; }
 .week-work-item strong, .week-work-item small { display: block; }
 .week-work-item strong { color: var(--forest); }
 .week-work-item small { margin-top: .12rem; color: var(--muted); }
+.week-work-assign { width: 100%; margin-top: .35rem; padding: .28rem .4rem; color: var(--forest); border: 1px solid #9eb49f; background: #fff; font-weight: 800; }
 .month-work-count { color: #864016 !important; }
 .week-section { margin-top: 1.3rem; border: 1px solid #aebcaf; border-top: 5px solid var(--forest); background: #f8faf7; box-shadow: var(--shadow); }
 .weekly-overview-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.15rem; color: var(--forest); background: #eef3ec; cursor: pointer; list-style: none; }

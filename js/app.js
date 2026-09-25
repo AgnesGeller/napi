@@ -894,12 +894,8 @@
     card.classList.toggle("has-vehicle", Boolean(vehicle));
   }
   function renderWorkItems() {
-    const items = workingPlan.workItems || [];
-    $("#workInboxEmpty").hidden = items.length > 0;
-    $("#workInboxList").innerHTML = items.map(item => {
-      const type = WORK_ITEM_TYPES[item.type] || WORK_ITEM_TYPES.work;
-      return `<article class="work-inbox-item" data-work-item-id="${escapeHTML(item.id)}" style="--work-type-color:${type.color}"><span class="work-inbox-type">${escapeHTML(type.label)}</span><div class="work-inbox-copy"><strong>${escapeHTML(item.customerName || "Nincs megadva")}</strong><span>${escapeHTML(item.address || "Nincs megadott cím")}</span>${item.note ? `<small>${escapeHTML(item.note)}</small>` : ""}</div><div class="work-inbox-actions">${item.type === "work" ? `<button class="btn btn-outline-green work-assign" type="button">Kiosztás</button>` : ""}<button class="btn btn-soft work-edit" type="button">Szerkesztés</button><button class="btn work-remove" type="button">Törlés</button></div></article>`;
-    }).join("");
+    $("#workInboxEmpty").hidden = true;
+    $("#workInboxList").innerHTML = "";
   }
   function renderTasks() {
     const list = $("#taskList");
@@ -1107,15 +1103,16 @@
       seen.add(key); return true;
     }).map(customer => `<option value="${escapeHTML(customer.name)}" label="${escapeHTML(customer.address || "Nincs megadott cím")}"></option>`).join("");
   }
-  function openWorkItemDialog(item = null) {
+  function openWorkItemDialog(item = null, date = workingPlan.date) {
     editingWorkItemId = item?.id || null;
-    editingWorkItemDate = item ? workingPlan.date : null;
+    editingWorkItemDate = item ? date : null;
     $("#workItemDialogTitle").textContent = item ? "Bejegyzés szerkesztése" : "Új bejegyzés";
-    $("#workItemDate").value = workingPlan.date;
+    $("#workItemDate").value = item ? date : workingPlan.date;
     $("#workItemType").value = item?.type || "work";
     $("#workItemCustomer").value = item?.customerName || "";
     $("#workItemAddress").value = item?.address || "";
     $("#workItemNote").value = item?.note || "";
+    $("#deleteWorkItemButton").hidden = !item;
     renderWorkCustomerOptions();
     $("#workItemDialog").showModal();
     $("#workItemCustomer").focus();
@@ -1136,6 +1133,13 @@
   $("#addWorkItemButton").addEventListener("click", () => openWorkItemDialog());
   document.querySelectorAll("[data-close-work-item]").forEach(button => button.addEventListener("click", closeWorkItemDialog));
   document.querySelectorAll("[data-close-work-assign]").forEach(button => button.addEventListener("click", closeWorkAssignment));
+  $("#deleteWorkItemButton").addEventListener("click", () => {
+    if (!editingWorkItemId || !editingWorkItemDate || !confirm("Biztosan törlöd ezt a bejegyzést?")) return;
+    const plan = workPlanForDate(editingWorkItemDate);
+    plan.workItems = (plan.workItems || []).filter(item => item.id !== editingWorkItemId);
+    persistWorkPlans([plan]);
+    closeWorkItemDialog(); renderWorkItems(); renderWeek(); renderMonth(); toast("A bejegyzés törölve.");
+  });
   $("#workItemCustomer").addEventListener("input", event => {
     const exact = customerDirectory.find(customer => searchKey(customer.name) === searchKey(event.target.value));
     if (exact && !$("#workItemAddress").value.trim()) $("#workItemAddress").value = exact.address || "";
@@ -1350,7 +1354,7 @@
       const workItems = plan?.workItems || [];
       const workHTML = workItems.map(item => {
         const type = WORK_ITEM_TYPES[item.type] || WORK_ITEM_TYPES.work;
-        return `<div class="week-work-item" style="--work-type-color:${type.color}"><strong>${escapeHTML(type.label)}: ${escapeHTML(item.customerName || "Nincs megadva")}</strong><small>${escapeHTML(item.address || "Nincs megadott cím")}${item.note ? ` · ${escapeHTML(item.note)}` : ""}</small></div>`;
+        return `<div class="week-work-item" style="--work-type-color:${type.color}"><button class="week-work-open" type="button" data-edit-work-date="${date}" data-edit-work-id="${escapeHTML(item.id)}"><strong>${escapeHTML(type.label)}: ${escapeHTML(item.customerName || "Nincs megadva")}</strong><small>${escapeHTML(item.address || "Nincs megadott cím")}${item.note ? ` · ${escapeHTML(item.note)}` : ""}</small></button>${item.type === "work" ? `<button class="week-work-assign" type="button" data-assign-work-date="${date}" data-assign-work-id="${escapeHTML(item.id)}">Kiosztás</button>` : ""}</div>`;
       }).join("");
       const taskHTML = tasks.length ? tasksByTeam(plan).map(group => {
         const lead = group.tasks[0];
@@ -1413,6 +1417,20 @@
   }
   $("#dayViewButton").addEventListener("click", () => switchView("day")); $("#weekViewButton").addEventListener("click", () => switchView("week")); $("#monthViewButton").addEventListener("click", () => switchView("month"));
   $("#weekGrid").addEventListener("click", event => {
+    const editWork = event.target.closest("[data-edit-work-id]");
+    if (editWork) {
+      const plan = data.plans.find(item => item.date === editWork.dataset.editWorkDate);
+      const item = plan?.workItems?.find(entry => entry.id === editWork.dataset.editWorkId);
+      if (item) openWorkItemDialog(item, plan.date);
+      return;
+    }
+    const assignWork = event.target.closest("[data-assign-work-id]");
+    if (assignWork) {
+      loadPlan(assignWork.dataset.assignWorkDate, { preserveCalendarPosition: true });
+      const item = workingPlan.workItems.find(entry => entry.id === assignWork.dataset.assignWorkId);
+      if (item) { switchView("day"); openWorkAssignment(item); }
+      return;
+    }
     const deleteButton = event.target.closest("[data-delete-date]");
     if (deleteButton) {
       const date = deleteButton.dataset.deleteDate;
