@@ -1617,7 +1617,8 @@
   setInterval(refreshSharedDataSilently, 2000);
 
   async function initialize() {
-    $("#planDate").value = isoToday();
+    const today = isoToday();
+    $("#planDate").value = today;
     try {
       const storedData = JSON.parse(localStorage.getItem(LOCAL_DATA_KEY));
       if (storedData) data = normalizeData(storedData);
@@ -1626,17 +1627,20 @@
       try {
         const recovery = JSON.parse(localStorage.getItem(RECOVERY_KEY));
         if (recovery?.data) {
-          data = normalizeData(recovery.data);
           const recovered = recovery.workingPlan ? normalizeData({ ...recovery.data, plans: [recovery.workingPlan] }).plans[0] : null;
-          workingPlan = recovered || blankPlan(isoToday());
-          workingPlan.meeting = typeof workingPlan.meeting === "string" ? workingPlan.meeting : DEFAULT_MEETING;
-          workingPlan.stops = typeof workingPlan.stops === "string" ? workingPlan.stops : DEFAULT_STOPS;
-          $("#planDate").value = workingPlan.date; $("#meetingInput").value = workingPlan.meeting; $("#stopsInput").value = workingPlan.stops; dirty = true;
+          if (recovered?.date === today) {
+            data = normalizeData(recovery.data);
+            workingPlan = recovered;
+            workingPlan.meeting = typeof workingPlan.meeting === "string" ? workingPlan.meeting : DEFAULT_MEETING;
+            workingPlan.stops = typeof workingPlan.stops === "string" ? workingPlan.stops : DEFAULT_STOPS;
+            $("#meetingInput").value = workingPlan.meeting; $("#stopsInput").value = workingPlan.stops; dirty = true;
+          } else localStorage.removeItem(RECOVERY_KEY);
         }
       } catch (_) { /* Hibás helyreállítási adatot figyelmen kívül hagyunk. */ }
     }
     updateStorageStatus();
-    if (!dirty) loadPlan($("#planDate").value, { preserveCalendarPosition: true }); else { renderTasks(); $("#saveState").textContent = "Helyreállított piszkozat • mentés szükséges"; }
+    setWeekAnchor(today); setMonthAnchor(today.slice(0, 7));
+    if (!dirty) loadPlan(today, { preserveCalendarPosition: true }); else { renderTasks(); $("#saveState").textContent = "Helyreállított piszkozat • mentés szükséges"; }
     renderWeek();
     renderMonth();
     if (navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) { await syncCustomerDirectory(); await pullSharedData({ initial: true }); if (pendingCloudDeletedDates.size) await pushCurrentState(); }
