@@ -215,7 +215,7 @@
     const id = uid();
     return { id, teamId: id, customerId: null, locationId: null, customerName: "", address: "", startTime: "", workerIds: [], vehicleIds: [], jobs: [], toolIds: [], toolQuantities: {}, extraTools: "", materials: [], workLogRequired: true, workIntensity: 3, workQuality: 3, notes: "" };
   }
-  function blankPlan(date) { return { id: uid(), date, meeting: DEFAULT_MEETING, stops: DEFAULT_STOPS, workItems: [], tasks: [] }; }
+  function blankPlan(date) { return { id: uid(), date, meeting: DEFAULT_MEETING, stops: DEFAULT_STOPS, workItems: [], deletedWorkItemIds: [], tasks: [] }; }
   function normalizeData(candidate) {
     if (!candidate || typeof candidate !== "object") throw new Error("Az adatfájl nem megfelelő formátumú.");
     const initial = createInitialData();
@@ -271,6 +271,7 @@
           address: String(item.address || ""),
           note: String(item.note || "")
         })) : [],
+        deletedWorkItemIds: Array.isArray(plan.deletedWorkItemIds) ? [...new Set(plan.deletedWorkItemIds.filter(Boolean))] : [],
         tasks: Array.isArray(plan.tasks) ? plan.tasks.map(normalizeTask) : []
       })) : []
     };
@@ -352,7 +353,10 @@
     data.plans.forEach(plan => remapPlanReferences(plan, previous)); remapPlanReferences(workingPlan, previous);
   }
   function normalizedRemotePlan(payload) {
-    return normalizeData({ ...data, plans: [payload] }).plans[0];
+    const plan = normalizeData({ ...data, plans: [payload] }).plans[0];
+    const deletedWorkItemIds = new Set(plan?.deletedWorkItemIds || []);
+    if (plan && deletedWorkItemIds.size) plan.workItems = (plan.workItems || []).filter(item => !deletedWorkItemIds.has(item.id));
+    return plan;
   }
   async function pullSharedData({ initial = false, throwOnError = false } = {}) {
     if (cloudSyncing || !navigator.onLine || !window.NapiCloudSync || !window.NapiCustomerDirectory?.hasSession?.()) return false;
@@ -368,10 +372,6 @@
       else if (initial && !remote.config) await window.NapiCloudSync.pushConfig(sharedConfigPayload());
       const remoteDates = new Set(); let currentChanged = false; let currentDeleted = false;
       remote.plans.forEach(row => {
-        if (pendingCloudPlanDates.has(row.plan_date) && !pendingCloudDeletedDates.has(row.plan_date)) {
-          remoteDates.add(row.plan_date);
-          return;
-        }
         if (row.payload?.deleted) {
           remoteDates.add(row.plan_date);
           const index = data.plans.findIndex(item => item.date === row.plan_date);
@@ -392,6 +392,19 @@
         const plan = normalizedRemotePlan(row.payload); if (!plan?.date) return;
         remoteDates.add(plan.date); plan.updatedAt = row.updated_at || plan.updatedAt;
         const index = data.plans.findIndex(item => item.date === plan.date); const local = data.plans[index];
+        const deletedWorkItemIds = new Set([...(local?.deletedWorkItemIds || []), ...(plan.deletedWorkItemIds || [])]);
+        plan.deletedWorkItemIds = [...deletedWorkItemIds];
+        plan.workItems = (plan.workItems || []).filter(item => !deletedWorkItemIds.has(item.id));
+        if (deletedWorkItemIds.size && local) {
+          local.deletedWorkItemIds = [...deletedWorkItemIds];
+          local.workItems = (local.workItems || []).filter(item => !deletedWorkItemIds.has(item.id));
+          if (local.date === workingPlan.date) {
+            workingPlan.deletedWorkItemIds = [...deletedWorkItemIds];
+            workingPlan.workItems = (workingPlan.workItems || []).filter(item => !deletedWorkItemIds.has(item.id));
+          }
+          dataChanged = true;
+        }
+        if (pendingCloudPlanDates.has(row.plan_date) && timestampValue(local?.updatedAt) >= timestampValue(row.updated_at)) return;
         if (!local || timestampValue(row.updated_at) > timestampValue(local.updatedAt)) {
           if (index >= 0) data.plans[index] = plan; else data.plans.push(plan);
           dataChanged = true;
@@ -450,7 +463,11 @@
   }
   function queueCloudSync(delay = 1200) {
     clearTimeout(cloudSyncTimer);
-    cloudSyncTimer = setTimeout(() => pushCurrentState(), delay);
+    cloudSyncTimer = setTimeout(async () => {
+      await waitForCurrentCloudSync();
+      await pullSharedData();
+      await pushCurrentState();
+    }, delay);
   }
   function persistPendingPlanDates() {
     if (pendingCloudPlanDates.size) localStorage.setItem(PENDING_PLANS_KEY, JSON.stringify([...pendingCloudPlanDates]));
@@ -472,7 +489,13 @@
     dirty = true;
     workingPlan.updatedAt = new Date().toISOString();
     const hasPlanContent = planHasContent(workingPlan);
-    if (hasPlanContent) upsertWorkingPlan();
+    if (hasPlanContent) {
+      upsertWorkingPlan();
+      pendingCloudDeletedDates.delete(workingPlan.date);
+      pendingCloudPlanDates.add(workingPlan.date);
+      persistPendingPlanDates();
+      persistPendingDeletionDates();
+    }
     else data.plans = data.plans.filter(plan => plan.date !== workingPlan.date);
     data.updatedAt = workingPlan.updatedAt;
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
@@ -1127,6 +1150,17 @@
     $("#workItemCustomer").focus();
   }
   function closeWorkItemDialog() { $("#workItemDialog").close(); editingWorkItemId = null; editingWorkItemDate = null; }
+  function deleteWorkItem(date, itemId) {
+    const plan = workPlanForDate(date);
+    const item = (plan.workItems || []).find(entry => entry.id === itemId);
+    if (!item || !confirm(`Biztosan törlöd ezt a(z) ${WORK_ITEM_TYPES[item.type]?.label.toLocaleLowerCase("hu-HU") || "előjegyzést"}?`)) return false;
+    plan.workItems = plan.workItems.filter(entry => entry.id !== itemId);
+    plan.deletedWorkItemIds = [...new Set([...(plan.deletedWorkItemIds || []), itemId])];
+    persistWorkPlans([plan]);
+    renderWorkItems(); renderTasks(); renderWeek(); renderMonth();
+    toast("Az előjegyzés minden eszközről törlésre került.");
+    return true;
+  }
   function openWorkAssignment(item) {
     assigningWorkItemId = item.id;
     $("#assignWorkItemSummary").textContent = `${item.customerName}${item.address ? ` – ${item.address}` : ""}`;
@@ -1143,11 +1177,7 @@
   document.querySelectorAll("[data-close-work-item]").forEach(button => button.addEventListener("click", closeWorkItemDialog));
   document.querySelectorAll("[data-close-work-assign]").forEach(button => button.addEventListener("click", closeWorkAssignment));
   $("#deleteWorkItemButton").addEventListener("click", () => {
-    if (!editingWorkItemId || !editingWorkItemDate || !confirm("Biztosan törlöd ezt a bejegyzést?")) return;
-    const plan = workPlanForDate(editingWorkItemDate);
-    plan.workItems = (plan.workItems || []).filter(item => item.id !== editingWorkItemId);
-    persistWorkPlans([plan]);
-    closeWorkItemDialog(); renderWorkItems(); renderWeek(); renderMonth(); toast("A bejegyzés törölve.");
+    if (editingWorkItemId && editingWorkItemDate && deleteWorkItem(editingWorkItemDate, editingWorkItemId)) closeWorkItemDialog();
   });
   $("#workItemCustomer").addEventListener("input", event => {
     const exact = customerDirectory.find(customer => searchKey(customer.name) === searchKey(event.target.value));
@@ -1159,7 +1189,10 @@
     const sourceDate = editingWorkItemDate;
     const sourcePlan = sourceDate ? workPlanForDate(sourceDate) : null;
     const existing = sourcePlan?.workItems?.find(item => item.id === editingWorkItemId);
-    if (sourcePlan && editingWorkItemId) sourcePlan.workItems = sourcePlan.workItems.filter(item => item.id !== editingWorkItemId);
+    if (sourcePlan && editingWorkItemId) {
+      sourcePlan.workItems = sourcePlan.workItems.filter(item => item.id !== editingWorkItemId);
+      if (sourceDate !== targetDate) sourcePlan.deletedWorkItemIds = [...new Set([...(sourcePlan.deletedWorkItemIds || []), editingWorkItemId])];
+    }
     const targetPlan = targetDate === sourceDate && sourcePlan ? sourcePlan : workPlanForDate(targetDate);
     targetPlan.workItems ||= [];
     const customerName = $("#workItemCustomer").value.trim();
@@ -1181,9 +1214,7 @@
     if (event.target.closest(".work-edit")) { openWorkItemDialog(item); return; }
     if (event.target.closest(".work-assign")) { openWorkAssignment(item); return; }
     if (event.target.closest(".work-remove")) {
-      if (!confirm(`Törlöd ezt a(z) ${WORK_ITEM_TYPES[item.type]?.label.toLocaleLowerCase("hu-HU") || "bejegyzést"}?`)) return;
-      workingPlan.workItems = workingPlan.workItems.filter(entry => entry.id !== item.id);
-      persistWorkPlans([workingPlan]); renderWorkItems(); renderTasks(); renderWeek(); renderMonth(); toast("A bejegyzés törölve.");
+      deleteWorkItem(workingPlan.date, item.id);
     }
   });
   $("#assignWorkItemForm").addEventListener("submit", event => {
@@ -1199,6 +1230,7 @@
       } else workingPlan.tasks.push(task);
     } else workingPlan.tasks.push(task);
     workingPlan.workItems = workingPlan.workItems.filter(entry => entry.id !== item.id);
+    workingPlan.deletedWorkItemIds = [...new Set([...(workingPlan.deletedWorkItemIds || []), item.id])];
     activeTaskId = task.id; collapsedTaskIds.delete(task.id); markDirty("A munka kiosztva • mentés szükséges");
     renderWorkItems(); renderTasks(); renderWeek(); renderMonth(); closeWorkAssignment(); toast("A munka bekerült a napi feladatok közé.");
   });
@@ -1366,7 +1398,7 @@
       const workItems = plan?.workItems || [];
       const workHTML = workItems.map(item => {
         const type = WORK_ITEM_TYPES[item.type] || WORK_ITEM_TYPES.work;
-        return `<div class="week-work-item" style="--work-type-color:${type.color}"><button class="week-work-open" type="button" data-edit-work-date="${date}" data-edit-work-id="${escapeHTML(item.id)}"><strong>${escapeHTML(type.label)}: ${escapeHTML(item.customerName || "Nincs megadva")}</strong><small>${escapeHTML(item.address || "Nincs megadott cím")}${item.note ? ` · ${escapeHTML(item.note)}` : ""}</small></button>${item.type === "work" ? `<button class="week-work-assign" type="button" data-assign-work-date="${date}" data-assign-work-id="${escapeHTML(item.id)}">Kiosztás</button>` : ""}</div>`;
+        return `<div class="week-work-item" style="--work-type-color:${type.color}"><button class="week-work-open" type="button" data-edit-work-date="${date}" data-edit-work-id="${escapeHTML(item.id)}"><strong>${escapeHTML(type.label)}: ${escapeHTML(item.customerName || "Nincs megadva")}</strong><small>${escapeHTML(item.address || "Nincs megadott cím")}${item.note ? ` · ${escapeHTML(item.note)}` : ""}</small></button><div class="week-work-actions">${item.type === "work" ? `<button class="week-work-assign" type="button" data-assign-work-date="${date}" data-assign-work-id="${escapeHTML(item.id)}">Kiosztás</button>` : ""}<button class="week-work-delete" type="button" data-delete-work-date="${date}" data-delete-work-id="${escapeHTML(item.id)}">Törlés</button></div></div>`;
       }).join("");
       const taskHTML = tasks.length ? tasksByTeam(plan).map(group => {
         const lead = group.tasks[0];
@@ -1439,6 +1471,11 @@
   }
   $("#dayViewButton").addEventListener("click", () => switchView("day")); $("#weekViewButton").addEventListener("click", () => switchView("week")); $("#monthViewButton").addEventListener("click", () => switchView("month"));
   $("#weekGrid").addEventListener("click", event => {
+    const deleteWork = event.target.closest("[data-delete-work-id]");
+    if (deleteWork) {
+      deleteWorkItem(deleteWork.dataset.deleteWorkDate, deleteWork.dataset.deleteWorkId);
+      return;
+    }
     const editWork = event.target.closest("[data-edit-work-id]");
     if (editWork) {
       const plan = data.plans.find(item => item.date === editWork.dataset.editWorkDate);
@@ -1816,8 +1853,8 @@
   async function refreshSharedDataSilently({ includeCustomers = false } = {}) {
     if (document.hidden || !navigator.onLine || !window.NapiCustomerDirectory?.hasSession?.()) return;
     if (includeCustomers) await syncCustomerDirectory();
-    if (cloudConfigDirty || pendingCloudDeletedDates.size || pendingCloudPlanDates.size) await pushCurrentState();
     await pullSharedData();
+    if (cloudConfigDirty || pendingCloudDeletedDates.size || pendingCloudPlanDates.size) await pushCurrentState();
   }
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshSharedDataSilently({ includeCustomers: true }); });
   window.addEventListener("focus", () => refreshSharedDataSilently({ includeCustomers: true }));
