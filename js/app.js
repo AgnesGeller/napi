@@ -368,6 +368,10 @@
       else if (initial && !remote.config) await window.NapiCloudSync.pushConfig(sharedConfigPayload());
       const remoteDates = new Set(); let currentChanged = false; let currentDeleted = false;
       remote.plans.forEach(row => {
+        if (pendingCloudPlanDates.has(row.plan_date) && !pendingCloudDeletedDates.has(row.plan_date)) {
+          remoteDates.add(row.plan_date);
+          return;
+        }
         if (row.payload?.deleted) {
           remoteDates.add(row.plan_date);
           const index = data.plans.findIndex(item => item.date === row.plan_date);

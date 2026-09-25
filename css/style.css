@@ -61,6 +61,8 @@ button, summary { touch-action: manipulation; }
 .work-alert-button { min-height: 44px; padding: .55rem 1rem; color: #fff; border: 2px solid #861b16; background: #b92f27; font-weight: 900; box-shadow: 0 3px 0 #861b16; }
 .work-alert-button:hover, .work-alert-button:focus-visible { color: #fff; background: #9f241e; }
 .work-alert-button:active { transform: translateY(2px); box-shadow: 0 1px 0 #861b16; }
+#workItemDialog .btn-save { color: #fff; border: 2px solid #861b16; background: #b92f27; font-weight: 900; box-shadow: 0 3px 0 #861b16; }
+#workItemDialog .btn-save:hover, #workItemDialog .btn-save:focus-visible { color: #fff; background: #9f241e; }
 .work-inbox-help { margin: -.15rem .2rem .85rem; color: var(--muted); }
 .work-inbox-empty { padding: 1rem; color: #748078; border: 1px dashed #b8c3b9; background: rgba(255,255,255,.7); text-align: center; }
 .work-inbox-empty[hidden] { display: none; }

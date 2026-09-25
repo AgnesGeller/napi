@@ -1,6 +1,6 @@
-const CACHE_NAME = "diszkertek-napi-v69";
+const CACHE_NAME = "diszkertek-napi-v70";
 const APP_FILES = [
-  "./", "index.html", "css/style.css?v=20260925d", "js/customer-directory.js?v=20260923h", "js/napi-sync.js?v=20260924a", "js/app.js?v=20260925f", "manifest.webmanifest",
+  "./", "index.html", "css/style.css?v=20260925g", "js/customer-directory.js?v=20260923h", "js/napi-sync.js?v=20260924a", "js/app.js?v=20260925g", "manifest.webmanifest",
   "assets/favicon.svg", "assets/app-icon-180.png", "assets/app-icon-192.png", "assets/app-icon-512.png", "assets/app-icon-maskable-512.png", "assets/diszkertek-logo.png", "assets/botanical.svg",
   "assets/vendor/bootstrap.min.css", "assets/vendor/bootstrap.bundle.min.js"
 ];
