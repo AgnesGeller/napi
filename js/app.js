@@ -1813,10 +1813,11 @@
   window.addEventListener("beforeunload", event => { if (!dirty || allowPageReload) return; event.preventDefault(); event.returnValue = ""; });
   window.addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; localStorage.removeItem(INSTALLED_KEY); updateInstallButtons(); });
   window.addEventListener("appinstalled", () => { installPrompt = null; localStorage.setItem(INSTALLED_KEY, "true"); updateInstallButtons(); toast("A Napi feladatok app telepítése sikerült."); });
-  function refreshSharedDataSilently({ includeCustomers = false } = {}) {
+  async function refreshSharedDataSilently({ includeCustomers = false } = {}) {
     if (document.hidden || !navigator.onLine || !window.NapiCustomerDirectory?.hasSession?.()) return;
-    if (includeCustomers) syncCustomerDirectory();
-    pullSharedData();
+    if (includeCustomers) await syncCustomerDirectory();
+    if (cloudConfigDirty || pendingCloudDeletedDates.size || pendingCloudPlanDates.size) await pushCurrentState();
+    await pullSharedData();
   }
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshSharedDataSilently({ includeCustomers: true }); });
   window.addEventListener("focus", () => refreshSharedDataSilently({ includeCustomers: true }));

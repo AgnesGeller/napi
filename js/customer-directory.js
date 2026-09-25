@@ -10,6 +10,7 @@
   const NAPI_ACCOUNT_EMAIL = "tamas@napi.diszkertek.hu";
   const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
   const isClockSkewError = result => /jwt issued at future/i.test(String(result?.msg || result?.message || ""));
+  let sessionRefreshPromise = null;
 
   function readJSON(key) {
     try {
@@ -51,17 +52,23 @@
     }
   }
 
+  async function refreshStoredSession(session) {
+    if (!sessionRefreshPromise) {
+      sessionRefreshPromise = authRequest("token?grant_type=refresh_token", { refresh_token: session.refresh_token })
+        .then(refreshed => { rememberSession(refreshed); return refreshed; })
+        .finally(() => { sessionRefreshPromise = null; });
+    }
+    return sessionRefreshPromise;
+  }
+
   async function activeSession() {
     let session = storedSession();
     if (!session) throw new Error("Az ügyféllista csatlakoztatása szükséges.");
     const expiresAt = Number(session.expires_at || 0);
     if (!expiresAt || expiresAt > Math.floor(Date.now() / 1000) + 60) return session;
     try {
-      session = await authRequest("token?grant_type=refresh_token", { refresh_token: session.refresh_token });
-      rememberSession(session);
-      return session;
+      return await refreshStoredSession(session);
     } catch (error) {
-      localStorage.removeItem(SESSION_KEY);
       throw error;
     }
   }
