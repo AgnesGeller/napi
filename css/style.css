@@ -55,7 +55,27 @@ button, summary { touch-action: manipulation; }
 .sync-connection-notice[hidden] { display: none; }
 .btn-soft { min-height: 40px; color: var(--forest); border: 1px solid #c3d0c4; background: var(--leaf-light); }
 .btn-soft:hover { background: #d3e4d5; }
-.tasks-section { margin-top: 1.3rem; }
+.work-inbox-section, .tasks-section { margin-top: 1.3rem; }
+.work-inbox-section { padding: 1rem; border: 1px solid #b7c5b8; border-top: 5px solid var(--orange); background: #fffaf0; box-shadow: var(--shadow); }
+.work-inbox-help { margin: -.15rem .2rem .85rem; color: var(--muted); }
+.work-inbox-empty { padding: 1rem; color: #748078; border: 1px dashed #b8c3b9; background: rgba(255,255,255,.7); text-align: center; }
+.work-inbox-empty[hidden] { display: none; }
+.work-inbox-list { display: grid; gap: .55rem; }
+.work-inbox-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .7rem; align-items: center; padding: .7rem; border: 1px solid #c9d3c9; border-left: 6px solid var(--work-type-color, var(--leaf)); background: #fff; }
+.work-inbox-type { min-width: 88px; padding: .28rem .45rem; color: #fff; border-radius: 4px; background: var(--work-type-color, var(--leaf)); font-size: .75rem; font-weight: 850; text-align: center; text-transform: uppercase; }
+.work-inbox-copy { min-width: 0; }
+.work-inbox-copy strong, .work-inbox-copy span, .work-inbox-copy small { display: block; }
+.work-inbox-copy strong { color: var(--forest); }
+.work-inbox-copy span { margin-top: .1rem; color: #394a3e; }
+.work-inbox-copy small { margin-top: .25rem; color: var(--muted); white-space: pre-wrap; }
+.work-inbox-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; }
+.work-inbox-actions .btn { min-height: 38px; padding: .3rem .6rem; font-size: .82rem; }
+.work-inbox-actions .work-remove { color: #8d2722; border-color: #d5aaa7; background: #fff5f4; }
+.week-work-item { padding: .4rem; border-left: 3px solid var(--work-type-color, var(--orange)); background: #fff7e9; font-size: .75rem; }
+.week-work-item strong, .week-work-item small { display: block; }
+.week-work-item strong { color: var(--forest); }
+.week-work-item small { margin-top: .12rem; color: var(--muted); }
+.month-work-count { color: #864016 !important; }
 .week-section { margin-top: 1.3rem; border: 1px solid #aebcaf; border-top: 5px solid var(--forest); background: #f8faf7; box-shadow: var(--shadow); }
 .weekly-overview-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.15rem; color: var(--forest); background: #eef3ec; cursor: pointer; list-style: none; }
 .weekly-overview-summary::-webkit-details-marker { display: none; }
@@ -328,6 +348,10 @@ button, summary { touch-action: manipulation; }
   .week-grid { grid-template-columns: 1fr; }
   .week-day { min-height: 0; }
   .btn-add { width: 100%; }
+  .work-inbox-item { grid-template-columns: 1fr; }
+  .work-inbox-type { width: max-content; }
+  .work-inbox-actions { justify-content: stretch; }
+  .work-inbox-actions .btn { flex: 1 1 120px; }
   .task-primary-actions { grid-template-columns: 1fr; }
   .task-card { border-left-width: 3px; }
   .task-card-header { grid-template-columns: 1fr; }

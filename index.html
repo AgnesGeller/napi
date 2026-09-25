@@ -30,7 +30,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260924a">
+  <link rel="stylesheet" href="css/style.css?v=20260925b">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -81,6 +81,19 @@
         <strong>A közös szinkron nincs csatlakoztatva ezen az eszközön.</strong>
         <button class="btn btn-outline-green" id="connectSyncButton" type="button">Csatlakoztatás</button>
       </div>
+    </section>
+
+    <section class="work-inbox-section" id="workInboxSection" aria-labelledby="workInboxHeading">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">Előjegyzések a kiválasztott napra</p>
+          <h2 id="workInboxHeading">Munkák</h2>
+        </div>
+        <button class="btn btn-add" id="addWorkItemButton" type="button">＋ Új bejegyzés</button>
+      </div>
+      <p class="work-inbox-help">Ide írd fel gyorsan a munkát, felmérést vagy megbeszélést. Autót és dolgozót később is választhatsz.</p>
+      <div class="work-inbox-empty" id="workInboxEmpty">Erre a napra még nincs előjegyzés.</div>
+      <div class="work-inbox-list" id="workInboxList"></div>
     </section>
 
     <section class="tasks-section" id="dayView" aria-labelledby="tasksHeading">
@@ -164,6 +177,32 @@
         <label class="wide">Helyszín / cím<input class="form-control" name="address" required maxlength="240" autocomplete="street-address"></label>
       </div>
       <footer class="dialog-footer"><button class="btn btn-save" value="default">Ügyfél mentése</button><button class="btn btn-secondary" value="cancel">Mégse</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="workItemDialog" class="app-dialog compact-dialog">
+    <form id="workItemForm" class="dialog-frame">
+      <header class="dialog-header"><div><p class="section-kicker">Gyors előjegyzés</p><h2 id="workItemDialogTitle">Új bejegyzés</h2></div><button class="icon-button" type="button" data-close-work-item aria-label="Bezárás">×</button></header>
+      <div class="dialog-body form-grid">
+        <label>Dátum<input class="form-control" id="workItemDate" name="date" type="date" required></label>
+        <label>Típus<select class="form-select" id="workItemType" name="type" required><option value="work">Munka</option><option value="survey">Felmérés</option><option value="meeting">Megbeszélés</option></select></label>
+        <label class="wide">Ügyfél<input class="form-control" id="workItemCustomer" name="customerName" type="search" list="workItemCustomerOptions" maxlength="120" autocomplete="off" required placeholder="Kezdj el írni egy ügyfélnevet…"></label>
+        <datalist id="workItemCustomerOptions"></datalist>
+        <label class="wide">Cím<input class="form-control" id="workItemAddress" name="address" type="text" maxlength="240" required placeholder="A helyszín címe"></label>
+        <label class="wide">Megjegyzés<textarea class="form-control" id="workItemNote" name="note" rows="4" maxlength="1000" placeholder="Mit kell elvégezni vagy miről lesz szó?"></textarea></label>
+      </div>
+      <footer class="dialog-footer"><button class="btn btn-save" type="submit">Mentés</button><button class="btn btn-secondary" type="button" data-close-work-item>Mégse</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="assignWorkItemDialog" class="app-dialog compact-dialog">
+    <form id="assignWorkItemForm" class="dialog-frame">
+      <header class="dialog-header"><div><p class="section-kicker">Napi feladat készítése</p><h2>Munka kiosztása</h2></div><button class="icon-button" type="button" data-close-work-assign aria-label="Bezárás">×</button></header>
+      <div class="dialog-body">
+        <p id="assignWorkItemSummary" class="directory-intro"></p>
+        <label>Autó / csapat<select class="form-select" id="assignWorkItemTeam"><option value="new">Új autó / külön csapat</option></select></label>
+      </div>
+      <footer class="dialog-footer"><button class="btn btn-save" type="submit">Kiosztás</button><button class="btn btn-secondary" type="button" data-close-work-assign>Mégse</button></footer>
     </form>
   </dialog>
 
@@ -310,6 +349,6 @@
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260923h"></script>
   <script src="js/napi-sync.js?v=20260924a"></script>
-  <script src="js/app.js?v=20260925a"></script>
+  <script src="js/app.js?v=20260925b"></script>
 </body>
 </html>
