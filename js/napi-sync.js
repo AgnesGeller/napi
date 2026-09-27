@@ -65,12 +65,13 @@
     const uniqueDates = [...new Set(dates)].filter(Boolean);
     if (!uniqueDates.length) return;
     const filter = uniqueDates.map(date => encodeURIComponent(date)).join(",");
-    const currentRows = await request(`napi_daily_plans?select=plan_date,updated_at&plan_date=in.(${filter})`);
-    const currentByDate = new Map((currentRows || []).map(row => [row.plan_date, row.updated_at]));
+    const currentRows = await request(`napi_daily_plans?select=plan_date,updated_at,payload&plan_date=in.(${filter})`);
+    const currentByDate = new Map((currentRows || []).map(row => [row.plan_date, row]));
     await Promise.all(uniqueDates.map(date => {
-      const currentTimestamp = Date.parse(currentByDate.get(date) || "") || 0;
+      const current = currentByDate.get(date);
+      const currentTimestamp = Date.parse(current?.updated_at || "") || 0;
       const deletedAt = new Date(Math.max(Date.now(), currentTimestamp + 1)).toISOString();
-      return pushPlan({ date, deleted: true, updatedAt: deletedAt });
+      return pushPlan({ date, deleted: true, deletedPlanId: current?.payload?.id || current?.payload?.deletedPlanId || null, updatedAt: deletedAt });
     }));
     const rows = await request(`napi_daily_plans?select=plan_date,payload&plan_date=in.(${filter})`);
     const confirmed = new Set((rows || []).filter(row => row.payload?.deleted).map(row => row.plan_date));

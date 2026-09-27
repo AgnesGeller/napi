@@ -447,7 +447,11 @@
         for (const date of [...pendingCloudPlanDates]) {
           if (pendingCloudDeletedDates.has(date)) { pendingCloudPlanDates.delete(date); continue; }
           const plan = data.plans.find(item => item.date === date);
-          if (plan && await window.NapiCloudSync.pushPlan(plan) === false) rejectedAsStale = true;
+          if (!plan) { pendingCloudPlanDates.delete(date); continue; }
+          if (await window.NapiCloudSync.pushPlan(plan) === false) {
+            rejectedAsStale = true;
+            continue;
+          }
           pendingCloudPlanDates.delete(date);
         }
         persistPendingPlanDates();
@@ -456,7 +460,17 @@
       const queuedWrite = cloudWritePromise.catch(() => {}).then(write);
       cloudWritePromise = queuedWrite;
       await queuedWrite;
-      if (rejectedAsStale) { await pullSharedData(); return false; }
+      if (rejectedAsStale) {
+        await pullSharedData();
+        for (const date of [...pendingCloudPlanDates]) {
+          const plan = data.plans.find(item => item.date === date);
+          if (!plan || pendingCloudDeletedDates.has(date)) continue;
+          plan.updatedAt = new Date(Math.max(Date.now(), timestampValue(plan.updatedAt) + 1)).toISOString();
+        }
+        localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+        persistPendingPlanDates();
+        return false;
+      }
       return true;
     } catch (error) {
       console.warn("A háttérszinkron most nem érhető el.", error);
