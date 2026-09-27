@@ -55,19 +55,23 @@
 
   async function pushPlan(plan) {
     const { ownerId } = await sessionDetails();
-    return request("napi_daily_plans?on_conflict=owner_id,plan_date", {
+    return request("rpc/napi_upsert_daily_plan", {
       method: "POST",
-      body: { owner_id: ownerId, plan_date: plan.date, payload: plan, updated_at: plan.updatedAt || new Date().toISOString() },
-      prefer: "resolution=merge-duplicates,return=minimal"
+      body: { p_owner_id: ownerId, p_plan_date: plan.date, p_payload: plan, p_updated_at: plan.updatedAt || new Date().toISOString() }
     });
   }
 
   async function deletePlans(dates) {
     const uniqueDates = [...new Set(dates)].filter(Boolean);
     if (!uniqueDates.length) return;
-    const deletedAt = new Date().toISOString();
-    await Promise.all(uniqueDates.map(date => pushPlan({ date, deleted: true, updatedAt: deletedAt })));
     const filter = uniqueDates.map(date => encodeURIComponent(date)).join(",");
+    const currentRows = await request(`napi_daily_plans?select=plan_date,updated_at&plan_date=in.(${filter})`);
+    const currentByDate = new Map((currentRows || []).map(row => [row.plan_date, row.updated_at]));
+    await Promise.all(uniqueDates.map(date => {
+      const currentTimestamp = Date.parse(currentByDate.get(date) || "") || 0;
+      const deletedAt = new Date(Math.max(Date.now(), currentTimestamp + 1)).toISOString();
+      return pushPlan({ date, deleted: true, updatedAt: deletedAt });
+    }));
     const rows = await request(`napi_daily_plans?select=plan_date,payload&plan_date=in.(${filter})`);
     const confirmed = new Set((rows || []).filter(row => row.payload?.deleted).map(row => row.plan_date));
     if (uniqueDates.some(date => !confirmed.has(date))) throw new Error("A teljes nap törlésének közös megerősítése nem sikerült.");

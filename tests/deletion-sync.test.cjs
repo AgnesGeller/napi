@@ -14,5 +14,6 @@ assert.match(source, /async function deleteWorkItem\(date, itemId\)/, "Az egysé
 assert.match(source, /const synced = await pushCurrentState\(\)/, "Az előjegyzés törlésének meg kell várnia a közös mentést.");
 assert.match(source, /async function deleteDay\(date\)/, "A teljes nap törlésének meg kell várnia a közös mentést.");
 assert.match(source, /const synced = await syncPromise/, "A teljes nap törlésének ellenőriznie kell a közös törlés eredményét.");
+assert.match(source, /rejectedAsStale/, "A régi eszköz visszautasított mentését kezelni kell.");
 
 console.log("Naptári törlés szinkronteszt: OK");

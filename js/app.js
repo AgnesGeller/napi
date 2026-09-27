@@ -432,6 +432,7 @@
   }
   async function pushCurrentState({ throwOnError = false } = {}) {
     if (!navigator.onLine || !window.NapiCloudSync || !window.NapiCustomerDirectory?.hasSession?.()) return false;
+    let rejectedAsStale = false;
     try {
       const write = async () => {
         const hasPlanContent = planHasContent(workingPlan);
@@ -446,7 +447,7 @@
         for (const date of [...pendingCloudPlanDates]) {
           if (pendingCloudDeletedDates.has(date)) { pendingCloudPlanDates.delete(date); continue; }
           const plan = data.plans.find(item => item.date === date);
-          if (plan) await window.NapiCloudSync.pushPlan(plan);
+          if (plan && await window.NapiCloudSync.pushPlan(plan) === false) rejectedAsStale = true;
           pendingCloudPlanDates.delete(date);
         }
         persistPendingPlanDates();
@@ -455,6 +456,7 @@
       const queuedWrite = cloudWritePromise.catch(() => {}).then(write);
       cloudWritePromise = queuedWrite;
       await queuedWrite;
+      if (rejectedAsStale) { await pullSharedData(); return false; }
       return true;
     } catch (error) {
       console.warn("A háttérszinkron most nem érhető el.", error);
@@ -488,7 +490,7 @@
 
   function markDirty(message = "Mentetlen módosítás") {
     dirty = true;
-    workingPlan.updatedAt = new Date().toISOString();
+    workingPlan.updatedAt = new Date(Math.max(Date.now(), timestampValue(workingPlan.updatedAt) + 1)).toISOString();
     const hasPlanContent = planHasContent(workingPlan);
     if (hasPlanContent) {
       upsertWorkingPlan();
@@ -593,6 +595,8 @@
   async function saveCurrentPlan() {
     saveDataLocally();
     markSaved();
+    await waitForCurrentCloudSync();
+    await pullSharedData();
     const cloudSaved = await pushCurrentState();
     collapsedTaskIds = new Set(workingPlan.tasks.map(task => task.id)); activeTaskId = null; renderTasks(); renderWeek(); renderMonth();
     toast(cloudSaved ? "A napi terv elmentve és minden eszközzel szinkronizálva." : "A napi terv elmentve ezen az eszközön. A közös szinkron internetkapcsolatkor automatikusan folytatódik.");
@@ -713,7 +717,7 @@
   }
 
   function upsertWorkingPlan() {
-    workingPlan.updatedAt = new Date().toISOString();
+    workingPlan.updatedAt = new Date(Math.max(Date.now(), timestampValue(workingPlan.updatedAt) + 1)).toISOString();
     const index = data.plans.findIndex(plan => plan.date === workingPlan.date);
     const clean = deepCopy(workingPlan);
     if (index >= 0) data.plans[index] = clean; else data.plans.push(clean);
@@ -1105,10 +1109,9 @@
     return stored ? deepCopy(stored) : blankPlan(date);
   }
   function persistWorkPlans(plans) {
-    const changedAt = new Date().toISOString();
     const byDate = new Map(plans.filter(Boolean).map(plan => [plan.date, plan]));
     byDate.forEach(plan => {
-      plan.updatedAt = changedAt;
+      plan.updatedAt = new Date(Math.max(Date.now(), timestampValue(plan.updatedAt) + 1)).toISOString();
       const index = data.plans.findIndex(item => item.date === plan.date);
       if (planHasContent(plan)) {
         const clean = deepCopy(plan);
@@ -1121,6 +1124,7 @@
         pendingCloudDeletedDates.add(plan.date);
       }
     });
+    const changedAt = [...byDate.values()].map(plan => plan.updatedAt).sort().at(-1) || new Date().toISOString();
     data.updatedAt = changedAt;
     data.plans.sort((a, b) => b.date.localeCompare(a.date));
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
