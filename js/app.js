@@ -1381,19 +1381,20 @@
   $("#addTaskButton").addEventListener("click", addTask);
   $("#addTaskBottomButton").addEventListener("click", addTask);
   $("#connectSyncButton").addEventListener("click", openCustomerAuth);
-  $("#sessionButton").addEventListener("click", async event => {
-    const button = event.currentTarget;
-    if (!window.NapiCustomerDirectory?.hasSession?.()) { openCustomerAuth(); return; }
-    button.disabled = true; button.textContent = "Kilépés…";
-    try {
-      await window.NapiCustomerDirectory.signOut();
-      customerDirectory = [];
-      customerDirectoryLastSync = null;
-      customerDirectoryState = "disconnected";
-      updateCustomerDirectoryButtons();
-      toast("Kiléptél ezen az eszközön. Az új PIN-nel újra beléphetsz.");
-    } finally { button.disabled = false; }
-  });
+  const sessionButton = $("#sessionButton");
+  if (sessionButton) sessionButton.addEventListener("click", async event => {
+      const button = event.currentTarget;
+      if (!window.NapiCustomerDirectory?.hasSession?.()) { openCustomerAuth(); return; }
+      button.disabled = true; button.textContent = "Kilépés…";
+      try {
+        await window.NapiCustomerDirectory.signOut();
+        customerDirectory = [];
+        customerDirectoryLastSync = null;
+        customerDirectoryState = "disconnected";
+        updateCustomerDirectoryButtons();
+        toast("Kiléptél ezen az eszközön. Az új PIN-nel újra beléphetsz.");
+      } finally { button.disabled = false; }
+    });
   $("#customerAuthForm").addEventListener("submit", async event => {
     event.preventDefault();
     const form = event.currentTarget; const button = form.querySelector("button[value='default']");

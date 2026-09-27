@@ -8,6 +8,7 @@ assert.match(source, /cache: "no-store"/, "Az ügyféllista lekérése nem haszn
 assert.match(source, /logout\?scope=local/, "A kilépés csak az aktuális eszköz munkamenetét zárhatja le.");
 assert.match(appSource, /setInterval\(\(\) => \{[^\n]+syncCustomerDirectory\(\); \}, 15000\)/, "Az ügyféllista automatikus frissítése hiányzik.");
 assert.match(appSource, /#sessionButton/, "A látható Belépés\/Kilépés gomb kezelése hiányzik.");
+assert.match(appSource, /if \(sessionButton\) sessionButton\.addEventListener/, "A régi HTML és az új JavaScript keveredése nem állíthatja le az appot.");
 const expiredSession = {
   access_token: "old-access",
   refresh_token: "old-refresh",
