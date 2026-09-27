@@ -3,6 +3,9 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 
 const source = fs.readFileSync("js/customer-directory.js", "utf8");
+const appSource = fs.readFileSync("js/app.js", "utf8");
+assert.match(source, /cache: "no-store"/, "Az ügyféllista lekérése nem használhat régi böngésző-gyorsítótárat.");
+assert.match(appSource, /setInterval\(\(\) => \{[^\n]+syncCustomerDirectory\(\); \}, 15000\)/, "Az ügyféllista automatikus frissítése hiányzik.");
 const expiredSession = {
   access_token: "old-access",
   refresh_token: "old-refresh",

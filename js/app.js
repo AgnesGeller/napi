@@ -198,6 +198,7 @@
   let customerDirectoryState = customerDirectory.length ? "cache" : "disconnected";
   let customerDirectoryLastSync = cachedCustomerDirectory.savedAt;
   let customerDirectorySyncing = false;
+  let customerDirectoryLastAttempt = 0;
   let cloudSyncTimer = null;
   let printRenderTimer = null;
   let cloudSyncing = false;
@@ -1051,6 +1052,8 @@
       if (notify) openCustomerAuth();
       return false;
     }
+    if (!notify && customerDirectoryState === "ready" && Date.now() - customerDirectoryLastAttempt < 8000) return true;
+    customerDirectoryLastAttempt = Date.now();
     customerDirectorySyncing = true;
     customerDirectoryState = "loading";
     updateCustomerDirectoryButtons();
@@ -1150,7 +1153,7 @@
     $("#workItemCustomer").focus();
   }
   function closeWorkItemDialog() { $("#workItemDialog").close(); editingWorkItemId = null; editingWorkItemDate = null; }
-  function deleteWorkItem(date, itemId) {
+  async function deleteWorkItem(date, itemId) {
     const plan = workPlanForDate(date);
     const item = (plan.workItems || []).find(entry => entry.id === itemId);
     if (!item || !confirm(`Biztosan törlöd ezt a(z) ${WORK_ITEM_TYPES[item.type]?.label.toLocaleLowerCase("hu-HU") || "előjegyzést"}?`)) return false;
@@ -1158,7 +1161,8 @@
     plan.deletedWorkItemIds = [...new Set([...(plan.deletedWorkItemIds || []), itemId])];
     persistWorkPlans([plan]);
     renderWorkItems(); renderTasks(); renderWeek(); renderMonth();
-    toast("Az előjegyzés minden eszközről törlésre került.");
+    const synced = await pushCurrentState();
+    toast(synced ? "Az előjegyzés minden eszközről törölve." : "Az előjegyzés helyben törölve. A közös törlés internetkapcsolatkor automatikusan befejeződik.", !synced);
     return true;
   }
   function openWorkAssignment(item) {
@@ -1176,8 +1180,8 @@
   $("#addWorkItemButton").addEventListener("click", () => openWorkItemDialog());
   document.querySelectorAll("[data-close-work-item]").forEach(button => button.addEventListener("click", closeWorkItemDialog));
   document.querySelectorAll("[data-close-work-assign]").forEach(button => button.addEventListener("click", closeWorkAssignment));
-  $("#deleteWorkItemButton").addEventListener("click", () => {
-    if (editingWorkItemId && editingWorkItemDate && deleteWorkItem(editingWorkItemDate, editingWorkItemId)) closeWorkItemDialog();
+  $("#deleteWorkItemButton").addEventListener("click", async () => {
+    if (editingWorkItemId && editingWorkItemDate && await deleteWorkItem(editingWorkItemDate, editingWorkItemId)) closeWorkItemDialog();
   });
   $("#workItemCustomer").addEventListener("input", event => {
     const exact = customerDirectory.find(customer => searchKey(customer.name) === searchKey(event.target.value));
@@ -1340,7 +1344,13 @@
     if (!event.target.matches(".new-job-input") || event.key !== "Enter") return;
     event.preventDefault(); const task = findTaskFromElement(event.target); if (task) addCustomJob(task, event.target.value);
   });
-  $("#taskList").addEventListener("focusin", event => { const card = event.target.closest(".task-card"); if (card) setActiveTask(card, findTaskFromElement(card)); if (event.target.matches(".customer-input") && searchKey(event.target.value).length >= 2) showCustomerSuggestions(card, event.target.value); });
+  $("#taskList").addEventListener("focusin", event => {
+    const card = event.target.closest(".task-card");
+    if (card) setActiveTask(card, findTaskFromElement(card));
+    if (!event.target.matches(".customer-input")) return;
+    if (searchKey(event.target.value).length >= 2) showCustomerSuggestions(card, event.target.value);
+    syncCustomerDirectory().then(synced => { if (synced && card?.isConnected) showCustomerSuggestions(card, event.target.value); });
+  });
   $("#taskList").addEventListener("wheel", event => { if (event.target.closest(".start-time-input")) event.preventDefault(); }, { passive: false });
   document.addEventListener("click", event => { if (!event.target.closest(".customer-picker")) document.querySelectorAll(".customer-suggestions").forEach(box => box.hidden = true); });
 
@@ -1868,7 +1878,7 @@
     } catch (_) { /* A kovetkezo hatterszinkron ujra probalkozik. */ }
   });
   window.addEventListener("online", () => { if (window.NapiCustomerDirectory?.hasSession?.()) { syncCustomerDirectory(); pullSharedData({ initial: true }).then(() => pushCurrentState()); } });
-  setInterval(() => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory(); }, 120000);
+  setInterval(() => { if (!document.hidden && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory(); }, 15000);
   setInterval(refreshSharedDataSilently, 2000);
 
   async function initialize() {

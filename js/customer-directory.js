@@ -78,11 +78,13 @@
       let response;
       try {
         response = await fetch(`${CONFIG.url}/rest/v1/${resource}?${query}`, {
+          cache: "no-store",
           headers: {
             "apikey": CONFIG.publishableKey,
             "Authorization": `Bearer ${accessToken}`,
             "Accept-Profile": "munkalap",
             "Accept": "application/json",
+            "Cache-Control": "no-cache",
             "Range": `${from}-${from + pageSize - 1}`
           }
         });

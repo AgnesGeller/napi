@@ -10,6 +10,7 @@ assert.ok(pullSource.indexOf("row.payload?.deleted") < pullSource.indexOf("pendi
 assert.match(source, /await pullSharedData\(\);\s*await pushCurrentState\(\);/, "Szinkron előtt le kell kérni a másik eszköz törléseit.");
 assert.match(source, /deletedWorkItemIds/, "Az előjegyzések törlési jelölése hiányzik.");
 assert.match(source, /data-delete-work-id/, "A naptári előjegyzés közvetlen törlése hiányzik.");
-assert.match(source, /function deleteWorkItem\(date, itemId\)/, "Az egységes előjegyzés-törlés hiányzik.");
+assert.match(source, /async function deleteWorkItem\(date, itemId\)/, "Az egységes előjegyzés-törlés hiányzik.");
+assert.match(source, /const synced = await pushCurrentState\(\)/, "Az előjegyzés törlésének meg kell várnia a közös mentést.");
 
 console.log("Naptári törlés szinkronteszt: OK");
