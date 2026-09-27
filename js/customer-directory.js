@@ -161,7 +161,7 @@
     localStorage.removeItem(CACHE_KEY);
     if (!session?.access_token) return;
     try {
-      await fetch(`${CONFIG.url}/auth/v1/logout`, {
+      await fetch(`${CONFIG.url}/auth/v1/logout?scope=local`, {
         method: "POST",
         headers: { "apikey": CONFIG.publishableKey, "Authorization": `Bearer ${session.access_token}` }
       });

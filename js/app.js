@@ -1027,6 +1027,11 @@
   }
   function updateCustomerDirectoryButtons() {
     const connected = Boolean(window.NapiCustomerDirectory?.hasSession?.());
+    const sessionButton = $("#sessionButton");
+    if (sessionButton) {
+      sessionButton.textContent = connected ? "↪ Kilépés" : "🔑 Belépés";
+      sessionButton.title = connected ? "Kilépés a közös szinkronból ezen az eszközön" : "Belépés a közös szinkronba";
+    }
     document.querySelectorAll(".add-customer").forEach(button => {
       button.hidden = connected;
       button.textContent = "🔒 Közös adatok csatlakoztatása";
@@ -1376,6 +1381,19 @@
   $("#addTaskButton").addEventListener("click", addTask);
   $("#addTaskBottomButton").addEventListener("click", addTask);
   $("#connectSyncButton").addEventListener("click", openCustomerAuth);
+  $("#sessionButton").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    if (!window.NapiCustomerDirectory?.hasSession?.()) { openCustomerAuth(); return; }
+    button.disabled = true; button.textContent = "Kilépés…";
+    try {
+      await window.NapiCustomerDirectory.signOut();
+      customerDirectory = [];
+      customerDirectoryLastSync = null;
+      customerDirectoryState = "disconnected";
+      updateCustomerDirectoryButtons();
+      toast("Kiléptél ezen az eszközön. Az új PIN-nel újra beléphetsz.");
+    } finally { button.disabled = false; }
+  });
   $("#customerAuthForm").addEventListener("submit", async event => {
     event.preventDefault();
     const form = event.currentTarget; const button = form.querySelector("button[value='default']");
