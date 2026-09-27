@@ -1422,7 +1422,7 @@
       return `<article class="week-day${date === isoToday() ? " today" : ""}${holiday ? " holiday" : ""}${workItems.length ? " has-work-items" : ""}"><header><div><p class="week-day-name">${escapeHTML(formatDate(date, { weekday: "long" }))}</p><p class="week-day-date">${escapeHTML(formatDate(date, { month: "short", day: "numeric" }))}</p></div>${holiday ? `<span class="holiday-label">${escapeHTML(holiday)}</span>` : ""}</header><div class="week-day-tasks">${dayContent}</div><div class="week-day-actions"><button class="week-open" type="button" data-open-date="${date}">${plan ? "Nap megnyitása" : "Terv készítése"}</button>${plan ? `<button class="week-delete" type="button" data-delete-date="${date}">Teljes nap törlése</button>` : ""}</div></article>`;
     }).join("");
   }
-  function deleteDay(date) {
+  async function deleteDay(date) {
     if (!confirm(`Biztosan törlöd a(z) ${formatDate(date)} teljes napi tervét? Előtte mentsd le PDF-ként, ha meg szeretnéd őrizni.`)) return false;
     data.plans = data.plans.filter(plan => plan.date !== date);
     data.updatedAt = new Date().toISOString();
@@ -1439,10 +1439,12 @@
     const syncPromise = syncDeletedDates([date]);
     if (workingPlan.date === date) { localStorage.removeItem(RECOVERY_KEY); dirty = false; loadPlan(date, { preserveCalendarPosition: true }); }
     renderWeek(); renderMonth(); toast("A teljes napi terv törölve • szinkronizálás folyamatban.");
-    syncPromise.then(synced => {
-      if (synced) toast("A teljes napi terv minden eszközről törölve.");
-      else toast("A törlés ezen az eszközön megtörtént. A közös törlés internetkapcsolatkor automatikusan befejeződik.", true);
-    });
+    const synced = await syncPromise;
+    if (synced) toast("A teljes napi terv minden eszközről törölve.");
+    else {
+      toast("A nap helyben törölve, de a közös törlés még nem sikerült. Ellenőrizd az internetet és a közös adatok csatlakoztatását.", true);
+      queueCloudSync(2000);
+    }
     return true;
   }
   function renderMonth() {
@@ -1480,7 +1482,7 @@
     else $("#dayView").scrollIntoView({ behavior: "smooth", block: "start" });
   }
   $("#dayViewButton").addEventListener("click", () => switchView("day")); $("#weekViewButton").addEventListener("click", () => switchView("week")); $("#monthViewButton").addEventListener("click", () => switchView("month"));
-  $("#weekGrid").addEventListener("click", event => {
+  $("#weekGrid").addEventListener("click", async event => {
     const deleteWork = event.target.closest("[data-delete-work-id]");
     if (deleteWork) {
       deleteWorkItem(deleteWork.dataset.deleteWorkDate, deleteWork.dataset.deleteWorkId);
@@ -1503,7 +1505,7 @@
     const deleteButton = event.target.closest("[data-delete-date]");
     if (deleteButton) {
       const date = deleteButton.dataset.deleteDate;
-      deleteDay(date); return;
+      await deleteDay(date); return;
     }
     const button = event.target.closest("[data-open-date]"); if (!button) return; loadPlan(button.dataset.openDate); switchView("day");
   });
@@ -1515,9 +1517,9 @@
   $("#previousMonthButton").addEventListener("click", () => { setMonthAnchor(monthOffset(monthAnchor, -1)); renderMonth(); });
   $("#nextMonthButton").addEventListener("click", () => { setMonthAnchor(monthOffset(monthAnchor, 1)); renderMonth(); });
   $("#currentMonthButton").addEventListener("click", () => { setMonthAnchor(isoToday().slice(0, 7)); renderMonth(); });
-  $("#monthGrid").addEventListener("click", event => {
+  $("#monthGrid").addEventListener("click", async event => {
     const deleteButton = event.target.closest("[data-month-delete]");
-    if (deleteButton) { deleteDay(deleteButton.dataset.monthDelete); return; }
+    if (deleteButton) { await deleteDay(deleteButton.dataset.monthDelete); return; }
     const day = event.target.closest("[data-month-date]"); if (!day) return; loadPlan(day.dataset.monthDate); switchView("day");
   });
 
@@ -1852,7 +1854,7 @@
   $("#installAppButton").addEventListener("click", installApplication);
   $("#quickInstallButton").addEventListener("click", installApplication);
   $("#saveButton").addEventListener("click", async () => { try { await saveCurrentPlan(); } catch (error) { $("#saveState").textContent = "Mentési hiba"; toast(`A mentés nem sikerült: ${readableError(error)}`, true); } });
-  $("#deleteDayButton").addEventListener("click", () => deleteDay(workingPlan.date));
+  $("#deleteDayButton").addEventListener("click", async () => { await deleteDay(workingPlan.date); });
   $("#downloadDataButton").addEventListener("click", downloadData); $("#openDataInput").addEventListener("change", event => importDataFile(event.target.files[0]));
   document.addEventListener("pointerdown", event => { const button = event.target.closest("[data-tooltip]"); if (button && event.pointerType !== "mouse") button.dataset.tooltipVisible = "true"; });
   ["pointerup", "pointercancel"].forEach(type => document.addEventListener(type, () => document.querySelectorAll("[data-tooltip-visible]").forEach(button => button.removeAttribute("data-tooltip-visible"))));
