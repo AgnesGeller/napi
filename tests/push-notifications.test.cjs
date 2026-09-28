@@ -14,6 +14,8 @@ assert.match(sync, /removePlanReminders\(uniqueDates\)/, "A teljes nap törlése
 assert.match(worker, /addEventListener\("push"/, "A service workerből hiányzik a háttérértesítés.");
 assert.match(worker, /addEventListener\("notificationclick"/, "Az értesítés megnyitási kezelése hiányzik.");
 assert.match(html, /id="notificationButton"/, "Az eszköz értesítési kapcsolója hiányzik.");
+assert.match(sync, /getPushSubscriptionState/, "Az érvénytelenített értesítési kapcsolat szerveroldali ellenőrzése hiányzik.");
+assert.match(app, /ensurePushSubscription/, "Az értesítési kapcsolat automatikus helyreállítása hiányzik.");
 assert.match(migration, /enable row level security/g, "Az értesítési táblák RLS-védelme hiányzik.");
 assert.doesNotMatch(sync, /privateKey|private_key/, "A VAPID privát kulcs nem kerülhet a frontendbe.");
 

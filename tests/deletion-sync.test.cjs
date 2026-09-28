@@ -20,6 +20,7 @@ assert.match(pullSource, /if \(pendingCloudPlanDates\.has\(row\.plan_date\)\) re
 assert.doesNotMatch(pullSource, /pendingCloudPlanDates\.has\(row\.plan_date\)[^\n]+timestampValue/, "A függőben lévő helyi törlés védelme nem függhet az eszközök eltérő órájától.");
 assert.match(source, /sessionStorage\.setItem\(UPDATE_RELOAD_DATE_KEY, workingPlan\.date\)/, "Az automatikus appfrissítésnek meg kell őriznie a szerkesztett napot.");
 assert.match(source, /sessionStorage\.removeItem\(UPDATE_RELOAD_DATE_KEY\)/, "A megőrzött dátumot csak az automatikus újratöltéshez szabad felhasználni.");
+assert.match(source, /if \(dirty\) localStorage\.setItem\(RECOVERY_KEY[\s\S]*?else localStorage\.removeItem\(RECOVERY_KEY\)/, "A helyi helyreállítás nem hozhatja vissza a már törölt előjegyzést.");
 
 const syncSource = fs.readFileSync("js/napi-sync.js", "utf8");
 assert.match(syncSource, /deletedPlanId/, "A teljes napi törlésből hiányzik a régi terv azonosítója.");

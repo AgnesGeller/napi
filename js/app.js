@@ -1164,6 +1164,7 @@
     if (pendingCloudDeletedDates.size) localStorage.setItem(PENDING_DELETIONS_KEY, JSON.stringify([...pendingCloudDeletedDates]));
     else localStorage.removeItem(PENDING_DELETIONS_KEY);
     if (dirty) localStorage.setItem(RECOVERY_KEY, JSON.stringify({ savedAt: changedAt, data, workingPlan }));
+    else localStorage.removeItem(RECOVERY_KEY);
     queueCloudSync(0);
   }
   function renderWorkCustomerOptions() {
@@ -1976,6 +1977,28 @@
     const registration = await navigator.serviceWorker.ready;
     return registration.pushManager.getSubscription();
   }
+  async function renewPushSubscription() {
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+    if (subscription) {
+      try { await window.NapiCloudSync.disablePushSubscription(subscription.endpoint); } catch (_) { /* A helyi megújítás ettől még folytatható. */ }
+      await subscription.unsubscribe();
+    }
+    subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKeyBytes(window.NapiCloudSync.vapidPublicKey) });
+    const deviceName = localStorage.getItem(NOTIFICATION_DEVICE_KEY) || "Android telefon";
+    await window.NapiCloudSync.savePushSubscription(subscription, deviceName);
+    return subscription;
+  }
+  async function ensurePushSubscription() {
+    if (!pushNotificationsSupported() || Notification.permission !== "granted" || !window.NapiCustomerDirectory?.hasSession?.()) return null;
+    const subscription = await currentPushSubscription();
+    if (!subscription) return renewPushSubscription();
+    const state = await window.NapiCloudSync.getPushSubscriptionState(subscription.endpoint);
+    if (!state?.enabled) return renewPushSubscription();
+    const deviceName = localStorage.getItem(NOTIFICATION_DEVICE_KEY) || "Android telefon";
+    await window.NapiCloudSync.savePushSubscription(subscription, deviceName);
+    return subscription;
+  }
   async function refreshNotificationDialog() {
     const status = $("#notificationStatus");
     if (!pushNotificationsSupported()) {
@@ -1985,7 +2008,11 @@
       return;
     }
     const subscription = await currentPushSubscription();
-    const enabled = Notification.permission === "granted" && Boolean(subscription);
+    let enabled = Notification.permission === "granted" && Boolean(subscription);
+    if (enabled && window.NapiCustomerDirectory?.hasSession?.()) {
+      const state = await window.NapiCloudSync.getPushSubscriptionState(subscription.endpoint);
+      enabled = Boolean(state?.enabled);
+    }
     status.textContent = enabled ? "Az értesítések be vannak kapcsolva ezen az eszközön." : Notification.permission === "denied" ? "Az értesítést a böngésző beállításaiban letiltottad." : "Az értesítések még nincsenek bekapcsolva ezen az eszközön.";
     $("#enableNotificationsButton").hidden = enabled;
     $("#disableNotificationsButton").hidden = !subscription;
@@ -2005,6 +2032,11 @@
       if (permission !== "granted") throw new Error("Az értesítési engedély nem lett megadva.");
       const registration = await navigator.serviceWorker.ready;
       let subscription = await registration.pushManager.getSubscription();
+      const state = subscription ? await window.NapiCloudSync.getPushSubscriptionState(subscription.endpoint) : null;
+      if (subscription && !state?.enabled) {
+        await subscription.unsubscribe();
+        subscription = null;
+      }
       if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKeyBytes(window.NapiCloudSync.vapidPublicKey) });
       const deviceName = $("#notificationDeviceName").value.trim() || "Android telefon";
       localStorage.setItem(NOTIFICATION_DEVICE_KEY, deviceName);
@@ -2138,8 +2170,9 @@
         allowPageReload = true;
         window.location.reload();
       });
-      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(registration => {
-        registration.update();
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(async registration => {
+        await registration.update();
+        try { await ensurePushSubscription(); } catch (error) { console.warn("Az értesítési kapcsolat automatikus megújítása most nem sikerült.", error); }
         setInterval(() => { if (!document.hidden && navigator.onLine) registration.update(); }, 60000);
       }).catch(() => {});
     }

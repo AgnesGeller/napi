@@ -133,6 +133,11 @@
     });
   }
 
+  async function getPushSubscriptionState(endpoint) {
+    const rows = await request(`napi_push_subscriptions?select=enabled,last_seen_at&endpoint=eq.${encodeURIComponent(endpoint)}&limit=1`);
+    return rows?.[0] || null;
+  }
+
   async function disablePushSubscription(endpoint) {
     const { ownerId } = await sessionDetails();
     return request(`napi_push_subscriptions?owner_id=eq.${ownerId}&endpoint=eq.${encodeURIComponent(endpoint)}`, {
@@ -140,5 +145,5 @@
     });
   }
 
-  window.NapiCloudSync = { pull, pushConfig, pushPlan, deletePlans, savePushSubscription, disablePushSubscription, vapidPublicKey: VAPID_PUBLIC_KEY };
+  window.NapiCloudSync = { pull, pushConfig, pushPlan, deletePlans, savePushSubscription, getPushSubscriptionState, disablePushSubscription, vapidPublicKey: VAPID_PUBLIC_KEY };
 })();
