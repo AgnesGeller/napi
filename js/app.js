@@ -417,7 +417,10 @@
         // törlést, amíg annak közös mentése folyamatban van. Az időbélyegek
         // eszközönként eltérhetnek, ezért itt nem szabad az órákra hagyatkozni.
         if (pendingCloudPlanDates.has(row.plan_date)) return;
-        if (!local || timestampValue(row.updated_at) > timestampValue(local.updatedAt)) {
+        // A szerver az egyetlen közös forrás. Ha ezen az eszközön nincs
+        // feltöltésre váró módosítás, mindig a szerver válasza az aktuális;
+        // így az eltérően járó telefon- és PC-órák nem akadályozzák a szinkront.
+        if (!local || !pendingCloudPlanDates.has(row.plan_date)) {
           if (index >= 0) data.plans[index] = plan; else data.plans.push(plan);
           dataChanged = true;
           if (plan.date === workingPlan.date && !dirty) currentChanged = true;
