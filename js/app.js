@@ -1937,9 +1937,11 @@
     if (directoryAction?.dataset.customerDirectory === "connect") { openCustomerAuth(); return; }
     if (directoryAction?.dataset.customerDirectory === "refresh") { await syncCustomerDirectory({ notify: true }); return; }
     if (directoryAction?.dataset.customerDirectory === "disconnect") { await window.NapiCustomerDirectory.signOut(); customerDirectory = []; customerDirectoryLastSync = null; customerDirectoryState = "disconnected"; renderSettings(); renderTasks(); toast("Az ügyféllista leválasztva, a helyi gyorsítótár törölve."); return; }
-    const colorChoice = event.target.closest("[data-worker-color]"); if (colorChoice) { setWorkerColor(colorChoice.dataset.workerColor); return; }
-    if (event.target.closest("[data-setting-submit]")) { saveSettingEditor(); return; }
-    const edit = event.target.closest("[data-setting-edit]"); if (edit) { editingSettingsId = edit.dataset.settingEdit; renderSettings(); return; }
+    const colorChoice = event.target.closest("[data-worker-color]");
+    if (colorChoice) { event.preventDefault(); setWorkerColor(colorChoice.dataset.workerColor); return; }
+    if (event.target.closest("[data-setting-submit]")) { event.preventDefault(); saveSettingEditor(); return; }
+    const edit = event.target.closest("[data-setting-edit]");
+    if (edit) { event.preventDefault(); editingSettingsId = edit.dataset.settingEdit; renderSettings(); $("#settingsContent").scrollTop = 0; return; }
     const toggle = event.target.closest("[data-setting-toggle]"); if (toggle) { const item = settingsType().find(entry => entry.id === toggle.dataset.settingToggle); if (item) { item.active = item.active === false; cloudConfigDirty = true; markDirty("Beállítás módosítva • mentés szükséges"); renderSettings(); renderTasks(); } return; }
     const dataAction = event.target.closest("[data-data-action]"); if (dataAction?.dataset.dataAction === "choose") chooseFolder(); if (dataAction?.dataset.dataAction === "download") downloadData();
   });
@@ -2129,13 +2131,10 @@
       navigator.serviceWorker.addEventListener("controllerchange", async () => {
         if (reloadingForUpdate) return;
         reloadingForUpdate = true;
-        try { sessionStorage.setItem(UPDATE_RELOAD_DATE_KEY, workingPlan.date); } catch (_) { /* A frissítés ettől még folytatható. */ }
-        if (dirty && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) {
-          await waitForCurrentCloudSync();
-          await pullSharedData();
-          saveDataLocally();
-          await pushCurrentState();
+        while (dirty || document.querySelector("dialog[open]") || document.activeElement?.closest?.("#taskList .task-card")) {
+          await new Promise(resolve => setTimeout(resolve, 750));
         }
+        try { sessionStorage.setItem(UPDATE_RELOAD_DATE_KEY, workingPlan.date); } catch (_) { /* A frissítés ettől még folytatható. */ }
         allowPageReload = true;
         window.location.reload();
       });

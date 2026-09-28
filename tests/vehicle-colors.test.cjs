@@ -10,5 +10,7 @@ assert.match(source, /aria-label="Egyedi autószín"/, "Az autó egyedi színvá
 assert.match(source, /settingsListHTML\(list, \(\) => "Autó", true, false\)/, "Az autóknál nem jelenhet meg felesleges HEX-kód.");
 assert.match(source, /activeSettingsTab === "vehicles"\) item\.color = validVehicleColor/, "Az autó színének mentése hiányzik.");
 assert.match(source, /function vehicleTheme\(vehicle\)[\s\S]*vehicle\?\.color/, "A napi terv és a PDF nem a beállított autószínt használja.");
+assert.match(source, /if \(colorChoice\) \{ event\.preventDefault\(\); setWorkerColor/, "A színválasztás nem zárhatja be a szerkesztőablakot.");
+assert.match(source, /while \(dirty \|\| document\.querySelector\("dialog\[open\]"\)/, "Az appfrissítés nem szakíthatja meg az autó szerkesztését.");
 
 console.log("Autószín szerkesztési teszt: OK");
