@@ -6,7 +6,7 @@ const pullStart = source.indexOf("async function pullSharedData");
 const pullEnd = source.indexOf("async function pushCurrentState", pullStart);
 const pullSource = source.slice(pullStart, pullEnd);
 
-assert.ok(pullSource.indexOf("row.payload?.deleted") < pullSource.indexOf("pendingCloudPlanDates.has(row.plan_date)"), "A teljes napi törlésnek meg kell előznie a várakozó helyi mentést.");
+assert.match(pullSource, /if \(row\.payload\?\.deleted\) \{[\s\S]*?if \(pendingCloudPlanDates\.has\(row\.plan_date\)\) return;/, "A törölt napra újonnan felvitt helyi tervet feltöltés előtt nem szabad visszatörölni.");
 assert.match(source, /await pullSharedData\(\);\s*await pushCurrentState\(\);/, "Szinkron előtt le kell kérni a másik eszköz törléseit.");
 assert.match(source, /deletedWorkItemIds/, "Az előjegyzések törlési jelölése hiányzik.");
 assert.match(source, /data-delete-work-id/, "A naptári előjegyzés közvetlen törlése hiányzik.");
@@ -18,6 +18,8 @@ assert.match(source, /rejectedAsStale/, "A régi eszköz visszautasított menté
 assert.match(source, /if \(await window\.NapiCloudSync\.pushPlan\(plan\) === false\)[\s\S]*continue;/, "A visszautasított előjegyzés-törlést függőben kell tartani.");
 assert.match(pullSource, /if \(pendingCloudPlanDates\.has\(row\.plan_date\)\) return;/, "A még fel nem töltött helyi módosítást másik eszköz adata nem írhatja felül.");
 assert.doesNotMatch(pullSource, /pendingCloudPlanDates\.has\(row\.plan_date\)[^\n]+timestampValue/, "A függőben lévő helyi törlés védelme nem függhet az eszközök eltérő órájától.");
+assert.match(source, /sessionStorage\.setItem\(UPDATE_RELOAD_DATE_KEY, workingPlan\.date\)/, "Az automatikus appfrissítésnek meg kell őriznie a szerkesztett napot.");
+assert.match(source, /sessionStorage\.removeItem\(UPDATE_RELOAD_DATE_KEY\)/, "A megőrzött dátumot csak az automatikus újratöltéshez szabad felhasználni.");
 
 const syncSource = fs.readFileSync("js/napi-sync.js", "utf8");
 assert.match(syncSource, /deletedPlanId/, "A teljes napi törlésből hiányzik a régi terv azonosítója.");

@@ -12,6 +12,7 @@
   const PENDING_PLANS_KEY = "diszkertek-napi-fuggo-tervek-v1";
   const WEEK_ANCHOR_KEY = "diszkertek-napi-heti-pozicio-v1";
   const MONTH_ANCHOR_KEY = "diszkertek-napi-havi-pozicio-v1";
+  const UPDATE_RELOAD_DATE_KEY = "diszkertek-napi-frissites-datuma-v1";
   const FINAL_NOTE = "A nap végén mindenki vegye ki a szemetét az autóból és hagyjon rendet maga után!";
   const DEFAULT_MEETING = "telephely, 6:30";
   const DEFAULT_STOPS = "Vizeshűtő, Lidl, Dohánybolt";
@@ -375,6 +376,9 @@
       remote.plans.forEach(row => {
         if (row.payload?.deleted) {
           remoteDates.add(row.plan_date);
+          // A törlés után ugyanarra a napra felvitt új tervet előbb meg kell
+          // próbálni közösen menteni; a szerver dönti el, melyik a frissebb.
+          if (pendingCloudPlanDates.has(row.plan_date)) return;
           const index = data.plans.findIndex(item => item.date === row.plan_date);
           if (index >= 0) { data.plans.splice(index, 1); dataChanged = true; }
           pendingCloudPlanDates.delete(row.plan_date);
@@ -1967,7 +1971,13 @@
 
   async function initialize() {
     const today = isoToday();
-    $("#planDate").value = today;
+    let initialDate = today;
+    try {
+      const updateReloadDate = sessionStorage.getItem(UPDATE_RELOAD_DATE_KEY);
+      sessionStorage.removeItem(UPDATE_RELOAD_DATE_KEY);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(updateReloadDate || "")) initialDate = updateReloadDate;
+    } catch (_) { /* Normál indításkor a mai nap nyílik meg. */ }
+    $("#planDate").value = initialDate;
     try {
       const storedData = JSON.parse(localStorage.getItem(LOCAL_DATA_KEY));
       if (storedData) data = normalizeData(storedData);
@@ -1977,7 +1987,7 @@
         const recovery = JSON.parse(localStorage.getItem(RECOVERY_KEY));
         if (recovery?.data) {
           const recovered = recovery.workingPlan ? normalizeData({ ...recovery.data, plans: [recovery.workingPlan] }).plans[0] : null;
-          if (recovered?.date === today) {
+          if (recovered?.date === initialDate) {
             data = normalizeData(recovery.data);
             workingPlan = recovered;
             workingPlan.meeting = typeof workingPlan.meeting === "string" ? workingPlan.meeting : DEFAULT_MEETING;
@@ -1988,8 +1998,8 @@
       } catch (_) { /* Hibás helyreállítási adatot figyelmen kívül hagyunk. */ }
     }
     updateStorageStatus();
-    setWeekAnchor(today); setMonthAnchor(today.slice(0, 7));
-    if (!dirty) loadPlan(today, { preserveCalendarPosition: true }); else { renderWorkItems(); renderTasks(); $("#saveState").textContent = "Helyreállított piszkozat • mentés szükséges"; }
+    setWeekAnchor(initialDate); setMonthAnchor(initialDate.slice(0, 7));
+    if (!dirty) loadPlan(initialDate, { preserveCalendarPosition: true }); else { renderWorkItems(); renderTasks(); $("#saveState").textContent = "Helyreállított piszkozat • mentés szükséges"; }
     renderWeek();
     renderMonth();
     if (navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) { await syncCustomerDirectory(); await pullSharedData({ initial: true }); if (pendingCloudDeletedDates.size || pendingCloudPlanDates.size) await pushCurrentState(); }
@@ -2000,6 +2010,7 @@
       navigator.serviceWorker.addEventListener("controllerchange", async () => {
         if (reloadingForUpdate) return;
         reloadingForUpdate = true;
+        try { sessionStorage.setItem(UPDATE_RELOAD_DATE_KEY, workingPlan.date); } catch (_) { /* A frissítés ettől még folytatható. */ }
         if (dirty && navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) {
           await waitForCurrentCloudSync();
           await pullSharedData();
