@@ -1414,7 +1414,30 @@
   $("#taskList").addEventListener("wheel", event => { if (event.target.closest(".start-time-input")) event.preventDefault(); }, { passive: false });
   document.addEventListener("click", event => { if (!event.target.closest(".customer-picker")) document.querySelectorAll(".customer-suggestions").forEach(box => box.hidden = true); });
 
-  function addTask(event) { const button = event?.currentTarget; if (button?.disabled) return; if (button) button.disabled = true; const task = blankTask(); task.workLogRequired = true; workingPlan.tasks.push(task); activeTaskId = task.id; collapsedTaskIds.delete(task.id); markDirty(); renderTasks(); $("#taskList .team-block:last-child")?.scrollIntoView({ behavior: "smooth", block: "start" }); if (button) button.disabled = false; }
+  function addTask(event) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const button = event?.currentTarget;
+    if (button?.disabled) return;
+    if (button) button.disabled = true;
+    const task = blankTask();
+    task.workLogRequired = true;
+    workingPlan.tasks.push(task);
+    activeTaskId = task.id;
+    collapsedTaskIds.delete(task.id);
+    markDirty();
+    renderTasks();
+    $("#dayViewButton").classList.add("active");
+    $("#dayViewButton").setAttribute("aria-pressed", "true");
+    $("#weekViewButton").classList.remove("active");
+    $("#weekViewButton").setAttribute("aria-pressed", "false");
+    $("#monthViewButton").classList.remove("active");
+    $("#monthViewButton").setAttribute("aria-pressed", "false");
+    requestAnimationFrame(() => {
+      $("#taskList").querySelector(`[data-task-id="${CSS.escape(task.id)}"]`)?.scrollIntoView({ behavior: "auto", block: "start" });
+    });
+    if (button) button.disabled = false;
+  }
   $("#addTaskButton").addEventListener("click", addTask);
   $("#addTaskBottomButton").addEventListener("click", addTask);
   $("#connectSyncButton").addEventListener("click", openCustomerAuth);
