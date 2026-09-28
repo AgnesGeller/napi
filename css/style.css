@@ -443,7 +443,8 @@ button, summary { touch-action: manipulation; }
   .print-client-row small { color: var(--orange); font-size: 7.5pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
   .print-client-row strong { color: #203627; font-size: 10pt; overflow-wrap: anywhere; }
   .print-client-block { break-inside: avoid; padding-top: 2mm; }
-  .print-client-block + .print-client-block { margin-top: 3mm; padding-top: 4mm; border-top: .5mm dashed var(--print-task-border, #8fa391); }
+  .print-client-block.has-divider { margin-top: 5mm; padding-top: 0; border-top: 1.2mm solid var(--print-task-border, #8fa391); }
+  .print-client-divider { width: max-content; margin: -3.2mm auto 3.5mm; padding: 1mm 4mm; break-after: avoid-page; color: #fff; background: var(--print-task-accent, var(--forest)); border: .35mm solid #fff; font-size: 7.5pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
   .print-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5mm 7mm; }
   .print-section { margin: 2mm 0; break-inside: avoid; }
   .print-section.wide { grid-column: 1 / -1; }
