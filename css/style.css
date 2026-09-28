@@ -442,9 +442,11 @@ button, summary { touch-action: manipulation; }
   .print-client-row small, .print-client-row strong { display: block; }
   .print-client-row small { color: var(--orange); font-size: 7.5pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
   .print-client-row strong { color: #203627; font-size: 10pt; overflow-wrap: anywhere; }
-  .print-client-block { break-inside: avoid; padding-top: 2mm; }
-  .print-client-block.has-divider { margin-top: 5mm; padding-top: 0; border-top: 1.2mm solid var(--print-task-border, #8fa391); }
-  .print-client-divider { width: max-content; margin: -3.2mm auto 3.5mm; padding: 1mm 4mm; break-after: avoid-page; color: #fff; background: var(--print-task-accent, var(--forest)); border: .35mm solid #fff; font-size: 7.5pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+  .print-client-block { break-inside: auto; padding-top: 2mm; }
+  .print-client-block.has-divider { margin-top: 5mm; padding-top: 0; }
+  .print-client-heading { break-inside: avoid-page; break-after: avoid-page; }
+  .print-client-divider { display: flex; align-items: center; gap: 3mm; margin: 0 0 3mm; color: var(--print-task-accent, var(--forest)); font-size: 7.5pt; font-weight: 800; letter-spacing: .08em; text-align: center; text-transform: uppercase; white-space: nowrap; }
+  .print-client-divider::before, .print-client-divider::after { content: ""; flex: 1; border-top: .8mm solid var(--print-task-border, #8fa391); }
   .print-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5mm 7mm; }
   .print-section { margin: 2mm 0; break-inside: avoid; }
   .print-section.wide { grid-column: 1 / -1; }
