@@ -1187,6 +1187,7 @@
     $("#workItemCustomer").value = item?.customerName || "";
     $("#workItemAddress").value = item?.address || "";
     $("#workItemNote").value = item?.note || "";
+    $("#workItemReminderTime").value = "";
     editingReminderTimes = [...(item?.reminderTimes || [])];
     updateReminderEditor();
     $("#deleteWorkItemButton").hidden = !item;
@@ -1237,11 +1238,22 @@
     $("#workItemReminderTime").value = "";
     updateReminderEditor();
   });
-  $("#workItemReminderTimes").addEventListener("click", event => {
+  $("#workItemReminderTimes").addEventListener("click", async event => {
     const button = event.target.closest("[data-remove-reminder]");
     if (!button) return;
     editingReminderTimes = editingReminderTimes.filter(time => time !== button.dataset.removeReminder);
     updateReminderEditor();
+    if (editingWorkItemId && editingWorkItemDate) {
+      const plan = workPlanForDate(editingWorkItemDate);
+      const item = (plan.workItems || []).find(entry => entry.id === editingWorkItemId);
+      if (item) {
+        item.reminderTimes = [...editingReminderTimes];
+        persistWorkPlans([plan]);
+        renderWorkItems(); renderWeek(); renderMonth();
+        const synced = await pushCurrentState();
+        toast(synced ? "A jelzési időpont törölve minden eszközről." : "A jelzési időpont törölve. A közös szinkron internetkapcsolatkor befejeződik.", !synced);
+      }
+    }
   });
   $("#deleteWorkItemButton").addEventListener("click", async () => {
     if (editingWorkItemId && editingWorkItemDate && await deleteWorkItem(editingWorkItemDate, editingWorkItemId)) closeWorkItemDialog();

@@ -16,6 +16,7 @@ assert.match(worker, /addEventListener\("notificationclick"/, "Az értesítés m
 assert.match(html, /id="notificationButton"/, "Az eszköz értesítési kapcsolója hiányzik.");
 assert.match(sync, /getPushSubscriptionState/, "Az érvénytelenített értesítési kapcsolat szerveroldali ellenőrzése hiányzik.");
 assert.match(app, /ensurePushSubscription/, "Az értesítési kapcsolat automatikus helyreállítása hiányzik.");
+assert.match(app, /item\.reminderTimes = \[\.\.\.editingReminderTimes\][\s\S]*?await pushCurrentState\(\)/, "A törölt jelzési időpontot azonnal közösen menteni kell.");
 assert.match(migration, /enable row level security/g, "Az értesítési táblák RLS-védelme hiányzik.");
 assert.doesNotMatch(sync, /privateKey|private_key/, "A VAPID privát kulcs nem kerülhet a frontendbe.");
 
