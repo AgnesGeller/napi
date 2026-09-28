@@ -32,6 +32,10 @@
       const result = text ? JSON.parse(text) : null;
       if (response.ok) return result;
       if (isClockSkewError(result) && attempt < 2) { await wait(attempt ? 2500 : 1200); continue; }
+      if (response.status === 401 && !isClockSkewError(result)) {
+        window.NapiCustomerDirectory?.clearSession?.();
+        throw new Error("A kapcsolat lejárt. Lépj be újra Tamás új PIN-kódjával.");
+      }
       throw new Error(isClockSkewError(result) ? "Az időellenőrzés miatt a kapcsolat késett. Próbáld meg újra a frissítést." : (result?.message || "A közös mentés most nem érhető el."));
     }
   }

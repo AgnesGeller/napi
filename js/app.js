@@ -405,7 +405,10 @@
           }
           dataChanged = true;
         }
-        if (pendingCloudPlanDates.has(row.plan_date) && timestampValue(local?.updatedAt) >= timestampValue(row.updated_at)) return;
+        // A másik eszköz adata addig nem írhatja felül a helyi módosítást vagy
+        // törlést, amíg annak közös mentése folyamatban van. Az időbélyegek
+        // eszközönként eltérhetnek, ezért itt nem szabad az órákra hagyatkozni.
+        if (pendingCloudPlanDates.has(row.plan_date)) return;
         if (!local || timestampValue(row.updated_at) > timestampValue(local.updatedAt)) {
           if (index >= 0) data.plans[index] = plan; else data.plans.push(plan);
           dataChanged = true;
@@ -425,6 +428,7 @@
       return true;
     } catch (error) {
       console.warn("A háttérszinkron most nem érhető el.", error);
+      updateCustomerDirectoryButtons();
       if (throwOnError) throw error;
       return false;
     }
@@ -474,6 +478,7 @@
       return true;
     } catch (error) {
       console.warn("A háttérszinkron most nem érhető el.", error);
+      updateCustomerDirectoryButtons();
       if (throwOnError) throw error;
       return false;
     }

@@ -28,6 +28,11 @@
     localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   }
 
+  function clearSession() {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(CACHE_KEY);
+  }
+
   function authError(result, fallback) {
     const message = String(result?.msg || result?.message || "").toLocaleLowerCase("hu-HU");
     if (message.includes("invalid login credentials")) return new Error("Hibás PIN-kód, vagy Tamás Napi-fiókja még nincs aktiválva.");
@@ -48,7 +53,9 @@
       const result = await response.json().catch(() => ({}));
       if (response.ok) return result;
       if (isClockSkewError(result) && attempt < 2) { await wait(attempt ? 2500 : 1200); continue; }
-      throw authError(result, "A belépés nem sikerült.");
+      const error = authError(result, "A belépés nem sikerült.");
+      error.status = response.status;
+      throw error;
     }
   }
 
@@ -69,6 +76,10 @@
     try {
       return await refreshStoredSession(session);
     } catch (error) {
+      if ([400, 401, 403].includes(error?.status)) {
+        clearSession();
+        throw new Error("A kapcsolat lejárt. Lépj be újra Tamás új PIN-kódjával.");
+      }
       throw error;
     }
   }
@@ -92,7 +103,7 @@
       const result = await response.json().catch(() => ({}));
       if (response.ok) return Array.isArray(result) ? result : [];
       if (isClockSkewError(result) && attempt < 2) { await wait(attempt ? 2500 : 1200); continue; }
-      if (response.status === 401 && !isClockSkewError(result)) localStorage.removeItem(SESSION_KEY);
+      if (response.status === 401 && !isClockSkewError(result)) clearSession();
       throw new Error(isClockSkewError(result) ? "Az időellenőrzés miatt a kapcsolat késett. Próbáld meg újra a frissítést." : (result?.message || "Az ügyféllista nem tölthető be."));
     }
   }
@@ -157,8 +168,7 @@
 
   async function signOut() {
     const session = storedSession();
-    localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(CACHE_KEY);
+    clearSession();
     if (!session?.access_token) return;
     try {
       await fetch(`${CONFIG.url}/auth/v1/logout?scope=local`, {
@@ -171,6 +181,7 @@
   window.NapiCustomerDirectory = {
     signIn,
     signOut,
+    clearSession,
     list,
     cached,
     session: activeSession,

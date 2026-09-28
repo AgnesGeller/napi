@@ -16,8 +16,11 @@ assert.match(source, /async function deleteDay\(date\)/, "A teljes nap törlés�
 assert.match(source, /const synced = await syncPromise/, "A teljes nap törlésének ellenőriznie kell a közös törlés eredményét.");
 assert.match(source, /rejectedAsStale/, "A régi eszköz visszautasított mentését kezelni kell.");
 assert.match(source, /if \(await window\.NapiCloudSync\.pushPlan\(plan\) === false\)[\s\S]*continue;/, "A visszautasított előjegyzés-törlést függőben kell tartani.");
+assert.match(pullSource, /if \(pendingCloudPlanDates\.has\(row\.plan_date\)\) return;/, "A még fel nem töltött helyi módosítást másik eszköz adata nem írhatja felül.");
+assert.doesNotMatch(pullSource, /pendingCloudPlanDates\.has\(row\.plan_date\)[^\n]+timestampValue/, "A függőben lévő helyi törlés védelme nem függhet az eszközök eltérő órájától.");
 
 const syncSource = fs.readFileSync("js/napi-sync.js", "utf8");
 assert.match(syncSource, /deletedPlanId/, "A teljes napi törlésből hiányzik a régi terv azonosítója.");
+assert.match(syncSource, /response\.status === 401[\s\S]*clearSession/, "A lejárt közös munkamenetet törölni kell, hogy újra be lehessen lépni.");
 
 console.log("Naptári törlés szinkronteszt: OK");
