@@ -228,7 +228,7 @@
       let steps = Array.isArray(template.steps) ? template.steps.filter(step => !searchKey(step).includes("munkanaplo")) : [];
       if (searchKey(template.name) === "kertkarbantartas") steps = steps.filter(step => searchKey(step) !== "kertkarbantartas elvegzese.");
       const templateMaterials = Array.isArray(template.materials) ? template.materials.map(normalizeMaterialItem) : [];
-      return { ...template, materials: templateMaterials, steps };
+      return { ...template, note: String(template.note || ""), materials: templateMaterials, steps };
     }) : initial.templates;
     initial.templates.forEach(seed => {
       if (!templates.some(template => searchKey(template.name) === searchKey(seed.name))) templates.push(deepCopy(seed));
@@ -240,11 +240,13 @@
         id: job.id || `${task.id || "task"}-job-${index}`,
         templateId: job.templateId || null,
         name: String(job.name || "Feladat").trim(),
+        note: String(job.note || ""),
         steps: Array.isArray(job.steps) ? job.steps.filter(step => !searchKey(step).includes("munkanaplo")) : []
       })) : (task.templateId || task.title || task.steps?.length ? [{
         id: `${task.id || "task"}-legacy-job`,
         templateId: task.templateId || null,
         name: String(task.title || legacyTemplate?.name || "Feladat").trim(),
+        note: String(legacyTemplate?.note || ""),
         steps: (Array.isArray(task.steps) ? task.steps : deepCopy(legacyTemplate?.steps || [])).filter(step => !searchKey(step).includes("munkanaplo"))
       }] : []);
       const { templateId: _legacyTemplateId, title: _legacyTitle, steps: _legacySteps, ...currentTask } = task;
@@ -780,7 +782,7 @@
       if (!plan.tasks.some(task => task.recurrenceId === recurrence.id)) {
         const task = blankTask(); task.recurrenceId = recurrence.id; task.customerName = recurrence.customerName; task.address = recurrence.address; task.startTime = recurrence.startTime || "";
         const template = recurrence.templateId ? byId(data.templates, recurrence.templateId) : null;
-        task.jobs = [{ id: uid(), templateId: template?.id || null, name: recurrence.jobName, steps: deepCopy(template?.steps || []) }];
+        task.jobs = [{ id: uid(), templateId: template?.id || null, name: recurrence.jobName, note: template?.note || "", steps: deepCopy(template?.steps || []) }];
         task.toolIds = deepCopy(template?.toolIds || []); task.toolIds.forEach(id => { task.toolQuantities[id] = "1"; });
         task.materials = deepCopy(template?.materials || []); plan.tasks.push(task); plan.updatedAt = new Date().toISOString();
         if (date === workingPlan.date && !workingPlan.tasks.some(item => item.recurrenceId === recurrence.id)) workingPlan.tasks.push(deepCopy(task));
@@ -874,10 +876,11 @@
       return;
     }
     jobs.forEach(job => {
-      const block = document.createElement("label");
+      const block = document.createElement("div");
       block.className = "job-workflow";
-      block.innerHTML = `<span class="job-workflow-heading"><strong>${escapeHTML(job.name)}</strong><button class="btn btn-soft job-info-button" type="button" data-job-info="${escapeHTML(job.id)}">Hasznos tudnivalók</button></span><textarea class="form-control job-steps-input" data-job-id="${escapeHTML(job.id)}" rows="4" maxlength="3000" placeholder="Soronként egy teendő"></textarea>`;
-      block.querySelector("textarea").value = (job.steps || []).join("\n");
+      block.innerHTML = `<span class="job-workflow-heading"><strong>${escapeHTML(job.name)}</strong><span class="job-workflow-actions"><button class="btn btn-soft job-info-button" type="button" data-job-info="${escapeHTML(job.id)}">Hasznos tudnivalók</button><button class="btn btn-soft remove-job-button" type="button" data-remove-job="${escapeHTML(job.id)}">Eltávolítás</button></span></span><label>Megjegyzés<textarea class="form-control job-note-input" data-job-id="${escapeHTML(job.id)}" rows="2" maxlength="1000" placeholder="Megjegyzés ehhez a feladathoz"></textarea></label><label>Kivitelezési tudnivalók<textarea class="form-control job-steps-input" data-job-id="${escapeHTML(job.id)}" rows="4" maxlength="3000" placeholder="Soronként egy teendő"></textarea></label>`;
+      block.querySelector(".job-note-input").value = job.note || "";
+      block.querySelector(".job-steps-input").value = (job.steps || []).join("\n");
       container.append(block);
     });
   }
@@ -906,8 +909,6 @@
       card.querySelector(".vehicle-chips")?.closest(".task-step")?.remove();
       card.querySelector(".worker-chips")?.closest(".task-step")?.remove();
     }
-    const templateContainer = card.querySelector(".template-chips");
-    activeSorted(data.templates).forEach(template => templateContainer.append(makeChip(template.name, taskJobs(task).some(job => job.templateId === template.id), "", { templateId: template.id })));
     const jobCount = taskJobs(task).length; card.querySelector(".job-count").textContent = jobCount ? `${jobCount} kiválasztva` : "Nincs kiválasztva";
     const toolContainer = card.querySelector(".tool-chips");
     activeSorted(data.tools).forEach(tool => toolContainer.append(makeChip(tool.name, task.toolIds.includes(tool.id), "", { group: "tool", id: tool.id })));
@@ -1021,7 +1022,7 @@
     const jobs = taskJobs(task); const selectedIndex = jobs.findIndex(job => job.templateId === template.id);
     if (selectedIndex >= 0) jobs.splice(selectedIndex, 1);
     else {
-      jobs.push({ id: uid(), templateId: template.id, name: template.name, steps: deepCopy(template.steps || []) });
+      jobs.push({ id: uid(), templateId: template.id, name: template.name, note: template.note || "", steps: deepCopy(template.steps || []) });
       task.toolIds = [...new Set([...(task.toolIds || []), ...(template.toolIds || [])])];
       task.toolIds.forEach(id => { if (!task.toolQuantities[id]) task.toolQuantities[id] = "1"; });
       (template.materials || []).forEach(material => {
@@ -1030,16 +1031,31 @@
     }
     markDirty("Feladatlista módosítva • mentés szükséges"); renderTasks();
   }
-  function addCustomJob(task, name) {
+  function addTemplateJob(task, template) {
+    if (taskJobs(task).some(job => job.templateId === template.id)) { toast("Ez a sablon már szerepel ennél az ügyfélnél.", true); return; }
+    task.jobs.push({ id: uid(), templateId: template.id, name: template.name, note: template.note || "", steps: deepCopy(template.steps || []) });
+    task.toolIds = [...new Set([...(task.toolIds || []), ...(template.toolIds || [])])];
+    task.toolIds.forEach(id => { if (!task.toolQuantities[id]) task.toolQuantities[id] = "1"; });
+    (template.materials || []).forEach(material => {
+      if (!task.materials.some(item => searchKey(item.name) === searchKey(material.name))) task.materials.push(normalizeMaterialItem(material));
+    });
+    markDirty("Sablon hozzáadva • mentés szükséges"); renderTasks();
+  }
+  function templateMatches(query, showAll = false) {
+    const needle = searchKey(query);
+    if (!showAll && needle.length < 2) return [];
+    return activeSorted(data.templates).filter(template => !needle || searchKey(`${template.name} ${template.note || ""}`).includes(needle)).slice(0, 12);
+  }
+  function showTemplateSuggestions(card, query, showAll = false) {
+    const box = card.querySelector(".job-template-suggestions"); const matches = templateMatches(query, showAll);
+    box.innerHTML = matches.map(template => `<button type="button" data-template-choice="${escapeHTML(template.id)}"><b>${escapeHTML(template.name)}</b>${template.note ? `<small>${escapeHTML(template.note)}</small>` : ""}</button>`).join("");
+    box.hidden = matches.length === 0;
+  }
+  function addCustomJob(task, name, note = "") {
     const cleanedName = String(name || "").trim();
     if (!cleanedName) { toast("Írd be az új feladat nevét.", true); return; }
-    let template = data.templates.find(item => searchKey(item.name) === searchKey(cleanedName));
-    if (!template) {
-      template = { id: uid(), name: cleanedName, active: true, toolIds: [], materials: [], steps: [], order: data.templates.length };
-      data.templates.push(template);
-    } else template.active = true;
-    if (!taskJobs(task).some(job => job.templateId === template.id)) task.jobs.push({ id: uid(), templateId: template.id, name: template.name, steps: deepCopy(template.steps || []) });
-    markDirty("Az új feladat megjegyezve • mentés szükséges"); renderTasks();
+    task.jobs.push({ id: uid(), templateId: null, name: cleanedName, note: String(note || "").trim(), steps: [] });
+    markDirty("Az egyszeri feladat hozzáadva • mentés szükséges"); renderTasks();
   }
   function updateCustomerDirectoryButtons() {
     const connected = Boolean(window.NapiCustomerDirectory?.hasSession?.());
@@ -1351,6 +1367,17 @@
       $("#jobInfoContent").innerHTML = job.steps.length ? `<ol class="job-info-steps">${job.steps.map(step => `<li>${escapeHTML(step)}</li>`).join("")}</ol>` : `<p>Ehhez a feladathoz még nincs külön kivitelezési tudnivaló. A Feladatleírások résznél hozzáadhatod.</p>`;
       $("#jobInfoDialog").showModal(); return;
     }
+    const removeJob = event.target.closest("[data-remove-job]");
+    if (removeJob) {
+      task.jobs = taskJobs(task).filter(job => job.id !== removeJob.dataset.removeJob);
+      markDirty("Feladat eltávolítva • mentés szükséges"); renderTasks(); return;
+    }
+    const templateChoice = event.target.closest("[data-template-choice]");
+    if (templateChoice) {
+      const template = byId(data.templates, templateChoice.dataset.templateChoice);
+      if (template) addTemplateJob(task, template);
+      return;
+    }
     const chip = event.target.closest(".choice-chip");
     if (chip?.dataset.group) {
       const target = chip.dataset.group === "worker" ? task.workerIds : chip.dataset.group === "vehicle" ? task.vehicleIds : task.toolIds;
@@ -1375,7 +1402,8 @@
     }
     if (event.target.closest(".customer-dropdown")) { if (!customerDirectory.length) openCustomerAuth(); else showCustomerSuggestions(card, "", true); return; }
     if (event.target.closest(".add-customer")) { if (window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory({ notify: true }); else openCustomerAuth(); return; }
-    if (event.target.closest(".add-custom-job")) { const input = card.querySelector(".new-job-input"); addCustomJob(task, input.value); return; }
+    if (event.target.closest(".job-template-dropdown")) { showTemplateSuggestions(card, "", true); return; }
+    if (event.target.closest(".add-custom-job")) { const input = card.querySelector(".new-job-input"); addCustomJob(task, input.value, card.querySelector(".new-job-note").value); return; }
     if (event.target.closest(".add-material")) { task.materials.push({ materialId: null, source: "", name: "", quantity: "", unit: "" }); markDirty(); renderTasks(); return; }
     const materialRow = event.target.closest(".material-row");
     if (event.target.closest(".remove-material") && materialRow) { task.materials.splice(Number(materialRow.dataset.materialIndex), 1); markDirty(); renderTasks(); return; }
@@ -1388,6 +1416,7 @@
   $("#taskList").addEventListener("input", event => {
     const card = event.target.closest(".task-card"); if (!card) return; const task = findTaskFromElement(card); if (!task) return;
     if (event.target.matches(".customer-input")) { task.customerId = null; task.locationId = null; task.customerName = event.target.value; showCustomerSuggestions(card, event.target.value); }
+    else if (event.target.matches(".job-template-search")) { showTemplateSuggestions(card, event.target.value); return; }
     else if (event.target.matches(".address-input")) task.address = event.target.value;
     else if (event.target.matches(".start-time-input")) task.startTime = event.target.value;
     else if (event.target.matches(".tool-quantity-input")) task.toolQuantities[event.target.dataset.toolId] = event.target.value;
@@ -1396,12 +1425,9 @@
     else if (event.target.matches(".extra-tools-input")) task.extraTools = event.target.value;
     else if (event.target.matches(".job-steps-input")) {
       const job = taskJobs(task).find(item => item.id === event.target.dataset.jobId);
-      if (job) {
-        job.steps = event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-        const template = job.templateId ? byId(data.templates, job.templateId) : null;
-        if (template) { template.steps = deepCopy(job.steps); cloudConfigDirty = true; }
-      }
+      if (job) job.steps = event.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
     }
+    else if (event.target.matches(".job-note-input")) { const job = taskJobs(task).find(item => item.id === event.target.dataset.jobId); if (job) job.note = event.target.value; }
     else if (event.target.matches(".notes-input")) task.notes = event.target.value;
     else if (event.target.closest(".material-row")) {
       const row = event.target.closest(".material-row"); const material = task.materials[Number(row.dataset.materialIndex)];
@@ -1418,11 +1444,12 @@
   });
   $("#taskList").addEventListener("keydown", event => {
     if (!event.target.matches(".new-job-input") || event.key !== "Enter") return;
-    event.preventDefault(); const task = findTaskFromElement(event.target); if (task) addCustomJob(task, event.target.value);
+    event.preventDefault(); const task = findTaskFromElement(event.target); if (task) addCustomJob(task, event.target.value, event.target.closest(".new-job-row")?.querySelector(".new-job-note")?.value || "");
   });
   $("#taskList").addEventListener("focusin", event => {
     const card = event.target.closest(".task-card");
     if (card) setActiveTask(card, findTaskFromElement(card));
+    if (event.target.matches(".job-template-search")) { if (searchKey(event.target.value).length >= 2) showTemplateSuggestions(card, event.target.value); return; }
     if (!event.target.matches(".customer-input")) return;
     if (searchKey(event.target.value).length >= 2) showCustomerSuggestions(card, event.target.value);
     syncCustomerDirectory().then(synced => { if (synced && card?.isConnected) showCustomerSuggestions(card, event.target.value); });
@@ -1682,7 +1709,7 @@
       const steps = (job.steps || []).map(cleanStep).filter(step => {
         const key = searchKey(step); if (!key || seen.has(key)) return false; seen.add(key); return true;
       });
-      return { name: job.name, steps };
+      return { name: job.name, note: String(job.note || "").trim(), steps };
     });
   }
 
@@ -1711,7 +1738,7 @@
         const descriptions = jobDescriptions(task);
         if (descriptions.length) {
           lines.push("Feladatok:");
-          descriptions.forEach(item => { lines.push(`- ${item.name}`); item.steps.forEach(step => lines.push(`  • ${step}`)); });
+          descriptions.forEach(item => { lines.push(`- ${item.name}`); if (item.note) lines.push(`  Megjegyzés: ${item.note}`); item.steps.forEach(step => lines.push(`  • ${step}`)); });
         }
         if (tools.length) { lines.push("Szükséges eszközök:"); tools.forEach(item => lines.push(`- ${item}`)); }
         const materials = task.materials.filter(item => item.name);
@@ -1739,7 +1766,7 @@
       const clientBlocks = group.tasks.map((task, clientIndex) => {
         const tools = [...task.toolIds.map(id => { const tool = byId(data.tools, id); return tool ? `${tool.name} - ${task.toolQuantities?.[id] || "1"} db` : ""; }).filter(Boolean), ...String(task.extraTools || "").split(",").map(item => item.trim()).filter(Boolean)];
         const materials = task.materials.filter(item => item.name);
-        const jobs = jobDescriptions(task).map(item => `<div class="print-job-description"><h4>${escapeHTML(item.name)}</h4>${item.steps.length ? `<ul>${item.steps.map(step => `<li>${escapeHTML(step.replaceAll("–", "-"))}</li>`).join("")}</ul>` : ""}</div>`).join("");
+        const jobs = jobDescriptions(task).map(item => `<div class="print-job-description"><h4>${escapeHTML(item.name)}</h4>${item.note ? `<p>${escapeHTML(item.note)}</p>` : ""}${item.steps.length ? `<ul>${item.steps.map(step => `<li>${escapeHTML(step.replaceAll("–", "-"))}</li>`).join("")}</ul>` : ""}</div>`).join("");
         const expectations = `<section class="print-section wide print-expectations"><h3>Munkavégzés</h3><p>${task.workLogRequired === false ? "Munkanaplót nem kell megírni." : "Munkanaplót megírni."}<br>${escapeHTML(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)].replaceAll("–", "-"))}<br>${escapeHTML(QUALITY_DESCRIPTIONS[validRating(task.workQuality)].replaceAll("–", "-"))}</p></section>`;
         return `<section class="print-client-block${clientIndex ? " has-divider" : ""}"><div class="print-client-heading">${clientIndex ? `<div class="print-client-divider">Következő ügyfél</div>` : ""}<div class="print-client-row"><section><small>${clientNumberForVehicle(task, plan)}. Ügyfél</small><strong>${escapeHTML(task.customerName || "Nincs kiválasztva")}</strong></section><section><small>Cím${task.startTime ? ` · Kezdés: ${escapeHTML(task.startTime)}` : ""}</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div></div><div class="print-grid">${jobs ? `<section class="print-section wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${item.source ? `<strong>${escapeHTML(item.source)}:</strong> ` : ""}${escapeHTML(item.name)}${item.quantity ? ` - ${escapeHTML(item.quantity)}${item.unit ? ` ${escapeHTML(item.unit)}` : ""}` : ""}</li>`).join("")}</ul></section>` : ""}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}${expectations}</div></section>`;
       });
@@ -1860,10 +1887,10 @@
     } else if (activeSettingsTab === "customers") {
       container.innerHTML = customerDirectorySettingsHTML();
     } else {
-      const template = editing || { name: "", toolIds: [], materials: [], steps: [] };
+      const template = editing || { name: "", note: "", toolIds: [], materials: [], steps: [] };
       const toolNames = template.toolIds.map(id => byId(data.tools, id)?.name).filter(Boolean).join(", ");
       const materialLines = template.materials.map(item => [item.source, item.name, item.unit].join(" | ")).join("\n");
-      container.innerHTML = `<div class="settings-editor"><h3>${editing ? "Sablon szerkesztése" : "Új feladatsablon"}</h3><label>Név<input class="form-control" id="settingName" value="${escapeHTML(template.name)}" maxlength="120"></label><label>Alapértelmezett eszközök vesszővel elválasztva<input class="form-control" id="settingTools" value="${escapeHTML(toolNames)}" placeholder="például: lapát, gereblye"></label><label>Anyagok – soronként: beszerzés helye | megnevezés | mértékegység<textarea class="form-control" id="settingMaterials" rows="3">${escapeHTML(materialLines)}</textarea></label><label>Kivitelezési tudnivalók – soronként egy lépés<textarea class="form-control" id="settingSteps" rows="5">${escapeHTML(template.steps.join("\n"))}</textarea></label><button class="btn btn-outline-green" type="button" data-setting-submit>Mentés</button></div>${settingsListHTML(list, item => `${item.steps?.length || 0} lépés • ${item.toolIds?.length || 0} eszköz`)}`;
+      container.innerHTML = `<div class="settings-editor"><h3>${editing ? "Sablon szerkesztése" : "Új sablon"}</h3><label>Feladat neve<input class="form-control" id="settingName" value="${escapeHTML(template.name)}" maxlength="120"></label><label>Megjegyzés<textarea class="form-control" id="settingNote" rows="3" maxlength="1000" placeholder="A sablonhoz tartozó megjegyzés">${escapeHTML(template.note || "")}</textarea></label><label>Alapértelmezett eszközök vesszővel elválasztva<input class="form-control" id="settingTools" value="${escapeHTML(toolNames)}" placeholder="például: lapát, gereblye"></label><label>Anyagok – soronként: beszerzés helye | megnevezés | mértékegység<textarea class="form-control" id="settingMaterials" rows="3">${escapeHTML(materialLines)}</textarea></label><label>Kivitelezési tudnivalók – soronként egy lépés<textarea class="form-control" id="settingSteps" rows="5">${escapeHTML(template.steps.join("\n"))}</textarea></label><button class="btn btn-outline-green" type="button" data-setting-submit>Mentés</button></div>${settingsListHTML(list, item => [item.note, `${item.steps?.length || 0} lépés`, `${item.toolIds?.length || 0} eszköz`].filter(Boolean).join(" • "))}`;
     }
   }
   function saveRecurringEditor() {
@@ -1920,6 +1947,7 @@
     if (activeSettingsTab === "materials") { item.source = $("#settingSource")?.value.trim() || ""; item.unit = $("#settingUnit")?.value.trim() || ""; }
     if (activeSettingsTab === "customers") item.address = $("#settingAddress").value.trim();
     if (activeSettingsTab === "templates") {
+      item.note = $("#settingNote").value.trim();
       const names = $("#settingTools").value.split(",").map(value => value.trim()).filter(Boolean);
       item.toolIds = names.map(nameValue => {
         let tool = data.tools.find(entry => searchKey(entry.name) === searchKey(nameValue));

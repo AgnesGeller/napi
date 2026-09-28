@@ -30,7 +30,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260928d">
+  <link rel="stylesheet" href="css/style.css?v=20260928e">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -158,7 +158,7 @@
       <nav class="settings-tabs" aria-label="Beállítási kategóriák">
         <button type="button" class="active" data-settings-tab="workers">Dolgozók</button>
         <button type="button" data-settings-tab="vehicles">Autók</button>
-        <button type="button" data-settings-tab="templates">Feladatsablonok</button>
+        <button type="button" data-settings-tab="templates">Sablonok</button>
         <button type="button" data-settings-tab="tools">Eszközök</button>
         <button type="button" data-settings-tab="materials">Anyagok</button>
         <button type="button" data-settings-tab="customers">Ügyfelek</button>
@@ -323,10 +323,15 @@
         <details class="task-step expandable" data-detail="jobs" open>
           <summary><span class="step-label"><strong>Feladatok</strong></span><span class="summary-hint job-count">Nincs kiválasztva</span></summary>
           <div class="detail-content">
-            <p class="field-help">Több feladatot is kiválaszthatsz. A zöld kijelölést ugyanarra kattintva leveheted.</p>
-            <div class="chip-grid template-chips"></div>
+            <div class="job-template-picker">
+              <span class="customer-field-label">Sablon keresése</span>
+              <span class="customer-picker-row"><input class="form-control job-template-search" type="search" autocomplete="off" placeholder="Írj be legalább két betűt…"><button class="job-template-dropdown" type="button" aria-label="Sablonlista megnyitása" title="Sablonlista megnyitása">⌄</button></span>
+              <div class="job-template-suggestions" hidden></div>
+            </div>
+            <p class="field-help">Válassz mentett sablont, vagy írj be alább egy csak erre a napi tervre érvényes feladatot.</p>
             <div class="new-job-row">
               <input class="form-control new-job-input" type="text" maxlength="120" placeholder="Új feladat neve" aria-label="Új feladat neve">
+              <input class="form-control new-job-note" type="text" maxlength="500" placeholder="Megjegyzés a feladathoz" aria-label="Megjegyzés az új feladathoz">
               <button type="button" class="btn btn-soft add-custom-job">＋ Hozzáadás</button>
             </div>
           </div>
@@ -369,6 +374,6 @@
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260927c"></script>
   <script src="js/napi-sync.js?v=20260928f"></script>
-  <script src="js/app.js?v=20260928l"></script>
+  <script src="js/app.js?v=20260928m"></script>
 </body>
 </html>

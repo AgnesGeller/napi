@@ -235,13 +235,24 @@ button, summary { touch-action: manipulation; }
 .summary-hint { color: var(--muted); font-size: .82rem; }
 .detail-content { padding: .2rem 0 1rem 2.25rem; }
 .field-help { margin: 0 0 .65rem; color: var(--muted); font-size: .86rem; }
-.new-job-row { display: grid; grid-template-columns: minmax(160px, 1fr) auto; gap: .5rem; margin-top: .75rem; }
+.job-template-picker { position: relative; margin-bottom: .75rem; }
+.job-template-picker .customer-picker-row { display: grid; grid-template-columns: 1fr 46px; }
+.job-template-search { border-radius: 7px 0 0 7px; }
+.job-template-dropdown { min-height: 46px; color: var(--forest); border: 1px solid #aebdaf; border-left: 0; border-radius: 0 7px 7px 0; background: #f3f7f2; font-size: 1.3rem; font-weight: 800; }
+.job-template-suggestions { position: absolute; z-index: 20; top: calc(100% + 3px); left: 0; right: 0; max-height: 260px; overflow: auto; border: 1px solid #90a694; background: #fff; box-shadow: var(--shadow); }
+.job-template-suggestions button { width: 100%; min-height: 48px; padding: .65rem .75rem; text-align: left; border: 0; border-bottom: 1px solid #e0e7df; background: #fff; }
+.job-template-suggestions button:hover, .job-template-suggestions button:focus { background: var(--leaf-light); outline: 0; }
+.job-template-suggestions b, .job-template-suggestions small { display: block; }
+.job-template-suggestions small { color: var(--muted); }
+.new-job-row { display: grid; grid-template-columns: minmax(150px, .8fr) minmax(220px, 1.2fr) auto; gap: .5rem; margin-top: .75rem; }
 .new-job-row .btn { min-height: 46px; white-space: nowrap; }
 .job-workflows { display: grid; gap: .7rem; }
 .job-workflow { display: grid; gap: .35rem; padding: .7rem; border-left: 4px solid var(--orange); background: #f6f8f3; }
 .job-workflow > span { color: var(--forest); font-weight: 800; }
 .job-workflow-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
-.job-info-button { min-height: 38px; }
+.job-workflow-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.job-info-button, .remove-job-button { min-height: 38px; }
+.remove-job-button { color: #8d251f; }
 .job-workflow textarea { min-height: 108px; resize: vertical; }
 .empty-detail { margin: 0; padding: .7rem; color: var(--muted); background: #f6f8f3; }
 .materials-list { display: grid; gap: .5rem; margin-bottom: .65rem; }
