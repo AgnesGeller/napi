@@ -93,6 +93,7 @@
     ["Gyula", "#356859", false], ["Bendegúz", "#795548", false], ["Ádám", "#5d4e9b", false], ["Tamás", "#9a342b", true]
   ];
   const workerPalette = ["#22577a", "#8a4f14", "#7a3e65", "#356859", "#795548", "#5d4e9b", "#9a342b", "#2f6944", "#c05a24", "#56636b"];
+  const vehiclePalette = ["#c18a00", "#c84b43", "#3c82a8", "#805eaa", "#3f7655", "#b65f21", "#596870", "#9a4266"];
   const toolSeeds = ["hosszúláncos", "sövénynyíró", "kisláncos", "hosszúfűrész", "damilos", "kék villa", "big bag zsák", "fűhenger", "talicska", "gereblye", "lapát", "ásó"];
   const materialSeeds = [
     ["Termőföld", "", "m³"], ["Támfalkő", "", "db"], ["Vasgálic", "", "g"], ["Magellan", "", "kupak"],
@@ -101,7 +102,7 @@
 
   function createInitialData() {
     const workers = workerSeeds.map(([name, color, manager], index) => ({ id: uid(), name, color, manager, active: true, order: index }));
-    const vehicles = ["Platós", "Dobozos", "Merci", "Opel"].map((name, index) => ({ id: uid(), name, active: true, order: index }));
+    const vehicles = ["Platós", "Dobozos", "Merci", "Opel"].map((name, index) => ({ id: uid(), name, color: vehiclePalette[index], active: true, order: index }));
     const tools = toolSeeds.map((name, index) => ({ id: uid(), name, active: true, order: index }));
     const materials = materialSeeds.map(([name, source, unit], index) => ({ id: uid(), name, source, unit, active: true, order: index }));
     const toolId = name => tools.find(tool => tool.name === name)?.id;
@@ -256,7 +257,7 @@
       version: 4,
       updatedAt: candidate.updatedAt || new Date().toISOString(),
       workers: Array.isArray(candidate.workers) ? candidate.workers : initial.workers,
-      vehicles: Array.isArray(candidate.vehicles) ? candidate.vehicles : initial.vehicles,
+      vehicles: Array.isArray(candidate.vehicles) ? candidate.vehicles.map((vehicle, index) => ({ ...vehicle, color: validVehicleColor(vehicle.color, index) })) : initial.vehicles,
       tools: Array.isArray(candidate.tools) ? candidate.tools : initial.tools,
       materials: Array.isArray(candidate.materials) ? candidate.materials.map((item, index) => typeof item === "string" ? { id: uid(), name: item, source: "", unit: "", active: true, order: index } : { ...item, source: String(item.source || ""), unit: String(item.unit || "") }) : initial.materials,
       templates,
@@ -937,16 +938,16 @@
     return (r * 299 + g * 587 + b * 114) / 1000 > 155 ? "#172019" : "#fff";
   }
   function validWorkerColor(value) { return /^#[0-9a-f]{6}$/i.test(String(value || "")) ? String(value).toLowerCase() : "#2f6944"; }
+  function validVehicleColor(value, index = 0) { return /^#[0-9a-f]{6}$/i.test(String(value || "")) ? String(value).toLowerCase() : vehiclePalette[Math.max(0, index) % vehiclePalette.length]; }
+  function mixHex(color, target, amount) {
+    const channels = hex => [hex.slice(1, 3), hex.slice(3, 5), hex.slice(5, 7)].map(value => parseInt(value, 16));
+    const source = channels(color); const destination = channels(target);
+    return `#${source.map((value, index) => Math.round(value + (destination[index] - value) * amount).toString(16).padStart(2, "0")).join("")}`;
+  }
   function vehicleTheme(vehicle) {
-    const themes = [
-      { background: "#fff0ad", header: "#ffe27a", border: "#c18a00", accent: "#8a6200", text: "#fff" },
-      { background: "#ffdeda", header: "#ffc2bd", border: "#c84b43", accent: "#a43731", text: "#fff" },
-      { background: "#dcefff", header: "#bce1fa", border: "#3c82a8", accent: "#286a8b", text: "#fff" },
-      { background: "#ebddff", header: "#d9c0f7", border: "#805eaa", accent: "#68488c", text: "#fff" }
-    ];
-    const known = { platos: 0, dobozos: 1, merci: 2, opel: 3 };
-    const index = known[searchKey(vehicle?.name)] ?? Math.max(0, data.vehicles.findIndex(item => item.id === vehicle?.id)) % themes.length;
-    return themes[index];
+    const index = Math.max(0, data.vehicles.findIndex(item => item.id === vehicle?.id));
+    const color = validVehicleColor(vehicle?.color, index);
+    return { background: mixHex(color, "#ffffff", .72), header: mixHex(color, "#ffffff", .48), border: color, accent: mixHex(color, "#000000", .2), text: bestTextColor(mixHex(color, "#000000", .2)) };
   }
   function applyTaskVehicleTheme(card, task) {
     const vehicle = (task.vehicleIds || []).map(id => byId(data.vehicles, id)).find(Boolean);
@@ -1811,9 +1812,12 @@
       container.innerHTML = `<div class="settings-editor"><h3>${editing ? "Dolgozó szerkesztése" : "Új dolgozó"}</h3><div class="form-grid"><label>Név<input class="form-control" id="settingName" value="${escapeHTML(editing?.name || "")}" maxlength="80"></label><fieldset class="worker-color-editor wide"><legend>Dolgozó színe</legend><div class="worker-color-palette">${palette}</div><label class="worker-custom-color"><span>Egyedi szín</span><input id="settingColor" type="color" value="${selectedColor}"><output id="settingColorCode">${selectedColor.toUpperCase()}</output></label></fieldset><label class="wide"><span><input id="settingManager" type="checkbox" ${editing?.manager ? "checked" : ""}> Csoportvezető</span></label></div><button class="btn btn-outline-green" type="button" data-setting-submit>Mentés</button></div>${settingsListHTML(list, item => item.manager ? "Csoportvezető" : "Dolgozó", true)}`;
     } else if (activeSettingsTab === "materials") {
       container.innerHTML = `<div class="settings-editor"><h3>${editing ? "Anyag szerkesztése" : "Új anyag"}</h3><div class="form-grid"><label>Anyag neve<input class="form-control" id="settingName" value="${escapeHTML(editing?.name || "")}" maxlength="100"></label><label>Mértékegység<input class="form-control" id="settingUnit" value="${escapeHTML(editing?.unit || "")}" maxlength="40" placeholder="például: db, kg, m³"></label><label class="wide">Alapértelmezett beszerzési hely<input class="form-control" id="settingSource" value="${escapeHTML(editing?.source || "")}" maxlength="160"></label></div><button class="btn btn-outline-green" type="button" data-setting-submit>Mentés</button></div>${settingsListHTML(list, item => [item.source, item.unit].filter(Boolean).join(" · "))}`;
-    } else if (activeSettingsTab === "vehicles" || activeSettingsTab === "tools") {
-      const title = activeSettingsTab === "vehicles" ? "autó" : "eszköz";
-      container.innerHTML = `<div class="settings-editor"><h3>${editing ? `${title[0].toUpperCase() + title.slice(1)} szerkesztése` : `Új ${title}`}</h3><label>Név<input class="form-control" id="settingName" value="${escapeHTML(editing?.name || "")}" maxlength="100"></label><button class="btn btn-outline-green" type="button" data-setting-submit>Mentés</button></div>${settingsListHTML(list)}`;
+    } else if (activeSettingsTab === "vehicles") {
+      const selectedColor = validVehicleColor(editing?.color, editing ? list.indexOf(editing) : list.length);
+      const palette = vehiclePalette.map(color => `<button class="worker-color-choice" type="button" data-worker-color="${color}" style="--choice-color:${color}" aria-label="${color} szín" aria-pressed="${color === selectedColor}"><span></span></button>`).join("");
+      container.innerHTML = `<div class="settings-editor"><h3>${editing ? "Autó szerkesztése" : "Új autó"}</h3><div class="form-grid"><label>Név<input class="form-control" id="settingName" value="${escapeHTML(editing?.name || "")}" maxlength="100"></label><fieldset class="worker-color-editor wide"><legend>Autó színe</legend><div class="worker-color-palette">${palette}</div><label class="worker-custom-color"><span>Egyedi szín</span><input id="settingColor" type="color" value="${selectedColor}"><output id="settingColorCode">${selectedColor.toUpperCase()}</output></label></fieldset></div><button class="btn btn-outline-green" type="button" data-setting-submit>Mentés</button></div>${settingsListHTML(list, () => "Autó", true)}`;
+    } else if (activeSettingsTab === "tools") {
+      container.innerHTML = `<div class="settings-editor"><h3>${editing ? "Eszköz szerkesztése" : "Új eszköz"}</h3><label>Név<input class="form-control" id="settingName" value="${escapeHTML(editing?.name || "")}" maxlength="100"></label><button class="btn btn-outline-green" type="button" data-setting-submit>Mentés</button></div>${settingsListHTML(list)}`;
     } else if (activeSettingsTab === "customers") {
       container.innerHTML = customerDirectorySettingsHTML();
     } else {
@@ -1873,6 +1877,7 @@
     const item = existing || { id: uid(), active: true, order: list.length };
     item.name = name;
     if (activeSettingsTab === "workers") { item.color = $("#settingColor").value; item.manager = $("#settingManager").checked; }
+    if (activeSettingsTab === "vehicles") item.color = validVehicleColor($("#settingColor").value, list.indexOf(item));
     if (activeSettingsTab === "materials") { item.source = $("#settingSource")?.value.trim() || ""; item.unit = $("#settingUnit")?.value.trim() || ""; }
     if (activeSettingsTab === "customers") item.address = $("#settingAddress").value.trim();
     if (activeSettingsTab === "templates") {

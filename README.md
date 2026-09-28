@@ -10,6 +10,7 @@ Az alkalmazás címe: <https://agnesgeller.github.io/napi/>
 - A **Heti nézet** péntektől csütörtökig mutatja a munkákat.
 - A **Havi nézetben** a napi tervek és az előjegyzések is láthatók.
 - A mentett tervek a csatlakoztatott PC-k és Android-telefonok között automatikusan szinkronizálódnak.
+- Az **Adatok kezelése → Autók** részen az autók neve és megkülönböztető színe is módosítható; ez a szín a napi terven és a PDF-en is megjelenik.
 - A PDF, a heti, havi és éves napi feladatok, valamint az alkalmazás a **Letöltések** ablakból érhető el.
 
 ## Telefonos értesítések
@@ -76,5 +77,5 @@ node --check sw.js
 A regressziós tesztek a `tests` mappában vannak. Windows alatt a következő paranccsal futtathatók:
 
 ```powershell
-node --test tests/deletion-sync.test.cjs tests/print-layout.test.cjs tests/push-notifications.test.cjs tests/sync-session.test.cjs
+node --test tests/deletion-sync.test.cjs tests/print-layout.test.cjs tests/push-notifications.test.cjs tests/sync-session.test.cjs tests/vehicle-colors.test.cjs
 ```
