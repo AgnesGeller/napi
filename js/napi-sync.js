@@ -3,6 +3,7 @@
 
   const SUPABASE_URL = "https://wojgdfojupnfldrmqaht.supabase.co";
   const PUBLISHABLE_KEY = "sb_publishable_sN7FyjIcTYuhQIMomkzkjA_v4xp3N78";
+  const VAPID_PUBLIC_KEY = "BGBc5hwEZ6yzTzS1QXsFPZf3u1zFHC3Cn8Fy3bC4f2s1VKgdJUuhSiLZT61eCYOGo8lT0m-NRtqoSjRNZBshpro";
   const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
   const isClockSkewError = result => /jwt issued at future/i.test(String(result?.msg || result?.message || ""));
 
@@ -59,10 +60,48 @@
 
   async function pushPlan(plan) {
     const { ownerId } = await sessionDetails();
-    return request("rpc/napi_upsert_daily_plan", {
+    const result = await request("rpc/napi_upsert_daily_plan", {
       method: "POST",
       body: { p_owner_id: ownerId, p_plan_date: plan.date, p_payload: plan, p_updated_at: plan.updatedAt || new Date().toISOString() }
     });
+    if (result !== false) await replacePlanReminders(plan);
+    return result;
+  }
+
+  function reminderRows(plan, ownerId) {
+    return (plan.workItems || []).flatMap(item => {
+      if (!["survey", "meeting"].includes(item.type)) return [];
+      return [...new Set(item.reminderTimes || [])].filter(time => /^([01]\d|2[0-3]):[0-5]\d$/.test(time)).map(time => {
+        const scheduled = new Date(`${plan.date}T${time}:00`);
+        const type = item.type === "survey" ? "Felmérés" : "Megbeszélés";
+        const details = [item.address, item.note].filter(Boolean).join(" – ");
+        return {
+          owner_id: ownerId,
+          plan_date: plan.date,
+          work_item_id: item.id,
+          notification_type: item.type,
+          title: `${type}: ${item.customerName || "Nincs megadva"}`,
+          body: details || "Nyisd meg a Napi feladatok alkalmazást a részletekért.",
+          scheduled_for: scheduled.toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      });
+    });
+  }
+
+  async function replacePlanReminders(plan) {
+    const { ownerId } = await sessionDetails();
+    await request(`napi_notification_reminders?owner_id=eq.${ownerId}&plan_date=eq.${encodeURIComponent(plan.date)}&sent_at=is.null`, { method: "DELETE", prefer: "return=minimal" });
+    const rows = reminderRows(plan, ownerId);
+    if (rows.length) await request("napi_notification_reminders?on_conflict=owner_id,work_item_id,scheduled_for", {
+      method: "POST", body: rows, prefer: "resolution=merge-duplicates,return=minimal"
+    });
+  }
+
+  async function removePlanReminders(dates) {
+    const { ownerId } = await sessionDetails();
+    const filter = [...new Set(dates)].filter(Boolean).map(date => encodeURIComponent(date)).join(",");
+    if (filter) await request(`napi_notification_reminders?owner_id=eq.${ownerId}&plan_date=in.(${filter})`, { method: "DELETE", prefer: "return=minimal" });
   }
 
   async function deletePlans(dates) {
@@ -80,8 +119,26 @@
     const rows = await request(`napi_daily_plans?select=plan_date,payload&plan_date=in.(${filter})`);
     const confirmed = new Set((rows || []).filter(row => row.payload?.deleted).map(row => row.plan_date));
     if (uniqueDates.some(date => !confirmed.has(date))) throw new Error("A teljes nap törlésének közös megerősítése nem sikerült.");
+    await removePlanReminders(uniqueDates);
     return rows;
   }
 
-  window.NapiCloudSync = { pull, pushConfig, pushPlan, deletePlans };
+  async function savePushSubscription(subscription, deviceName) {
+    const { ownerId } = await sessionDetails();
+    const json = subscription.toJSON();
+    return request("napi_push_subscriptions?on_conflict=owner_id,endpoint", {
+      method: "POST",
+      body: { owner_id: ownerId, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth, device_name: deviceName || "Android telefon", enabled: true, last_seen_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+      prefer: "resolution=merge-duplicates,return=minimal"
+    });
+  }
+
+  async function disablePushSubscription(endpoint) {
+    const { ownerId } = await sessionDetails();
+    return request(`napi_push_subscriptions?owner_id=eq.${ownerId}&endpoint=eq.${encodeURIComponent(endpoint)}`, {
+      method: "PATCH", body: { enabled: false, updated_at: new Date().toISOString() }, prefer: "return=minimal"
+    });
+  }
+
+  window.NapiCloudSync = { pull, pushConfig, pushPlan, deletePlans, savePushSubscription, disablePushSubscription, vapidPublicKey: VAPID_PUBLIC_KEY };
 })();

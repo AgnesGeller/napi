@@ -30,7 +30,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260928c">
+  <link rel="stylesheet" href="css/style.css?v=20260928d">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -48,6 +48,7 @@
         <button class="btn btn-install-header" id="quickInstallButton" type="button" hidden>📱 App telepítése</button>
         <button class="btn btn-light-outline" id="downloadButton" type="button">⬇ Letöltések</button>
         <button class="btn btn-light-outline" id="refreshButton" type="button" title="A legújabb adatok és appverzió betöltése">⟳ Frissítés</button>
+        <button class="btn btn-light-outline" id="notificationButton" type="button" hidden>🔔 Értesítések</button>
         <button class="btn btn-light-outline" id="settingsButton" type="button">⚙ Adatok kezelése</button>
         <button class="btn btn-light-outline" id="sessionButton" type="button">🔑 Belépés</button>
       </div>
@@ -191,8 +192,26 @@
         <datalist id="workItemCustomerOptions"></datalist>
         <label class="wide">Cím<input class="form-control" id="workItemAddress" name="address" type="text" maxlength="240" required placeholder="A helyszín címe"></label>
         <label class="wide">Megjegyzés<textarea class="form-control" id="workItemNote" name="note" rows="4" maxlength="1000" placeholder="Mit kell elvégezni vagy miről lesz szó?"></textarea></label>
+        <section class="wide reminder-editor" id="workItemReminderEditor" hidden>
+          <h3>Telefonos emlékeztető</h3>
+          <p>Adj hozzá egy vagy több időpontot. Minden engedélyezett telefon ugyanazt az értesítést kapja.</p>
+          <div class="reminder-add-row"><label>Értesítés ideje<input class="form-control" id="workItemReminderTime" type="time"></label><button class="btn btn-soft" id="addReminderTimeButton" type="button">＋ Időpont hozzáadása</button></div>
+          <div class="reminder-time-list" id="workItemReminderTimes" aria-live="polite"></div>
+        </section>
       </div>
       <footer class="dialog-footer"><button class="btn btn-save" type="submit">Mentés</button><button class="btn btn-danger" id="deleteWorkItemButton" type="button" hidden>Törlés</button><button class="btn btn-secondary" type="button" data-close-work-item>Mégse</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="notificationDialog" class="app-dialog compact-dialog">
+    <form method="dialog" class="dialog-frame">
+      <header class="dialog-header"><div><p class="section-kicker">Ez az eszköz</p><h2>Telefonos értesítések</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
+      <div class="dialog-body">
+        <p class="directory-intro">Ezen a telefonon külön kell engedélyezni az értesítéseket. Ezután a felmérések és megbeszélések beállított időpontban jelennek meg.</p>
+        <label>Eszköz neve<input class="form-control" id="notificationDeviceName" type="text" maxlength="80" placeholder="Például: Tamás telefonja"></label>
+        <p class="directory-message" id="notificationStatus" role="status"></p>
+      </div>
+      <footer class="dialog-footer"><button class="btn btn-save" id="enableNotificationsButton" type="button">Értesítések bekapcsolása</button><button class="btn btn-danger" id="disableNotificationsButton" type="button" hidden>Kikapcsolás ezen a telefonon</button><button class="btn btn-secondary" value="cancel">Bezárás</button></footer>
     </form>
   </dialog>
 
@@ -349,7 +368,7 @@
 
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260927c"></script>
-  <script src="js/napi-sync.js?v=20260927c"></script>
-  <script src="js/app.js?v=20260928d"></script>
+  <script src="js/napi-sync.js?v=20260928e"></script>
+  <script src="js/app.js?v=20260928e"></script>
 </body>
 </html>

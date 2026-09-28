@@ -13,6 +13,7 @@
   const WEEK_ANCHOR_KEY = "diszkertek-napi-heti-pozicio-v1";
   const MONTH_ANCHOR_KEY = "diszkertek-napi-havi-pozicio-v1";
   const UPDATE_RELOAD_DATE_KEY = "diszkertek-napi-frissites-datuma-v1";
+  const NOTIFICATION_DEVICE_KEY = "diszkertek-napi-ertesitesi-eszkoz-v1";
   const FINAL_NOTE = "A nap végén mindenki vegye ki a szemetét az autóból és hagyjon rendet maga után!";
   const DEFAULT_MEETING = "telephely, 6:30";
   const DEFAULT_STOPS = "Vizeshűtő, Lidl, Dohánybolt";
@@ -185,6 +186,7 @@
   let pendingCustomerTaskId = null;
   let editingWorkItemId = null;
   let editingWorkItemDate = null;
+  let editingReminderTimes = [];
   let assigningWorkItemId = null;
   let weekAnchor = storedCalendarPosition(WEEK_ANCHOR_KEY, isoToday(), /^\d{4}-\d{2}-\d{2}$/);
   let monthAnchor = storedCalendarPosition(MONTH_ANCHOR_KEY, isoToday().slice(0, 7), /^\d{4}-\d{2}$/);
@@ -271,7 +273,8 @@
           locationId: item.locationId || null,
           customerName: String(item.customerName || ""),
           address: String(item.address || ""),
-          note: String(item.note || "")
+          note: String(item.note || ""),
+          reminderTimes: [...new Set(Array.isArray(item.reminderTimes) ? item.reminderTimes.filter(time => /^([01]\d|2[0-3]):[0-5]\d$/.test(time)) : [])].sort()
         })) : [],
         deletedWorkItemIds: Array.isArray(plan.deletedWorkItemIds) ? [...new Set(plan.deletedWorkItemIds.filter(Boolean))] : [],
         tasks: Array.isArray(plan.tasks) ? plan.tasks.map(normalizeTask) : []
@@ -1179,12 +1182,21 @@
     $("#workItemCustomer").value = item?.customerName || "";
     $("#workItemAddress").value = item?.address || "";
     $("#workItemNote").value = item?.note || "";
+    editingReminderTimes = [...(item?.reminderTimes || [])];
+    updateReminderEditor();
     $("#deleteWorkItemButton").hidden = !item;
     renderWorkCustomerOptions();
     $("#workItemDialog").showModal();
     $("#workItemCustomer").focus();
   }
-  function closeWorkItemDialog() { $("#workItemDialog").close(); editingWorkItemId = null; editingWorkItemDate = null; }
+  function closeWorkItemDialog() { $("#workItemDialog").close(); editingWorkItemId = null; editingWorkItemDate = null; editingReminderTimes = []; }
+  function updateReminderEditor() {
+    const enabled = ["survey", "meeting"].includes($("#workItemType").value);
+    $("#workItemReminderEditor").hidden = !enabled;
+    $("#workItemReminderTimes").innerHTML = editingReminderTimes.length
+      ? editingReminderTimes.map(time => `<span class="reminder-time-chip">${escapeHTML(time)}<button type="button" data-remove-reminder="${escapeHTML(time)}" aria-label="${escapeHTML(time)} értesítés törlése">×</button></span>`).join("")
+      : `<span class="field-help">Nincs beállított értesítés.</span>`;
+  }
   async function deleteWorkItem(date, itemId) {
     const plan = workPlanForDate(date);
     const item = (plan.workItems || []).find(entry => entry.id === itemId);
@@ -1212,6 +1224,20 @@
   $("#addWorkItemButton").addEventListener("click", () => openWorkItemDialog());
   document.querySelectorAll("[data-close-work-item]").forEach(button => button.addEventListener("click", closeWorkItemDialog));
   document.querySelectorAll("[data-close-work-assign]").forEach(button => button.addEventListener("click", closeWorkAssignment));
+  $("#workItemType").addEventListener("change", updateReminderEditor);
+  $("#addReminderTimeButton").addEventListener("click", () => {
+    const time = $("#workItemReminderTime").value;
+    if (!time) { toast("Válassz értesítési időpontot.", true); return; }
+    editingReminderTimes = [...new Set([...editingReminderTimes, time])].sort();
+    $("#workItemReminderTime").value = "";
+    updateReminderEditor();
+  });
+  $("#workItemReminderTimes").addEventListener("click", event => {
+    const button = event.target.closest("[data-remove-reminder]");
+    if (!button) return;
+    editingReminderTimes = editingReminderTimes.filter(time => time !== button.dataset.removeReminder);
+    updateReminderEditor();
+  });
   $("#deleteWorkItemButton").addEventListener("click", async () => {
     if (editingWorkItemId && editingWorkItemDate && await deleteWorkItem(editingWorkItemDate, editingWorkItemId)) closeWorkItemDialog();
   });
@@ -1234,7 +1260,8 @@
     const customerName = $("#workItemCustomer").value.trim();
     const address = $("#workItemAddress").value.trim();
     const directoryMatch = customerDirectory.find(customer => searchKey(customer.name) === searchKey(customerName) && (!address || searchKey(customer.address) === searchKey(address))) || customerDirectory.find(customer => searchKey(customer.name) === searchKey(customerName));
-    targetPlan.workItems.push({ id: existing?.id || uid(), type: $("#workItemType").value, customerId: directoryMatch?.customerId || null, locationId: directoryMatch?.locationId || null, customerName, address, note: $("#workItemNote").value.trim() });
+    const type = $("#workItemType").value;
+    targetPlan.workItems.push({ id: existing?.id || uid(), type, customerId: directoryMatch?.customerId || null, locationId: directoryMatch?.locationId || null, customerName, address, note: $("#workItemNote").value.trim(), reminderTimes: ["survey", "meeting"].includes(type) ? [...editingReminderTimes] : [] });
     persistWorkPlans([sourcePlan, targetPlan]);
     setWeekAnchor(targetDate); setMonthAnchor(targetDate.slice(0, 7));
     $("#weekView").open = true;
@@ -1906,6 +1933,67 @@
   $("#stopsInput").addEventListener("input", event => { workingPlan.stops = event.target.value; markDirty(); });
   $("#todayButton").addEventListener("click", () => changeDate(isoToday()));
   $("#folderButton").addEventListener("click", chooseFolder); $("#refreshButton").addEventListener("click", refreshApplication);
+  function pushNotificationsSupported() {
+    return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  }
+  function vapidKeyBytes(value) {
+    const padding = "=".repeat((4 - value.length % 4) % 4);
+    const raw = atob((value + padding).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from([...raw].map(character => character.charCodeAt(0)));
+  }
+  async function currentPushSubscription() {
+    if (!pushNotificationsSupported()) return null;
+    const registration = await navigator.serviceWorker.ready;
+    return registration.pushManager.getSubscription();
+  }
+  async function refreshNotificationDialog() {
+    const status = $("#notificationStatus");
+    if (!pushNotificationsSupported()) {
+      status.textContent = "Ezen a böngészőn nem használhatók telefonos értesítések.";
+      $("#enableNotificationsButton").hidden = true;
+      $("#disableNotificationsButton").hidden = true;
+      return;
+    }
+    const subscription = await currentPushSubscription();
+    const enabled = Notification.permission === "granted" && Boolean(subscription);
+    status.textContent = enabled ? "Az értesítések be vannak kapcsolva ezen az eszközön." : Notification.permission === "denied" ? "Az értesítést a böngésző beállításaiban letiltottad." : "Az értesítések még nincsenek bekapcsolva ezen az eszközön.";
+    $("#enableNotificationsButton").hidden = enabled;
+    $("#disableNotificationsButton").hidden = !subscription;
+  }
+  async function openNotificationDialog() {
+    $("#notificationDeviceName").value = localStorage.getItem(NOTIFICATION_DEVICE_KEY) || "Android telefon";
+    $("#notificationDialog").showModal();
+    await refreshNotificationDialog();
+  }
+  $("#notificationButton").addEventListener("click", openNotificationDialog);
+  $("#enableNotificationsButton").addEventListener("click", async () => {
+    const button = $("#enableNotificationsButton");
+    if (!window.NapiCustomerDirectory?.hasSession?.()) { $("#notificationStatus").textContent = "Előbb csatlakoztasd ezt az eszközt a Belépés gombbal."; return; }
+    button.disabled = true;
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") throw new Error("Az értesítési engedély nem lett megadva.");
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidKeyBytes(window.NapiCloudSync.vapidPublicKey) });
+      const deviceName = $("#notificationDeviceName").value.trim() || "Android telefon";
+      localStorage.setItem(NOTIFICATION_DEVICE_KEY, deviceName);
+      await window.NapiCloudSync.savePushSubscription(subscription, deviceName);
+      await refreshNotificationDialog();
+      toast("Az értesítések bekapcsolva ezen az eszközön.");
+    } catch (error) { $("#notificationStatus").textContent = readableError(error); }
+    finally { button.disabled = false; }
+  });
+  $("#disableNotificationsButton").addEventListener("click", async () => {
+    const button = $("#disableNotificationsButton"); button.disabled = true;
+    try {
+      const subscription = await currentPushSubscription();
+      if (subscription) { await window.NapiCloudSync.disablePushSubscription(subscription.endpoint); await subscription.unsubscribe(); }
+      await refreshNotificationDialog();
+      toast("Az értesítések kikapcsolva ezen az eszközön.");
+    } catch (error) { $("#notificationStatus").textContent = readableError(error); }
+    finally { button.disabled = false; }
+  });
   function updateDownloadPeriodLabels() {
     const reference = workingPlan.date; const weekStart = startOfWeek(reference); const weekEnd = dateOffset(weekStart, 6);
     $("#downloadWeekRange").textContent = `${formatDate(weekStart, { year: "numeric", month: "long", day: "numeric" })} – ${formatDate(weekEnd, { year: "numeric", month: "long", day: "numeric" })}`;
@@ -1972,6 +2060,8 @@
   async function initialize() {
     const today = isoToday();
     let initialDate = today;
+    const linkedDate = new URLSearchParams(window.location.search).get("date");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(linkedDate || "")) initialDate = linkedDate;
     try {
       const updateReloadDate = sessionStorage.getItem(UPDATE_RELOAD_DATE_KEY);
       sessionStorage.removeItem(UPDATE_RELOAD_DATE_KEY);
@@ -2005,6 +2095,7 @@
     if (navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) { await syncCustomerDirectory(); await pullSharedData({ initial: true }); if (pendingCloudDeletedDates.size || pendingCloudPlanDates.size) await pushCurrentState(); }
     if (appRunsStandalone()) localStorage.setItem(INSTALLED_KEY, "true");
     updateInstallButtons();
+    $("#notificationButton").hidden = !pushNotificationsSupported();
     if ("serviceWorker" in navigator) {
       let reloadingForUpdate = false;
       navigator.serviceWorker.addEventListener("controllerchange", async () => {

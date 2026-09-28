@@ -63,6 +63,13 @@ button, summary { touch-action: manipulation; }
 .work-alert-button:active { transform: translateY(2px); box-shadow: 0 1px 0 #861b16; }
 #workItemDialog .btn-save { color: #fff; border: 2px solid #861b16; background: #b92f27; font-weight: 900; box-shadow: 0 3px 0 #861b16; }
 #workItemDialog .btn-save:hover, #workItemDialog .btn-save:focus-visible { color: #fff; background: #9f241e; }
+.reminder-editor { padding: .8rem; border: 2px solid #c78928; background: #fff8df; }
+.reminder-editor h3 { margin: 0; color: #6f3b09; font: 700 1.05rem Georgia, serif; }
+.reminder-editor p { margin: .25rem 0 .7rem; color: #644d30; font-size: .86rem; }
+.reminder-add-row { display: grid; grid-template-columns: minmax(150px, 1fr) auto; gap: .55rem; align-items: end; }
+.reminder-time-list { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .65rem; }
+.reminder-time-chip { display: inline-flex; align-items: center; gap: .4rem; padding: .38rem .5rem; border: 1px solid #b77718; background: #fff; color: #5d330b; font-weight: 850; }
+.reminder-time-chip button { min-width: 30px; min-height: 30px; padding: 0; color: #8a211c; border: 0; background: transparent; font-size: 1.2rem; }
 .work-inbox-help { margin: -.15rem .2rem .85rem; color: var(--muted); }
 .work-inbox-empty { padding: 1rem; color: #748078; border: 1px dashed #b8c3b9; background: rgba(255,255,255,.7); text-align: center; }
 .work-inbox-empty[hidden] { display: none; }
@@ -352,6 +359,7 @@ button, summary { touch-action: manipulation; }
 }
 
 @media (max-width: 760px) {
+  .reminder-add-row { grid-template-columns: 1fr; }
   body { padding-bottom: 78px; }
   body.actions-open { padding-bottom: 225px; }
   .history-item { align-items: stretch; flex-direction: column; gap: .55rem; }
