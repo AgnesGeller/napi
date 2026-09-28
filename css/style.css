@@ -332,10 +332,16 @@ button, summary { touch-action: manipulation; }
 .delete-archive summary { padding: .75rem .9rem; color: #812b25; font-weight: 850; cursor: pointer; }
 .delete-archive p { margin: 0; padding: 0 .9rem .7rem; color: var(--muted); }
 .archive-delete-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; padding: 0 .9rem .9rem; }
-.history-item { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: #fff; }
-.history-item:hover { background: var(--leaf-light); }
-.history-item b, .history-item span { display: block; }
-.history-item span { color: var(--muted); font-size: .88rem; }
+.history-message { margin: 0 0 .75rem; color: var(--muted); }
+.history-message.error { padding: .65rem .75rem; color: #812b25; border-left: 4px solid #b1342c; background: #fff3f1; }
+.history-item { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .9rem; text-align: left; border: 1px solid var(--line); border-left: 5px solid var(--forest); background: #fff; }
+.history-item + .history-item { margin-top: .55rem; }
+.history-item:hover, .history-item:focus-visible { background: var(--leaf-light); }
+.history-copy-info, .history-copy-info b, .history-copy-info span, .history-copy-info small { display: block; }
+.history-copy-info { min-width: 0; }
+.history-copy-info span { margin-top: .15rem; color: var(--muted); font-size: .88rem; }
+.history-copy-info small { margin-top: .35rem; overflow-wrap: anywhere; color: var(--forest); font-size: .82rem; line-height: 1.35; }
+.history-item > strong { flex: 0 0 auto; color: var(--rust); }
 .toast-region { position: fixed; z-index: 200; right: 1rem; bottom: 9rem; width: min(360px, calc(100% - 2rem)); display: grid; gap: .5rem; }
 .app-toast { padding: .8rem 1rem; color: #fff; background: var(--forest); border-left: 5px solid #dca06b; box-shadow: var(--shadow); }
 .app-toast.error { background: #722622; }
@@ -348,6 +354,8 @@ button, summary { touch-action: manipulation; }
 @media (max-width: 760px) {
   body { padding-bottom: 78px; }
   body.actions-open { padding-bottom: 225px; }
+  .history-item { align-items: stretch; flex-direction: column; gap: .55rem; }
+  .history-item > strong { align-self: flex-end; }
   .header-inner { width: min(1180px, calc(100% - 1.1rem)); align-items: flex-start; flex-direction: column; }
   .brand-lockup img { width: 68px; height: 54px; }
   .header-actions { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }

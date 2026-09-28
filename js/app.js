@@ -1433,12 +1433,52 @@
     workingPlan.tasks.forEach(task => task.id = uid()); markDirty("Korábbi terv másolva • mentés szükséges"); renderWorkItems(); renderTasks(); toast("A terv átmásolva az új dátumra.");
   }
   $("#copyYesterdayButton").addEventListener("click", () => copyPlanFrom(dateOffset(workingPlan.date, -1)));
-  $("#copyEarlierButton").addEventListener("click", () => {
-    const plans = data.plans.filter(plan => plan.date !== workingPlan.date && planHasTasks(plan)).sort((a, b) => b.date.localeCompare(a.date));
-    $("#historyList").innerHTML = plans.length ? plans.map(plan => `<button class="history-item" type="button" data-copy-date="${plan.date}"><span><b>${escapeHTML(formatDate(plan.date))}</b><span>${plan.tasks.length} feladat</span></span><strong>Másolás →</strong></button>`).join("") : `<p>Még nincs másolható korábbi terv.</p>`;
-    $("#historyDialog").showModal();
+  function earlierPlans() {
+    return data.plans.filter(plan => plan.date < workingPlan.date && planHasTasks(plan)).sort((a, b) => b.date.localeCompare(a.date));
+  }
+  function earlierPlanDetails(plan) {
+    return tasksByTeam(plan).map(group => {
+      const lead = group.tasks[0];
+      const vehicles = (lead.vehicleIds || []).map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ") || "Autó nélkül";
+      const customers = group.tasks.map(task => `${clientNumberForVehicle(task, plan)}. ${task.customerName || "Ügyfél nélkül"}`).join(", ");
+      return `${vehicles}: ${customers}`;
+    }).join(" • ");
+  }
+  function renderEarlierPlans(syncError = "") {
+    const plans = earlierPlans();
+    const warning = syncError ? `<p class="history-message error">${escapeHTML(syncError)}</p>` : "";
+    if (plans.length) {
+      $("#historyList").innerHTML = `${warning}<p class="history-message">Válaszd ki, melyik elmentett tervet szeretnéd átmásolni erre a napra.</p>${plans.map(plan => {
+        const teamCount = tasksByTeam(plan).length;
+        return `<button class="history-item" type="button" data-copy-date="${escapeHTML(plan.date)}"><span class="history-copy-info"><b>${escapeHTML(formatDate(plan.date, { year: "numeric", month: "long", day: "numeric", weekday: "long" }))}</b><span>${plan.tasks.length} ügyfél · ${teamCount} autó / csapat</span><small>${escapeHTML(earlierPlanDetails(plan))}</small></span><strong>Ezt másolom →</strong></button>`;
+      }).join("")}`;
+      return;
+    }
+    const connected = Boolean(window.NapiCustomerDirectory?.hasSession?.());
+    $("#historyList").innerHTML = `${warning}<p class="history-message">A kiválasztott nap előtt nincs másolható, elmentett napi terv.</p>${connected ? "" : `<button class="btn btn-outline-green" type="button" data-history-connect>Csatlakoztatás a közös tervekhez</button>`}`;
+  }
+  $("#copyEarlierButton").addEventListener("click", async () => {
+    const button = $("#copyEarlierButton");
+    $("#historyList").innerHTML = `<p class="history-message">Korábbi tervek betöltése…</p>`;
+    if (!$("#historyDialog").open) $("#historyDialog").showModal();
+    button.disabled = true;
+    try {
+      if (navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) {
+        await waitForCurrentCloudSync();
+        await pullSharedData({ throwOnError: true });
+      }
+      renderEarlierPlans();
+    } catch (error) {
+      renderEarlierPlans(`A közös tervek frissítése nem sikerült: ${readableError(error)}`);
+    } finally {
+      button.disabled = false;
+    }
   });
-  $("#historyList").addEventListener("click", event => { const item = event.target.closest("[data-copy-date]"); if (item) { copyPlanFrom(item.dataset.copyDate); $("#historyDialog").close(); } });
+  $("#historyList").addEventListener("click", event => {
+    if (event.target.closest("[data-history-connect]")) { $("#historyDialog").close(); openCustomerAuth(); return; }
+    const item = event.target.closest("[data-copy-date]");
+    if (item) { copyPlanFrom(item.dataset.copyDate); $("#historyDialog").close(); }
+  });
 
   function renderWeek() {
     const start = startOfWeek(weekAnchor); const days = Array.from({ length: 7 }, (_, index) => dateOffset(start, index));
