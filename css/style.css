@@ -84,6 +84,11 @@ button, summary { touch-action: manipulation; }
 .work-inbox-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; }
 .work-inbox-actions .btn { min-height: 38px; padding: .3rem .6rem; font-size: .82rem; }
 .work-inbox-actions .work-remove { color: #8d2722; border-color: #d5aaa7; background: #fff5f4; }
+.print-work-items { margin: 0 0 1rem; padding: .75rem; border: 1px solid #b9c5ba; }
+.print-work-items h2 { margin: 0 0 .55rem; font-size: 1rem; color: var(--forest); }
+.print-work-item { padding: .4rem 0; border-top: 1px solid #dce3dc; }
+.print-work-item:first-of-type { border-top: 0; }
+.print-work-item strong, .print-work-item span, .print-work-item small { display: block; }
 .week-day.has-work-items { border: 2px solid #b92f27; background: #fff0ee; box-shadow: inset 0 4px 0 #b92f27; }
 .week-day.has-work-items > header { background: #fbdedb; }
 .week-work-item { padding: .5rem; border: 2px solid #c44b44; border-left: 6px solid var(--work-type-color, #b92f27); background: #fff; font-size: .78rem; box-shadow: 0 2px 0 rgba(134,27,22,.16); }

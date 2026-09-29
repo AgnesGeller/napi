@@ -58,43 +58,11 @@
     });
   }
 
-  async function pushPlan(plan) {
+  async function pushPlan(plan, { workItemsOnly = false } = {}) {
     const { ownerId } = await sessionDetails();
-    const result = await request("rpc/napi_upsert_daily_plan", {
+    return request("rpc/napi_save_daily_plan", {
       method: "POST",
-      body: { p_owner_id: ownerId, p_plan_date: plan.date, p_payload: plan, p_updated_at: plan.updatedAt || new Date().toISOString() }
-    });
-    if (result !== false) await replacePlanReminders(plan);
-    return result;
-  }
-
-  function reminderRows(plan, ownerId) {
-    return (plan.workItems || []).flatMap(item => {
-      if (!["survey", "meeting"].includes(item.type)) return [];
-      return [...new Set(item.reminderTimes || [])].filter(time => /^([01]\d|2[0-3]):[0-5]\d$/.test(time)).map(time => {
-        const scheduled = new Date(`${plan.date}T${time}:00`);
-        const type = item.type === "survey" ? "Felmérés" : "Megbeszélés";
-        const details = [item.address, item.note].filter(Boolean).join(" – ");
-        return {
-          owner_id: ownerId,
-          plan_date: plan.date,
-          work_item_id: item.id,
-          notification_type: item.type,
-          title: `${type}: ${item.customerName || "Nincs megadva"}`,
-          body: details || "Nyisd meg a Napi feladatok alkalmazást a részletekért.",
-          scheduled_for: scheduled.toISOString(),
-          updated_at: new Date().toISOString()
-        };
-      });
-    });
-  }
-
-  async function replacePlanReminders(plan) {
-    const { ownerId } = await sessionDetails();
-    await request(`napi_notification_reminders?owner_id=eq.${ownerId}&plan_date=eq.${encodeURIComponent(plan.date)}&sent_at=is.null`, { method: "DELETE", prefer: "return=minimal" });
-    const rows = reminderRows(plan, ownerId);
-    if (rows.length) await request("napi_notification_reminders?on_conflict=owner_id,work_item_id,scheduled_for", {
-      method: "POST", body: rows, prefer: "resolution=merge-duplicates,return=minimal"
+      body: { p_owner_id: ownerId, p_plan_date: plan.date, p_payload: plan, p_base_updated_at: plan.cloudUpdatedAt || null, p_work_items_only: workItemsOnly }
     });
   }
 
@@ -114,7 +82,7 @@
       const current = currentByDate.get(date);
       const currentTimestamp = Date.parse(current?.updated_at || "") || 0;
       const deletedAt = new Date(Math.max(Date.now(), currentTimestamp + 1)).toISOString();
-      return pushPlan({ date, deleted: true, deletedPlanId: current?.payload?.id || current?.payload?.deletedPlanId || null, updatedAt: deletedAt });
+      return pushPlan({ date, deleted: true, deletedPlanId: current?.payload?.id || current?.payload?.deletedPlanId || null, updatedAt: deletedAt, cloudUpdatedAt: current?.updated_at || null });
     }));
     const rows = await request(`napi_daily_plans?select=plan_date,payload&plan_date=in.(${filter})`);
     const confirmed = new Set((rows || []).filter(row => row.payload?.deleted).map(row => row.plan_date));
