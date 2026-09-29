@@ -6,7 +6,7 @@ const app = fs.readFileSync("js/app.js", "utf8");
 const sync = fs.readFileSync("js/napi-sync.js", "utf8");
 const worker = fs.readFileSync("sw.js", "utf8");
 const html = fs.readFileSync("index.html", "utf8");
-const migration = fs.readFileSync("supabase/migrations/20260928130000_napi_push_notifications.sql", "utf8");
+const migration = fs.readFileSync("supabase/migrations/20260928094018_napi_push_notifications.sql", "utf8");
 
 assert.match(app, /reminderTimes:[\s\S]*?\.sort\(\)/, "Az értesítési időpontok normalizálása hiányzik.");
 assert.match(app, /\["survey", "meeting"\]\.includes\(type\)/, "Csak felméréshez és megbeszéléshez készülhet értesítés.");

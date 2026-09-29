@@ -34,12 +34,12 @@ Minden engedélyezett telefon ugyanazt az értesítést kapja. Egy telefon a **K
 - A táblákon RLS aktív; a bejelentkezett felhasználó csak a saját rekordjait kezelheti.
 - A VAPID privát kulcs a Supabase Vaultban van, nem kerül a böngészőbe vagy a repositoryba.
 - A `napi-send-reminders` Edge Function küldi ki az esedékes értesítéseket. A Supabase Cron percenként indítja.
-- Az elküldött értesítési sorok 30 nap után automatikusan törlődnek, így a tárhelyhasználat alacsony marad.
+- A részben kézbesített értesítések csak a kimaradt eszközökön próbálkoznak újra; a lezárt és végleg sikertelen sorok 30 nap után törlődnek.
 - A Kassza és a Munkalap tábláihoz, fájljaihoz és működéséhez ez a funkció nem nyúl.
 
 ## Supabase-üzemeltetés
 
-Az adatbázis-leírás: `supabase/migrations/20260928130000_napi_push_notifications.sql`.
+Az adatbázis teljes, live környezettel egyező Napi-migrációs lánca a `supabase/migrations` mappában található. A fájlok időrendben alkalmazandók; kizárólag `napi_*` objektumokat hoznak létre vagy módosítanak.
 
 Az Edge Function forrása: `supabase/functions/napi-send-reminders/index.ts`.
 
@@ -77,5 +77,6 @@ node --check sw.js
 A regressziós tesztek a `tests` mappában vannak. Windows alatt a következő paranccsal futtathatók:
 
 ```powershell
-node --test tests/deletion-sync.test.cjs tests/print-layout.test.cjs tests/push-notifications.test.cjs tests/sync-session.test.cjs tests/vehicle-colors.test.cjs
+$tests = Get-ChildItem tests -File | Where-Object { $_.Name -match '\.test\.(cjs|mjs)$' } | ForEach-Object FullName
+node --test $tests
 ```

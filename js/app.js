@@ -12,6 +12,7 @@
   const PENDING_PLANS_KEY = "diszkertek-napi-fuggo-tervek-v1";
   const PENDING_WORK_ITEMS_KEY = "diszkertek-napi-fuggo-elojegyzesek-v1";
   const PENDING_CONFIG_KEY = "diszkertek-napi-fuggo-torzsadat-v1";
+  const PENDING_CONFIG_CHANGES_KEY = "diszkertek-napi-fuggo-torzsadat-modositasok-v1";
   const WEEK_ANCHOR_KEY = "diszkertek-napi-heti-pozicio-v1";
   const MONTH_ANCHOR_KEY = "diszkertek-napi-havi-pozicio-v1";
   const UPDATE_RELOAD_DATE_KEY = "diszkertek-napi-frissites-datuma-v1";
@@ -209,7 +210,11 @@
   let printRenderTimer = null;
   let cloudSyncing = false;
   let cloudWritePromise = Promise.resolve();
-  let cloudConfigDirty = localStorage.getItem(PENDING_CONFIG_KEY) === "true";
+  let storedConfigChanges = [];
+  try { storedConfigChanges = JSON.parse(localStorage.getItem(PENDING_CONFIG_CHANGES_KEY)) || []; } catch (_) { /* Üres listával folytatjuk. */ }
+  let pendingConfigChanges = Array.isArray(storedConfigChanges) ? storedConfigChanges : [];
+  let cloudConfigDirty = pendingConfigChanges.length > 0 || localStorage.getItem(PENDING_CONFIG_KEY) === "true";
+  let configRevisions = {};
   let lastCloudConfigUpdatedAt = "";
   let storedPendingPlans = [];
   try { storedPendingPlans = JSON.parse(localStorage.getItem(PENDING_PLANS_KEY)) || []; } catch (_) { /* Üres listával folytatjuk. */ }
@@ -333,6 +338,24 @@
   function sharedConfigPayload() {
     return { version: data.version, workers: data.workers, vehicles: data.vehicles, tools: data.tools, materials: data.materials, templates: data.templates, customers: data.customers, recurrences: data.recurrences };
   }
+  function configRevision(collection, id) { return configRevisions?.[collection]?.[id] || null; }
+  function withConfigBaseRevisions(changes) {
+    return (changes || []).map(change => ({ ...change, base_revision: change.base_revision ?? configRevision(change.collection, change.id) }));
+  }
+  function persistPendingConfigChanges() {
+    if (pendingConfigChanges.length) {
+      localStorage.setItem(PENDING_CONFIG_CHANGES_KEY, JSON.stringify(pendingConfigChanges));
+      localStorage.setItem(PENDING_CONFIG_KEY, "true");
+    } else {
+      localStorage.removeItem(PENDING_CONFIG_CHANGES_KEY);
+      localStorage.removeItem(PENDING_CONFIG_KEY);
+    }
+    cloudConfigDirty = pendingConfigChanges.length > 0;
+  }
+  function enqueueConfigChanges(changes) {
+    pendingConfigChanges = window.NapiDomain.mergeConfigChangeQueue(pendingConfigChanges, withConfigBaseRevisions(changes));
+    persistPendingConfigChanges();
+  }
   function remapIds(ids, oldItems, newItems) {
     return (ids || []).map(id => {
       if (newItems.some(item => item.id === id)) return id;
@@ -377,12 +400,18 @@
     try {
       const remote = await window.NapiCloudSync.pull();
       let dataChanged = false;
-      if (remote.config && !cloudConfigDirty && timestampValue(remote.config.updated_at) > timestampValue(lastCloudConfigUpdatedAt)) {
-        applySharedConfig(remote.config.payload);
-        lastCloudConfigUpdatedAt = remote.config.updated_at || "";
-        dataChanged = true;
+      if (remote.config) {
+        configRevisions = remote.config.payload?._configRevisions || {};
+        if (cloudConfigDirty && !pendingConfigChanges.length) {
+          enqueueConfigChanges(window.NapiDomain.configChangesBetween(remote.config.payload, sharedConfigPayload(), { deleteMissing: true }));
+        }
+        if (!cloudConfigDirty && remote.config.updated_at !== lastCloudConfigUpdatedAt) {
+          applySharedConfig(remote.config.payload);
+          lastCloudConfigUpdatedAt = remote.config.updated_at || "";
+          dataChanged = true;
+        }
       }
-      else if (initial && !remote.config) await window.NapiCloudSync.pushConfig(sharedConfigPayload());
+      else if (initial) enqueueConfigChanges(window.NapiDomain.configChangesBetween({}, sharedConfigPayload()));
       const remoteDates = new Set(); let currentChanged = false; let currentDeleted = false;
       remote.plans.forEach(row => {
         if (row.payload?.deleted) {
@@ -495,7 +524,18 @@
         }
         persistPendingPlanDates();
         persistPendingWorkItemDates();
-        if (cloudConfigDirty) { await window.NapiCloudSync.pushConfig(sharedConfigPayload()); cloudConfigDirty = false; localStorage.removeItem(PENDING_CONFIG_KEY); }
+        if (cloudConfigDirty && pendingConfigChanges.length) {
+          const sentChanges = deepCopy(pendingConfigChanges);
+          const result = await window.NapiCloudSync.pushConfig(sentChanges);
+          if (result?.payload) {
+            configRevisions = result.payload._configRevisions || {};
+            pendingConfigChanges = window.NapiDomain.reconcileConfigChangeQueue(pendingConfigChanges, sentChanges, result.conflicts, configRevisions);
+            persistPendingConfigChanges();
+            lastCloudConfigUpdatedAt = result.updated_at || lastCloudConfigUpdatedAt;
+            applySharedConfig(window.NapiDomain.applyConfigChanges(result.payload, pendingConfigChanges));
+          }
+          if (result?.conflicts?.length) toast("Egy törzsadatot közben egy másik eszköz is módosított; a frissebb közös változat maradt meg.", true);
+        }
       };
       const queuedWrite = cloudWritePromise.catch(() => {}).then(write);
       cloudWritePromise = queuedWrite;
@@ -565,11 +605,10 @@
     printRenderTimer = setTimeout(renderPrintView, 180);
     queueCloudSync();
   }
-  function markConfigDirty(message = "Beállítás módosítva • szinkronizálás folyamatban") {
+  function markConfigDirty(changes, message = "Beállítás módosítva • szinkronizálás folyamatban") {
     const effect = window.NapiDomain.configChangeEffects(data, new Date().toISOString());
     data = effect.data;
-    cloudConfigDirty = true;
-    localStorage.setItem(PENDING_CONFIG_KEY, "true");
+    enqueueConfigChanges(changes);
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
     $("#saveState").textContent = message;
     clearTimeout(printRenderTimer);
@@ -780,12 +819,13 @@
       const imported = await readDataArchive(file);
       if (dirty && !confirm("A megnyitott adatfájl módosítja a mostani adatokat. Folytatod?")) return;
       const partial = Boolean(imported.exportType && imported.exportType !== "all");
+      const previousConfig = sharedConfigPayload();
       const result = window.NapiDomain.persistImportedData(localStorage, LOCAL_DATA_KEY, data, normalizeData(imported), partial);
       data = result.data;
       result.planDates.forEach(date => { pendingCloudPlanDates.add(date); pendingCloudDeletedDates.delete(date); pendingCloudWorkItemDates.delete(date); });
       result.deletedDates.forEach(date => { pendingCloudDeletedDates.add(date); pendingCloudPlanDates.delete(date); pendingCloudWorkItemDates.delete(date); });
       persistPendingPlanDates(); persistPendingWorkItemDates(); persistPendingDeletionDates();
-      if (result.configChanged) { cloudConfigDirty = true; localStorage.setItem(PENDING_CONFIG_KEY, "true"); }
+      if (result.configChanged) markConfigDirty(window.NapiDomain.configChangesBetween(previousConfig, sharedConfigPayload(), { deleteMissing: true }), "Az importált törzsadatok szinkronizálása folyamatban");
       data.updatedAt = new Date().toISOString();
       localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
       loadPlan($("#planDate").value || isoToday());
@@ -1570,7 +1610,7 @@
     if (!name || !address) return;
     const duplicate = data.customers.find(customer => searchKey(customer.name) === searchKey(name) && searchKey(customer.address) === searchKey(address));
     const customer = duplicate || { id: uid(), name, address, active: true, order: data.customers.length };
-    if (!duplicate) { data.customers.push(customer); markConfigDirty(); }
+    if (!duplicate) { data.customers.push(customer); markConfigDirty([{ collection: "customers", id: customer.id, value: deepCopy(customer) }]); }
     const task = workingPlan.tasks.find(item => item.id === pendingCustomerTaskId);
     if (task) { task.customerId = customer.id; task.customerName = customer.name; task.address = customer.address; }
     markDirty("Ügyfél hozzáadva • mentés szükséges"); renderTasks(); $("#customerDialog").close();
@@ -1961,7 +2001,7 @@
     let item = data.recurrences.find(entry => entry.id === editingSettingsId);
     if (item) removeRecurrence(item.id);
     item = { id: item?.id || uid(), customerName, address, templateId: template.id, jobName: template.name, frequency, weekday: Number($("#recurringWeekday")?.value || 5), monthDay: Number($("#recurringMonthDay")?.value || startDate.slice(8,10)), customDates, startTime: $("#recurringStartTime")?.value || "", startDate, endDate };
-    data.recurrences.push(item); materializeRecurrence(item); editingSettingsId = null; persistPendingPlanDates(); markConfigDirty("Ismétlődő tervek elkészítve • szinkronizálás folyamatban"); renderSettings(); renderWeek(); renderMonth();
+    data.recurrences.push(item); materializeRecurrence(item); editingSettingsId = null; persistPendingPlanDates(); markConfigDirty([{ collection: "recurrences", id: item.id, value: deepCopy(item) }], "Ismétlődő tervek elkészítve • szinkronizálás folyamatban"); renderSettings(); renderWeek(); renderMonth();
     toast("Az ismétlődő feladatok bekerültek a naptárba.");
   }
   function settingsListHTML(list, description = () => "", showWorkerColor = false, showColorCode = true) {
@@ -1995,6 +2035,7 @@
   function saveSettingEditor() {
     const list = settingsType(); const existing = list.find(item => item.id === editingSettingsId); const name = $("#settingName")?.value.trim(); if (!name) { toast("A név megadása kötelező.", true); return; }
     const item = existing || { id: uid(), active: true, order: list.length };
+    const configChanges = [];
     item.name = name;
     if (activeSettingsTab === "workers") { item.color = $("#settingColor").value; item.manager = $("#settingManager").checked; }
     if (activeSettingsTab === "vehicles") item.color = validVehicleColor($("#settingColor").value, list.indexOf(item));
@@ -2005,13 +2046,13 @@
       const names = $("#settingTools").value.split(",").map(value => value.trim()).filter(Boolean);
       item.toolIds = names.map(nameValue => {
         let tool = data.tools.find(entry => searchKey(entry.name) === searchKey(nameValue));
-        if (!tool) { tool = { id: uid(), name: nameValue, active: true, order: data.tools.length }; data.tools.push(tool); }
+        if (!tool) { tool = { id: uid(), name: nameValue, active: true, order: data.tools.length }; data.tools.push(tool); configChanges.push({ collection: "tools", id: tool.id, value: deepCopy(tool) }); }
         return tool.id;
       });
       item.materials = $("#settingMaterials").value.split(/\r?\n/).map(line => line.split("|").map(value => value.trim())).filter(parts => parts.some(Boolean)).map(([source = "", materialName = "", unit = ""]) => ({ source, name: materialName, quantity: "", unit })).filter(material => material.name);
       item.steps = $("#settingSteps").value.split(/\r?\n/).map(value => value.trim()).filter(value => value && !searchKey(value).includes("munkanaplo"));
     }
-    if (!existing) list.push(item); editingSettingsId = null; markConfigDirty(); renderSettings(); renderTasks();
+    if (!existing) list.push(item); configChanges.push({ collection: activeSettingsTab, id: item.id, value: deepCopy(item) }); editingSettingsId = null; markConfigDirty(configChanges); renderSettings(); renderTasks();
   }
   $("#settingsButton").addEventListener("click", () => { activeSettingsTab = "workers"; editingSettingsId = null; renderSettings(); $("#settingsDialog").showModal(); });
   $("#settingsDialog").addEventListener("click", async event => {
@@ -2029,7 +2070,7 @@
     const recurringDelete = event.target.closest("[data-recurring-delete]");
     if (recurringDelete) {
       if (!confirm("Törlöd ezt az ismétlődő tervet és az általa előre létrehozott napi feladatokat?")) return;
-      removeRecurrence(recurringDelete.dataset.recurringDelete); editingSettingsId = null; persistPendingDeletionDates(); markConfigDirty("Ismétlődő terv törölve • szinkronizálás folyamatban"); renderSettings(); renderWeek(); renderMonth(); return;
+      const recurrenceId = recurringDelete.dataset.recurringDelete; removeRecurrence(recurrenceId); editingSettingsId = null; persistPendingDeletionDates(); markConfigDirty([{ collection: "recurrences", id: recurrenceId, deleted: true }], "Ismétlődő terv törölve • szinkronizálás folyamatban"); renderSettings(); renderWeek(); renderMonth(); return;
     }
     const directoryAction = event.target.closest("[data-customer-directory]");
     if (directoryAction?.dataset.customerDirectory === "connect") { openCustomerAuth(); return; }
@@ -2040,7 +2081,7 @@
     if (event.target.closest("[data-setting-submit]")) { event.preventDefault(); saveSettingEditor(); return; }
     const edit = event.target.closest("[data-setting-edit]");
     if (edit) { event.preventDefault(); editingSettingsId = edit.dataset.settingEdit; renderSettings(); $("#settingsContent").scrollTop = 0; return; }
-    const toggle = event.target.closest("[data-setting-toggle]"); if (toggle) { const item = settingsType().find(entry => entry.id === toggle.dataset.settingToggle); if (item) { item.active = item.active === false; markConfigDirty(); renderSettings(); renderTasks(); } return; }
+    const toggle = event.target.closest("[data-setting-toggle]"); if (toggle) { const item = settingsType().find(entry => entry.id === toggle.dataset.settingToggle); if (item) { item.active = item.active === false; markConfigDirty([{ collection: activeSettingsTab, id: item.id, value: deepCopy(item) }]); renderSettings(); renderTasks(); } return; }
     const dataAction = event.target.closest("[data-data-action]"); if (dataAction?.dataset.dataAction === "choose") chooseFolder(); if (dataAction?.dataset.dataAction === "download") downloadData();
   });
   $("#settingsDialog").addEventListener("input", event => {
@@ -2251,7 +2292,7 @@
     if (!dirty) loadPlan(initialDate, { preserveCalendarPosition: true }); else { renderWorkItems(); renderTasks(); $("#saveState").textContent = "Helyreállított piszkozat • mentés szükséges"; }
     renderWeek();
     renderMonth();
-    if (navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) { await syncCustomerDirectory(); await pullSharedData({ initial: true }); if (pendingCloudDeletedDates.size || pendingCloudPlanDates.size) await pushCurrentState(); }
+    if (navigator.onLine && window.NapiCustomerDirectory?.hasSession?.()) { await syncCustomerDirectory(); await pullSharedData({ initial: true }); if (cloudConfigDirty || pendingCloudDeletedDates.size || pendingCloudPlanDates.size) await pushCurrentState(); }
     if (appRunsStandalone()) localStorage.setItem(INSTALLED_KEY, "true");
     updateInstallButtons();
     $("#notificationButton").hidden = !pushNotificationsSupported();

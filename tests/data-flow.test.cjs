@@ -48,4 +48,30 @@ assert.match(printHtml, /Előjegyzések/);
 assert.match(printHtml, /Kiss Kert/);
 assert.equal(domain.planHasPrintableContent({ tasks: [], workItems: [appointment] }), true);
 
+// 6. Az eltérő törzsadat-elemek párhuzamos módosítása nem írja felül egymást.
+const sharedConfig = {
+  workers: [{ id: "worker-a", name: "Anna" }], vehicles: [{ id: "vehicle-a", name: "Autó" }],
+  tools: [], materials: [], templates: [], customers: [], recurrences: []
+};
+const deviceAConfig = domain.applyConfigChanges(sharedConfig, [{ collection: "workers", id: "worker-a", value: { id: "worker-a", name: "Anna új" } }]);
+const mergedConfig = domain.applyConfigChanges(deviceAConfig, [{ collection: "vehicles", id: "vehicle-a", value: { id: "vehicle-a", name: "Új autó" } }]);
+assert.equal(mergedConfig.workers[0].name, "Anna új");
+assert.equal(mergedConfig.vehicles[0].name, "Új autó");
+
+const queuedTwice = domain.mergeConfigChangeQueue(
+  [{ collection: "workers", id: "worker-a", value: { id: "worker-a", name: "Első" }, base_revision: "rev-1" }],
+  [{ collection: "workers", id: "worker-a", value: { id: "worker-a", name: "Második" }, base_revision: "rev-2" }]
+);
+assert.equal(queuedTwice[0].base_revision, "rev-1", "Az elsőként látott szerverrevízió maradjon az összehasonlítás alapja.");
+assert.equal(queuedTwice[0].value.name, "Második");
+
+const sent = [{ collection: "workers", id: "worker-a", value: { id: "worker-a", name: "Első" }, base_revision: "rev-1" }];
+const changedDuringRequest = [{ collection: "workers", id: "worker-a", value: { id: "worker-a", name: "Második" }, base_revision: "rev-1" }];
+const rebased = domain.reconcileConfigChangeQueue(changedDuringRequest, sent, [], { workers: { "worker-a": "rev-2" } });
+assert.equal(rebased[0].base_revision, "rev-2", "A kérés alatt született újabb helyi módosítás az elfogadott szerverrevízióról folytatódjon.");
+assert.deepEqual(domain.reconcileConfigChangeQueue(changedDuringRequest, sent, [{ collection: "workers", id: "worker-a" }], {}), [], "Ütközéskor a szerverváltozat maradjon, ne történjen késleltetett felülírás.");
+
+const deletions = domain.configChangesBetween(sharedConfig, { ...sharedConfig, workers: [] }, { deleteMissing: true });
+assert.deepEqual(deletions, [{ collection: "workers", id: "worker-a", deleted: true }]);
+
 console.log("Napi adatfolyam viselkedési regressziós teszt: OK");

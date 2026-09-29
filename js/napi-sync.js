@@ -49,12 +49,11 @@
     return { config: configRows?.[0] || null, plans: Array.isArray(planRows) ? planRows : [] };
   }
 
-  async function pushConfig(payload) {
+  async function pushConfig(changes) {
     const { ownerId } = await sessionDetails();
-    return request("napi_app_config?on_conflict=owner_id", {
+    return request("rpc/napi_merge_app_config", {
       method: "POST",
-      body: { owner_id: ownerId, payload, updated_at: new Date().toISOString() },
-      prefer: "resolution=merge-duplicates,return=minimal"
+      body: { p_owner_id: ownerId, p_changes: changes }
     });
   }
 

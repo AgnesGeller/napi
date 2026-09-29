@@ -118,4 +118,3 @@ $$;
 
 revoke all on function public.napi_get_web_push_secrets() from public, anon, authenticated;
 grant execute on function public.napi_get_web_push_secrets() to service_role;
-

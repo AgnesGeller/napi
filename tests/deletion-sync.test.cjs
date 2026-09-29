@@ -24,7 +24,7 @@ assert.match(source, /sessionStorage\.removeItem\(UPDATE_RELOAD_DATE_KEY\)/, "A 
 assert.match(source, /if \(dirty\) localStorage\.setItem\(RECOVERY_KEY[\s\S]*?else localStorage\.removeItem\(RECOVERY_KEY\)/, "A helyi helyreállítás nem hozhatja vissza a már törölt előjegyzést.");
 
 const syncSource = fs.readFileSync("js/napi-sync.js", "utf8");
-const mergeMigration = fs.readFileSync("supabase/migrations/20260928183046_napi_merge_shared_work_items.sql", "utf8");
+const mergeMigration = fs.readFileSync("supabase/migrations/20260928163159_napi_merge_shared_work_items.sql", "utf8");
 const atomicMigration = fs.readFileSync("supabase/migrations/20260929021956_reconcile_napi_reminders_atomically.sql", "utf8");
 assert.match(syncSource, /deletedPlanId/, "A teljes napi törlésből hiányzik a régi terv azonosítója.");
 assert.match(syncSource, /response\.status === 401[\s\S]*clearSession/, "A lejárt közös munkamenetet törölni kell, hogy újra be lehessen lépni.");

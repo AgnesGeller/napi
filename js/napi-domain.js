@@ -6,6 +6,7 @@
   "use strict";
 
   const escapeHTML = value => String(value ?? "").replace(/[&<>"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[character]);
+  const CONFIG_COLLECTIONS = ["workers", "vehicles", "tools", "materials", "templates", "customers", "recurrences"];
 
   function renderWorkItemsHTML(items, types) {
     return (items || []).map(item => {
@@ -77,11 +78,68 @@
     };
   }
 
+  function configChangesBetween(previous, next, { deleteMissing = false } = {}) {
+    const changes = [];
+    CONFIG_COLLECTIONS.forEach(collection => {
+      const before = new Map((previous?.[collection] || []).filter(item => item?.id).map(item => [item.id, item]));
+      const after = new Map((next?.[collection] || []).filter(item => item?.id).map(item => [item.id, item]));
+      after.forEach((value, id) => {
+        if (JSON.stringify(before.get(id)) !== JSON.stringify(value)) changes.push({ collection, id, value });
+      });
+      if (deleteMissing) before.forEach((_value, id) => {
+        if (!after.has(id)) changes.push({ collection, id, deleted: true });
+      });
+    });
+    return changes;
+  }
+
+  function applyConfigChanges(config, changes) {
+    const result = JSON.parse(JSON.stringify(config || {}));
+    CONFIG_COLLECTIONS.forEach(collection => { if (!Array.isArray(result[collection])) result[collection] = []; });
+    (changes || []).forEach(change => {
+      if (!CONFIG_COLLECTIONS.includes(change.collection) || !change.id) return;
+      const list = result[change.collection];
+      const index = list.findIndex(item => item?.id === change.id);
+      if (change.deleted) { if (index >= 0) list.splice(index, 1); return; }
+      if (!change.value || typeof change.value !== "object") return;
+      if (index >= 0) list[index] = JSON.parse(JSON.stringify(change.value));
+      else list.push(JSON.parse(JSON.stringify(change.value)));
+    });
+    return result;
+  }
+
+  function mergeConfigChangeQueue(queue, changes) {
+    const merged = new Map((queue || []).map(change => [`${change.collection}:${change.id}`, change]));
+    (changes || []).forEach(change => {
+      if (!CONFIG_COLLECTIONS.includes(change.collection) || !change.id) return;
+      const key = `${change.collection}:${change.id}`;
+      const previous = merged.get(key);
+      merged.set(key, { ...change, base_revision: previous?.base_revision ?? change.base_revision ?? null });
+    });
+    return [...merged.values()];
+  }
+
+  function removeAcknowledgedConfigChanges(queue, sent) {
+    const acknowledgements = new Map((sent || []).map(change => [`${change.collection}:${change.id}`, JSON.stringify(change)]));
+    return (queue || []).filter(change => acknowledgements.get(`${change.collection}:${change.id}`) !== JSON.stringify(change));
+  }
+
+  function reconcileConfigChangeQueue(queue, sent, conflicts, revisions) {
+    const sentKeys = new Set((sent || []).map(change => `${change.collection}:${change.id}`));
+    const conflictKeys = new Set((conflicts || []).map(change => `${change.collection}:${change.id}`));
+    return removeAcknowledgedConfigChanges(queue, sent).flatMap(change => {
+      const key = `${change.collection}:${change.id}`;
+      if (!sentKeys.has(key)) return [change];
+      if (conflictKeys.has(key)) return [];
+      return [{ ...change, base_revision: revisions?.[change.collection]?.[change.id] || null }];
+    });
+  }
+
   function persistImportedData(storage, key, currentData, incomingData, partial) {
     const result = applyImportedData(currentData, incomingData, partial);
     storage.setItem(key, JSON.stringify(result.data));
     return result;
   }
 
-  return { applyImportedData, configChangeEffects, mergePendingWorkItems, mergeWorkItems, persistImportedData, planHasPrintableContent, printWorkItemsHTML, renderWorkItemsHTML };
+  return { applyConfigChanges, applyImportedData, configChangeEffects, configChangesBetween, mergeConfigChangeQueue, mergePendingWorkItems, mergeWorkItems, persistImportedData, planHasPrintableContent, printWorkItemsHTML, reconcileConfigChangeQueue, removeAcknowledgedConfigChanges, renderWorkItemsHTML };
 });
