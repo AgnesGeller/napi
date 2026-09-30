@@ -489,8 +489,9 @@
         for (const plan of missingPlans) await window.NapiCloudSync.pushPlan(plan);
       }
       data.plans.sort((a, b) => b.date.localeCompare(a.date)); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+      refreshActionPlanOptions();
       const taskEditorActive = Boolean(document.activeElement?.closest?.("#taskList .task-card"));
-      if (currentDeleted || (currentChanged && !taskEditorActive)) loadPlan(workingPlan.date, { preserveCalendarPosition: true });
+      if (currentDeleted || (currentChanged && !taskEditorActive)) loadPlan(workingPlan.date, { preserveCalendarPosition: true, selectForActions: false });
       else if (dataChanged) { if (!dirty && !taskEditorActive) { renderTasks(); renderWorkItems(); } renderWeek(); renderMonth(); }
       return true;
     } catch (error) {
@@ -637,6 +638,7 @@
     else data.plans = data.plans.filter(plan => plan.date !== workingPlan.date);
     data.updatedAt = workingPlan.updatedAt;
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+    refreshActionPlanOptions();
     $("#saveState").textContent = message;
     try { localStorage.setItem(RECOVERY_KEY, JSON.stringify({ savedAt: new Date().toISOString(), data, workingPlan })); } catch (_) { /* A mappamentés ettől még használható. */ }
     clearTimeout(printRenderTimer);
@@ -928,7 +930,7 @@
   }
   function setWeekAnchor(date) { weekAnchor = date; try { sessionStorage.setItem(WEEK_ANCHOR_KEY, date); } catch (_) { /* A nézet ettől még használható. */ } }
   function setMonthAnchor(month) { monthAnchor = month; try { sessionStorage.setItem(MONTH_ANCHOR_KEY, month); } catch (_) { /* A nézet ettől még használható. */ } }
-  function loadPlan(date, { preserveCalendarPosition = false } = {}) {
+  function loadPlan(date, { preserveCalendarPosition = false, selectForActions = true } = {}) {
     const stored = data.plans.find(plan => plan.date === date);
     workingPlan = stored ? deepCopy(stored) : blankPlan(date);
     activeTaskId = stored ? null : (workingPlan.tasks[0]?.id || null);
@@ -942,6 +944,7 @@
     renderWorkItems();
     renderTasks();
     renderPrintView();
+    refreshActionPlanOptions(selectForActions ? date : undefined);
     if ($("#weekView").open) renderWeek();
     if ($("#monthView")?.open) renderMonth();
   }
@@ -1309,6 +1312,7 @@
     data.updatedAt = changedAt;
     data.plans.sort((a, b) => b.date.localeCompare(a.date));
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+    refreshActionPlanOptions();
     persistPendingPlanDates();
     persistPendingWorkItemDates();
     if (pendingCloudDeletedDates.size) localStorage.setItem(PENDING_DELETIONS_KEY, JSON.stringify([...pendingCloudDeletedDates]));
@@ -1844,27 +1848,42 @@
     });
   }
 
-  function planText() {
-    const lines = [`${formatDate(workingPlan.date)} – Napi feladatok`, ""];
-    if (workingPlan.meeting) lines.push(`Találkozó: ${workingPlan.meeting}`);
-    if (workingPlan.stops) lines.push(`Megálló: ${workingPlan.stops}`);
-    if (workingPlan.meeting || workingPlan.stops) lines.push("");
-    if (workingPlan.workItems?.length) {
+  function refreshActionPlanOptions(preferredDate = $("#actionPlanDate")?.value) {
+    const select = $("#actionPlanDate"); if (!select) return;
+    const plans = window.NapiDomain.availableActionPlans(data.plans, workingPlan);
+    select.replaceChildren(...plans.map(plan => {
+      const option = document.createElement("option"); option.value = plan.date;
+      option.textContent = formatDate(plan.date, { year: "numeric", month: "short", day: "numeric", weekday: "short" });
+      return option;
+    }));
+    const selectedDate = plans.some(plan => plan.date === preferredDate) ? preferredDate : plans.some(plan => plan.date === workingPlan.date) ? workingPlan.date : plans[0]?.date;
+    if (selectedDate) select.value = selectedDate;
+  }
+  function selectedActionPlan() {
+    refreshActionPlanOptions();
+    return window.NapiDomain.actionPlanForDate(data.plans, workingPlan, $("#actionPlanDate").value);
+  }
+  function planText(plan = workingPlan) {
+    const lines = [`${formatDate(plan.date)} – Napi feladatok`, ""];
+    if (plan.meeting) lines.push(`Találkozó: ${plan.meeting}`);
+    if (plan.stops) lines.push(`Megálló: ${plan.stops}`);
+    if (plan.meeting || plan.stops) lines.push("");
+    if (plan.workItems?.length) {
       lines.push("Munkák:");
-      workingPlan.workItems.forEach(item => {
+      plan.workItems.forEach(item => {
         const type = WORK_ITEM_TYPES[item.type]?.label || "Munka";
         lines.push(`- ${type}: ${item.customerName || "nincs megadva"}${item.address ? ` – ${item.address}` : ""}${item.note ? ` – ${item.note}` : ""}`);
       });
       lines.push("");
     }
-    tasksByTeam().forEach(group => {
+    tasksByTeam(plan).forEach(group => {
       const lead = group.tasks[0];
       const workers = (lead.workerIds || []).map(id => byId(data.workers, id)?.name).filter(Boolean).join(", ");
       const vehicles = (lead.vehicleIds || []).map(id => byId(data.vehicles, id)?.name).filter(Boolean).join(" + ");
       lines.push(`${vehicles || "Autó nélkül"} – ${workers || "nincs dolgozó kiválasztva"}`, "");
       group.tasks.forEach((task, teamIndex) => {
         const tools = [...task.toolIds.map(id => { const tool = byId(data.tools, id); return tool ? `${tool.name} – ${task.toolQuantities?.[id] || "1"} db` : ""; }).filter(Boolean), ...String(task.extraTools || "").split(",").map(item => item.trim()).filter(Boolean)];
-        lines.push(`${clientNumberForVehicle(task)}. ${task.customerName || "nincs kiválasztva"}`);
+        lines.push(`${clientNumberForVehicle(task, plan)}. ${task.customerName || "nincs kiválasztva"}`);
         lines.push(`Cím: ${task.address || "nincs megadva"}${task.startTime ? ` · Kezdés: ${task.startTime}` : ""}`);
         const descriptions = jobDescriptions(task);
         if (descriptions.length) {
@@ -2009,12 +2028,12 @@
   });
   $("#printButton").addEventListener("click", async event => {
     const button = event.currentTarget; button.disabled = true; button.textContent = "PDF készítése…";
-    try { await downloadPlansPdf([workingPlan], `napi-feladatok-${workingPlan.date}.pdf`); toast("A PDF-fájl elkészült és letöltődött."); }
+    try { const plan = selectedActionPlan(); await downloadPlansPdf([plan], `napi-feladatok-${plan.date}.pdf`); toast("A PDF-fájl elkészült és letöltődött."); }
     catch (error) { toast(`A PDF nem készíthető el: ${readableError(error)}`, true); }
     finally { button.disabled = false; button.textContent = "PDF mentése a gépre"; }
   });
   async function copyText() {
-    const text = planText();
+    const text = planText(selectedActionPlan());
     try { await navigator.clipboard.writeText(text); toast("A napi terv szövege a vágólapra került."); }
     catch (_) { const area = document.createElement("textarea"); area.value = text; area.style.position = "fixed"; area.style.opacity = "0"; document.body.append(area); area.select(); document.execCommand("copy"); area.remove(); toast("A napi terv szövege a vágólapra került."); }
   }
@@ -2025,8 +2044,9 @@
   shareButton.addEventListener("click", async () => {
     shareButton.disabled = true; shareButton.textContent = "PDF készítése…";
     try {
-      const title = `${workingPlan.date} – Napi feladatok`;
-      const file = await createPlansPdfFile([workingPlan], `napi-feladatok-${workingPlan.date}.pdf`);
+      const plan = selectedActionPlan();
+      const title = `${plan.date} – Napi feladatok`;
+      const file = await createPlansPdfFile([plan], `napi-feladatok-${plan.date}.pdf`);
       if (window.NapiPdfShare.supportsFileShare(navigator, file)) {
         await window.NapiPdfShare.shareFile(navigator, file, title);
       } else {
@@ -2346,7 +2366,7 @@
     if (event.key !== LOCAL_DATA_KEY || !event.newValue || dirty) return;
     try {
       data = normalizeData(JSON.parse(event.newValue));
-      loadPlan(workingPlan.date, { preserveCalendarPosition: true });
+      loadPlan(workingPlan.date, { preserveCalendarPosition: true, selectForActions: false });
       renderWeek(); renderMonth();
     } catch (_) { /* A kovetkezo hatterszinkron ujra probalkozik. */ }
   });

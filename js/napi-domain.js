@@ -28,6 +28,17 @@
     return Boolean(plan && ((Array.isArray(plan.tasks) && plan.tasks.length) || (Array.isArray(plan.workItems) && plan.workItems.length)));
   }
 
+  function availableActionPlans(plans, workingPlan) {
+    const byDate = new Map((plans || []).filter(plan => plan?.date && planHasPrintableContent(plan)).map(plan => [plan.date, plan]));
+    if (workingPlan?.date) byDate.set(workingPlan.date, workingPlan);
+    return [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  function actionPlanForDate(plans, workingPlan, date) {
+    if (workingPlan?.date === date) return workingPlan;
+    return (plans || []).find(plan => plan?.date === date) || null;
+  }
+
   function mergeWorkItems(existingItems, incomingItems, deletedIds = []) {
     const deleted = new Set(deletedIds);
     const merged = new Map();
@@ -157,5 +168,5 @@
     return result;
   }
 
-  return { applyConfigChanges, applyImportedData, configChangeEffects, configChangesBetween, mergeConfigChangeQueue, mergePendingWorkItems, mergeWorkItems, persistImportedData, planHasPrintableContent, printWorkItemsHTML, reconcileConfigChangeQueue, removeAcknowledgedConfigChanges, renderWorkItemsHTML, resolvePlanConflict };
+  return { actionPlanForDate, applyConfigChanges, applyImportedData, availableActionPlans, configChangeEffects, configChangesBetween, mergeConfigChangeQueue, mergePendingWorkItems, mergeWorkItems, persistImportedData, planHasPrintableContent, printWorkItemsHTML, reconcileConfigChangeQueue, removeAcknowledgedConfigChanges, renderWorkItemsHTML, resolvePlanConflict };
 });

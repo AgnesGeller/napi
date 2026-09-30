@@ -278,6 +278,8 @@ button, summary { touch-action: manipulation; }
 .save-state { width: min(1040px, 100%); margin: 0 auto .4rem; color: #e7ede8; font-size: .82rem; }
 .dock-buttons { width: min(1040px, 100%); margin: auto; display: grid; grid-template-columns: 1.25fr 1fr 1fr 1fr; gap: .45rem; }
 .dock-buttons .btn { min-height: 48px; }
+.action-date-picker { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .45rem; padding: .3rem .45rem; color: #fff; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); font-size: .78rem; font-weight: 750; }
+.action-date-picker .form-select { min-width: 0; min-height: 38px; padding-top: .35rem; padding-bottom: .35rem; font-size: .88rem; }
 .btn-save { background: #f7edd7; color: #24361f; border-color: #f7edd7; }
 .btn-save:hover { background: #fff7e8; color: #172517; }
 .task-save-button, .task-save-button:focus { color: #fff; border: 3px solid #7f2f12; background: #b64918; box-shadow: 0 7px 0 #713015, 0 14px 28px rgba(94,42,18,.24); font-size: clamp(1.08rem, 2.2vw, 1.28rem); font-weight: 900; letter-spacing: .025em; }
@@ -431,6 +433,7 @@ button, summary { touch-action: manipulation; }
   .action-dock.is-open .dock-toggle { min-width: 0; min-height: 36px; margin: 0 0 .35rem auto; padding: .25rem .65rem; border-width: 1px; background: transparent; box-shadow: none; font-size: .85rem; }
   .action-dock.is-open #dockContent { display: block; }
   .dock-buttons { grid-template-columns: 1fr 1fr; }
+  .action-date-picker { grid-column: 1 / -1; }
   .form-grid { grid-template-columns: 1fr; }
   .form-grid .wide { grid-column: auto; }
 }

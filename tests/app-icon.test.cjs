@@ -14,6 +14,6 @@ assert.ok(icon512?.src.includes("app-icon-512.png?v=20260929"), "Az 512 pixeles 
 assert.ok(maskable?.src.includes("app-icon-maskable-512.png?v=20260929"), "A maszkolható Android-ikon hiányzik vagy nem friss verziójú.");
 assert.match(html, /rel="shortcut icon"[^>]+app-icon-192\.png\?v=20260929/, "A Windows/Chrome PNG parancsikon hiányzik.");
 assert.match(html, /manifest\.webmanifest\?v=20260929/, "A manifest gyorsítótár-frissítése hiányzik.");
-assert.match(serviceWorker, /diszkertek-napi-v101/, "A service worker gyorsítótára nem frissült.");
+assert.match(serviceWorker, /diszkertek-napi-v102/, "A service worker gyorsítótára nem frissült.");
 
 console.log("Appikon regressziós teszt: OK");
