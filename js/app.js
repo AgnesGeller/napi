@@ -1022,6 +1022,8 @@
     const card = $("#taskTemplate").content.firstElementChild.cloneNode(true); card.dataset.taskId = task.id;
     card.classList.toggle("is-active", task.id === activeTaskId); card.querySelector(".active-badge").hidden = task.id !== activeTaskId;
     card.classList.toggle("is-collapsed", collapsedTaskIds.has(task.id));
+    card.querySelector(".edit-task").textContent = collapsedTaskIds.has(task.id) ? "Szerkesztés" : "Visszacsukás";
+    card.querySelector(".edit-task").setAttribute("aria-expanded", String(!collapsedTaskIds.has(task.id)));
     applyTaskVehicleTheme(card, task);
     card.querySelector(".task-number").textContent = `${clientIndex + 1}.`;
     updateTaskSummary(card, task, clientIndex);
@@ -1044,6 +1046,7 @@
       card.querySelector(".worker-chips")?.closest(".task-step")?.remove();
     }
     const jobCount = taskJobs(task).length; card.querySelector(".job-count").textContent = jobCount ? `${jobCount} kiválasztva` : "Nincs kiválasztva";
+    card.querySelector(".selected-jobs").innerHTML = taskJobs(task).map(job => `<span class="job-workflow"><strong>${escapeHTML(job.name)}</strong></span>`).join("");
     const toolContainer = card.querySelector(".tool-chips");
     activeSorted(data.tools).forEach(tool => toolContainer.append(makeChip(tool.name, task.toolIds.includes(tool.id), "", { group: "tool", id: tool.id })));
     renderToolQuantities(card.querySelector(".tool-quantities"), task);
@@ -1504,7 +1507,12 @@
     const card = event.target.closest(".task-card"); if (!card) return;
     const task = findTaskFromElement(card); const index = workingPlan.tasks.indexOf(task); const clientIndex = clientIndexInTeam(task);
     setActiveTask(card, task);
-    if (event.target.closest(".edit-task")) { collapsedTaskIds.delete(task.id); activeTaskId = task.id; renderTasks(); const refreshedCard = $("#taskList").querySelector(`[data-task-id="${CSS.escape(task.id)}"]`); refreshedCard?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    if (event.target.closest(".edit-task")) {
+      if (collapsedTaskIds.has(task.id)) collapsedTaskIds.delete(task.id); else collapsedTaskIds.add(task.id);
+      activeTaskId = task.id; renderTasks();
+      const refreshedCard = $("#taskList").querySelector(`[data-task-id="${CSS.escape(task.id)}"]`);
+      refreshedCard?.scrollIntoView({ behavior: "smooth", block: "start" }); return;
+    }
     const infoButton = event.target.closest("[data-job-info]");
     if (infoButton) {
       const job = taskJobs(task).find(item => item.id === infoButton.dataset.jobInfo); if (!job) return;
@@ -2056,7 +2064,7 @@
     previewPdfUrl = null; previewPdfFile = null; viberPdfSaved = false;
   });
   ["#closePdfPreviewButton", "#discardPdfPreviewButton"].forEach(selector => $(selector).addEventListener("click", () => pdfPreviewDialog.close()));
-  async function showPdfPreview({ saveForViber = false } = {}) {
+  async function showPdfPreview() {
     const button = $("#pdfPreviewButton"); button.disabled = true;
     try {
       const plan = selectedActionPlan();
@@ -2077,7 +2085,8 @@
       $("#openViberButton").hidden = !windowsDesktop;
       $("#viberFileHelp").hidden = !windowsDesktop;
       $("#sharePdfPreviewButton").hidden = windowsDesktop;
-      if (saveForViber) { downloadPdfFile(previewPdfFile); viberPdfSaved = true; }
+      viberPdfSaved = false;
+      $("#openViberButton").disabled = true;
       pdfPreviewDialog.showModal();
     } catch (error) {
       if (previewPdfUrl) URL.revokeObjectURL(previewPdfUrl);
@@ -2088,10 +2097,28 @@
     } finally { button.disabled = false; }
   }
   $("#pdfPreviewButton").addEventListener("click", () => showPdfPreview());
-  $("#savePdfPreviewButton").addEventListener("click", () => { if (previewPdfFile) { downloadPdfFile(previewPdfFile); viberPdfSaved = true; } });
+  $("#savePdfPreviewButton").addEventListener("click", () => { if (previewPdfFile) { downloadPdfFile(previewPdfFile); viberPdfSaved = true; $("#openViberButton").disabled = false; } });
   $("#openViberButton").addEventListener("click", () => {
-    if (!windowsDesktop || !previewPdfFile) return;
-    if (!viberPdfSaved) { downloadPdfFile(previewPdfFile); viberPdfSaved = true; }
+    if (!windowsDesktop || !previewPdfFile || !viberPdfSaved) return;
+    window.location.href = "viber://forward?text=";
+  });
+  let viberFile = null;
+  let viberFileSaved = false;
+  const viberFileDialog = $("#viberFileDialog");
+  viberFileDialog.addEventListener("close", () => {
+    viberFile = null; viberFileSaved = false;
+    $("#viberFileName").textContent = "";
+    $("#launchViberButton").disabled = true;
+  });
+  ["#closeViberFileButton", "#dismissViberFileButton"].forEach(selector => $(selector).addEventListener("click", () => viberFileDialog.close()));
+  $("#saveViberFileButton").addEventListener("click", () => {
+    if (!viberFile) return;
+    downloadPdfFile(viberFile);
+    viberFileSaved = true;
+    $("#launchViberButton").disabled = false;
+  });
+  $("#launchViberButton").addEventListener("click", () => {
+    if (!windowsDesktop || !viberFile || !viberFileSaved) return;
     window.location.href = "viber://forward?text=";
   });
   $("#sharePdfPreviewButton").addEventListener("click", async event => {
@@ -2117,14 +2144,20 @@
   const shareButton = $("#shareButton");
   const shareButtonLabel = windowsDesktop ? "PDF mentése Viberhez" : "PDF küldése Viberre";
   shareButton.textContent = shareButtonLabel;
-  shareButton.title = windowsDesktop ? "PDF mentése; a Viber az előnézetből nyitható meg a fájl csatolásához" : "A napi terv PDF-fájljának megosztása Viberre";
+  shareButton.title = windowsDesktop ? "PDF mentése és a Viber külön megnyitása a fájl csatolásához" : "A napi terv PDF-fájljának megosztása Viberre";
   shareButton.addEventListener("click", async () => {
     shareButton.disabled = true; shareButton.textContent = "PDF készítése…";
     try {
-      if (windowsDesktop) { await showPdfPreview({ saveForViber: true }); return; }
       const plan = selectedActionPlan();
       const title = `${plan.date} – Napi feladatok`;
       const file = await createPlansPdfFile([plan], `napi-feladatok-${plan.date}.pdf`);
+      if (windowsDesktop) {
+        viberFile = file; viberFileSaved = false;
+        $("#viberFileName").textContent = file.name;
+        $("#launchViberButton").disabled = true;
+        viberFileDialog.showModal();
+        return;
+      }
       if (window.NapiPdfShare.supportsFileShare(navigator, file)) {
         await window.NapiPdfShare.shareFile(navigator, file, title);
       } else {

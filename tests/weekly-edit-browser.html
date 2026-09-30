@@ -10,7 +10,8 @@
   const iso=date=>new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,10);
   const now=new Date();const earlier=new Date(now);earlier.setDate(now.getDate()-1);const date=iso(earlier);
   const task={id:'task-1',teamId:'team',customerName:'Korábbi ügyfél',address:'Megőrzött cím',startTime:'08:30',notes:'Megőrzött megjegyzés',workerIds:[],vehicleIds:[],toolIds:[],materials:[{name:'Föld',quantity:'3',unit:'zsák'}],jobs:[{id:'job-1',name:'Kertgondozás',note:'Feladatjegyzet',steps:['Első lépés','Második lépés']}]};
-  localStorage.setItem('diszkertek-napi-adatok-v1',JSON.stringify({plans:[{id:date,date,tasks:[task],workItems:[]}]}));
+  task.toolIds=['tool-1'];task.toolQuantities={'tool-1':'2'};task.extraTools='Mérőszalag';
+  localStorage.setItem('diszkertek-napi-adatok-v1',JSON.stringify({tools:[{id:'tool-1',name:'Gereblye',active:true}],plans:[{id:date,date,tasks:[task],workItems:[]}]}));
   const frame=document.querySelector('#app');await new Promise(resolve=>{frame.onload=resolve;frame.src='../index.html';});
   const win=frame.contentWindow,doc=win.document;
   const assert=(value,message)=>{if(!value)throw new Error(message);};
@@ -32,12 +33,33 @@
   assert(card.querySelector('.start-time-input').value===task.startTime,'A kezdési idő hiányzik.');
   assert(card.querySelector('.notes-input').value===task.notes,'A megjegyzés hiányzik.');
   assert(card.textContent.includes('Kertgondozás')&&card.querySelector('.material-name').value==='Föld','Feladat vagy anyag hiányzik.');
+  const visible=element=>element.getClientRects().length>0&&element.getBoundingClientRect().height>0;
+  for(const name of ['jobs','tools','materials','workflow','expectations']) {
+   const detail=card.querySelector(`[data-detail="${name}"]`);if(!detail.open)detail.querySelector('summary').click();
+   assert(detail.open&&visible(detail.querySelector('.detail-content')),`${name}: a tartalom nem látható lenyitáskor.`);
+  }
+  assert(visible(card.querySelector('.selected-jobs strong'))&&card.querySelector('.selected-jobs').textContent.includes('Kertgondozás'),'A mentett feladat a Feladatok részben nem látszik.');
+  assert(visible(card.querySelector('.tool-quantity-input'))&&card.querySelector('.tool-quantity-input').value==='2','Az eszköz és mennyisége nem látszik.');
+  assert(visible(card.querySelector('.material-name'))&&visible(card.querySelector('.job-steps-input')),'Anyag vagy feladatleírás nem látható.');
+  assert(card.querySelector('.job-steps-input').value.includes('Első lépés'),'Hiányzó kivitelezési adat.');
+  for(const name of ['jobs','tools','materials','workflow','expectations']) {
+   const detail=card.querySelector(`[data-detail="${name}"]`);detail.querySelector('summary').click();
+   assert(!detail.open,`${name}: nem csukható vissza.`);detail.querySelector('summary').click();
+  }
   const deadline=Date.now()+7000;
   while(pulls<2&&Date.now()<deadline) await new Promise(resolve=>setTimeout(resolve,100));
   assert(pulls>=2,'Nem futott le kétszer a háttérszinkron.');
   assert(doc.querySelector('.task-card')===card,'Változatlan szerveradat lecserélte a szerkesztőt.');
   assert(!card.classList.contains('is-collapsed'),'A háttérszinkron becsukta a szerkesztőt.');
-  const notes=card.querySelector('.notes-input');notes.value='Új helyi megjegyzés';notes.dispatchEvent(new win.Event('input',{bubbles:true}));
+  card.querySelector('.edit-task').click();
+  assert(doc.querySelector('.task-card').classList.contains('is-collapsed'),'Az egész feladat nem csukható vissza.');
+  doc.querySelector('.edit-task').click();
+  assert(!doc.querySelector('.task-card').classList.contains('is-collapsed'),'A visszacsukott feladat nem nyitható újra.');
+  doc.querySelector('#monthViewButton')?.click();
+  doc.querySelector(`[data-month-date="${date}"]`).click();
+  assert(doc.querySelector('#planDate').value===date,'Havi megnyitás hibás.');
+  doc.querySelector('.edit-task').click();
+  const notes=doc.querySelector('.notes-input');notes.value='Új helyi megjegyzés';notes.dispatchEvent(new win.Event('input',{bubbles:true}));
   assert(JSON.parse(localStorage.getItem('diszkertek-napi-adatok-v1')).plans.find(plan=>plan.date===date).tasks[0].notes==='Új helyi megjegyzés','A helyi szerkesztés nem maradt meg.');
   const createPdf=win.NapiPdfShare.createPdfBlob;
   let exportedPastDate=false;
@@ -51,6 +73,22 @@
   assert(exportedPastDate,'A PDF nem a heti nézetből kiválasztott, szerkesztett napból készül.');
   assert(doc.querySelector('#pdfPreviewDialog').open&&doc.querySelector('#pdfPreviewPages img')?.naturalWidth>100,'A kiválasztott nap PDF-je nem készült el.');
   doc.querySelector('#discardPdfPreviewButton').click();
+  if(/Windows/i.test(win.navigator.userAgent)) {
+   let downloads=0;const anchorClick=win.HTMLAnchorElement.prototype.click;
+   win.HTMLAnchorElement.prototype.click=function(){if(this.download){downloads++;return;}return anchorClick.call(this);};
+   try {
+    doc.querySelector('#shareButton').click();
+    const deadline=Date.now()+20000;
+    while(doc.querySelector('#shareButton').disabled&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,100));
+    assert(doc.querySelector('#viberFileDialog').open,'A Viber mentési ablak nem nyílt meg.');
+    assert(!doc.querySelector('#pdfPreviewDialog').open&&downloads===0,'A Viber előkészítése PDF-et nyitott vagy töltött le.');
+    assert(doc.querySelector('#launchViberButton').disabled,'A Viber mentés előtt indítható.');
+    doc.querySelector('#saveViberFileButton').click();
+    assert(downloads===1&&!doc.querySelector('#launchViberButton').disabled,'A külön mentés nem működik.');
+    assert(doc.querySelector('#viberFileDialog').getBoundingClientRect().width<=win.innerWidth,'A Viber ablak kilóg mobilméretben.');
+    doc.querySelector('#dismissViberFileButton').click();
+   } finally {win.HTMLAnchorElement.prototype.click=anchorClick;}
+  }
   result.textContent=`WEEKLY_EDIT_OK: ${pulls} háttérlekérés; korábbi nap, minden mező, nyitott szerkesztő, helyi mentés és valódi PDF.`;
  } catch(error){result.textContent=`WEEKLY_EDIT_ERROR: ${error.message}`;}
 })();
