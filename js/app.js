@@ -1906,7 +1906,7 @@
     const departure = plan.meeting || plan.stops ? `<div class="print-departure">${plan.meeting ? `<p><strong>Találkozó:</strong> ${escapeHTML(plan.meeting)}</p>` : ""}${plan.stops ? `<p><strong>Megálló:</strong> ${escapeHTML(plan.stops)}</p>` : ""}</div>` : "";
     const logoUrl = new URL("assets/diszkertek-logo.png", document.baseURI).href;
     const printHeader = `<header class="print-header"><img src="${escapeHTML(logoUrl)}" alt="Díszkertek logó" width="416" height="512"><div><h1>Napi feladatok</h1><div class="print-date">${escapeHTML(formatDate(plan.date))}</div></div></header>`;
-    const workItems = window.NapiDomain.printWorkItemsHTML(plan.workItems || [], WORK_ITEM_TYPES);
+    // Az előjegyzések vezetői adatok, nem részei a kiosztott PDF-nek.
     const tasks = tasksByTeam(plan).map((group, groupIndex) => {
       const lead = group.tasks[0];
       const workers = (lead.workerIds || []).map(id => byId(data.workers, id)).filter(Boolean).map(worker => `<span class="print-worker" style="--print-worker-color:${escapeHTML(worker.color)};--print-worker-text:${bestTextColor(worker.color)}">${escapeHTML(worker.name)}</span>`).join("");
@@ -1924,7 +1924,7 @@
       const printTask = `<article class="print-task" style="--print-task-color:${printTheme.background};--print-task-border:${printTheme.border};--print-task-accent:${printTheme.accent}"><div class="print-task-start"><div class="print-task-heading"><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2><div class="print-heading-workers">${workers || `<span>Nincs dolgozó kiválasztva</span>`}</div></div>${firstClient}</div>${remainingClients.join("")}</article>`;
       return `${groupIndex ? `<div class="print-divider">Következő csapat</div>` : ""}${printTask}`;
     }).join("");
-    return `<section class="print-sheet">${printHeader}${departure}${workItems}${tasks || (!workItems ? `<p>Nincs feladat erre a napra.</p>` : "")}${tasks ? `<div class="print-footer-note">${FINAL_NOTE}</div>` : ""}</section>`;
+    return `<section class="print-sheet">${printHeader}${departure}${tasks || `<p>Nincs feladat erre a napra.</p>`}${tasks ? `<div class="print-footer-note">${FINAL_NOTE}</div>` : ""}</section>`;
   }
   function renderPrintView(plans = activePrintPlans || [workingPlan]) {
     $("#printView").innerHTML = plans.map(printPlanHTML).join("");
@@ -1959,7 +1959,7 @@
     });
     return rules.join("\n");
   }
-  async function createPlansPdfFile(plans, filename) {
+  async function createPlansPdfFile(plans, filename, onRendered) {
     const scrollPosition = { x: window.scrollX, y: window.scrollY };
     const previousScrollBehavior = document.documentElement.style.scrollBehavior;
     renderPrintView(plans);
@@ -1988,8 +1988,8 @@
           backgroundColor: "#ffffff"
         },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        pagebreak: { mode: ["css", "legacy"] }
-      });
+        pagebreak: { mode: ["css", "legacy"], avoid: [".print-task-heading", ".print-client-heading", ".print-section"] }
+      }, onRendered);
       return window.NapiPdfShare.createPdfFile(blob, filename);
     } finally {
       host.remove();
@@ -2001,7 +2001,8 @@
     const url = URL.createObjectURL(file);
     const link = document.createElement("a");
     link.href = url; link.download = file.name; document.body.append(link); link.click(); link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    // Mobilon a fájlkezelő később veheti át a blob URL-t, mint a kattintás.
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
   async function downloadPlansPdf(plans, filename) {
     const file = await createPlansPdfFile(plans, filename);
@@ -2034,6 +2035,55 @@
     try { const plan = selectedActionPlan(); await downloadPlansPdf([plan], `napi-feladatok-${plan.date}.pdf`); toast("A PDF-fájl elkészült és letöltődött."); }
     catch (error) { toast(`A PDF nem készíthető el: ${readableError(error)}`, true); }
     finally { button.disabled = false; button.textContent = "PDF mentése a gépre"; }
+  });
+  let previewPdfFile = null;
+  let previewPdfUrl = null;
+  const pdfPreviewDialog = $("#pdfPreviewDialog");
+  pdfPreviewDialog.addEventListener("close", () => {
+    $("#pdfPreviewPages").replaceChildren();
+    $("#openPdfPreviewLink").removeAttribute("href");
+    if (previewPdfUrl) URL.revokeObjectURL(previewPdfUrl);
+    previewPdfUrl = null; previewPdfFile = null;
+  });
+  ["#closePdfPreviewButton", "#discardPdfPreviewButton"].forEach(selector => $(selector).addEventListener("click", () => pdfPreviewDialog.close()));
+  $("#pdfPreviewButton").addEventListener("click", async event => {
+    const button = event.currentTarget; button.disabled = true;
+    try {
+      const plan = selectedActionPlan();
+      previewPdfFile = await createPlansPdfFile([plan], `napi-feladatok-${plan.date}.pdf`, (canvas, pdf) => {
+        const pages = $("#pdfPreviewPages"); pages.replaceChildren();
+        const pageHeight = Math.floor(canvas.width * pdf.internal.pageSize.getHeight() / pdf.internal.pageSize.getWidth());
+        for (let index = 0; index < pdf.internal.getNumberOfPages(); index++) {
+          const page = document.createElement("canvas"); page.width = canvas.width; page.height = pageHeight;
+          const context = page.getContext("2d"); context.fillStyle = "#fff"; context.fillRect(0, 0, page.width, page.height);
+          context.drawImage(canvas, 0, index * pageHeight, canvas.width, Math.min(pageHeight, canvas.height - index * pageHeight), 0, 0, canvas.width, Math.min(pageHeight, canvas.height - index * pageHeight));
+          const image = document.createElement("img"); image.src = page.toDataURL("image/jpeg", .9); image.alt = `${index + 1}. PDF-oldal`;
+          pages.append(image);
+        }
+      });
+      previewPdfUrl = URL.createObjectURL(previewPdfFile);
+      $("#pdfPreviewTitle").textContent = `${formatDate(plan.date)} – PDF előnézet`;
+      $("#openPdfPreviewLink").href = previewPdfUrl;
+      pdfPreviewDialog.showModal();
+    } catch (error) {
+      if (previewPdfUrl) URL.revokeObjectURL(previewPdfUrl);
+      previewPdfUrl = null; previewPdfFile = null;
+      $("#pdfPreviewPages").replaceChildren();
+      toast(`Az előnézet nem készíthető el: ${readableError(error)}`, true);
+    } finally { button.disabled = false; }
+  });
+  $("#savePdfPreviewButton").addEventListener("click", () => { if (previewPdfFile) downloadPdfFile(previewPdfFile); });
+  $("#sharePdfPreviewButton").addEventListener("click", async event => {
+    if (!previewPdfFile) return;
+    const button = event.currentTarget; button.disabled = true;
+    try {
+      // A kész fájl friss kattintásból kerül átadásra, PDF-generálási várakozás nélkül.
+      if (!await window.NapiPdfShare.shareFile(navigator, previewPdfFile, $("#pdfPreviewTitle").textContent)) {
+        toast("Ez a böngésző nem támogatja a fájlmegosztást. Mentsd a PDF-et, majd csatold a Viberben.");
+      }
+    } catch (error) {
+      if (error?.name !== "AbortError") toast(`A PDF megosztása nem sikerült: ${readableError(error)}`, true);
+    } finally { button.disabled = false; }
   });
   async function copyText() {
     let text;

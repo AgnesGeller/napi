@@ -43,6 +43,10 @@
     win.NapiPdfShare.createPdfBlob = async (...args) => {
       try {
         assert(args[1].textContent.includes('Mai tesztügyfél'), 'A PDF nem a mai tervből készül.');
+        assert(!args[1].textContent.includes('PDF előjegyzés') && !args[1].textContent.includes('Előjegyzések'), 'Vezetői előjegyzés került a PDF-be.');
+        const logo = args[1].querySelector('.print-header img');
+        const logoRect = logo.getBoundingClientRect();
+        assert(Math.abs(logoRect.width / logoRect.height - logo.naturalWidth / logo.naturalHeight) < .01, 'A PDF-logó aránya deformált.');
         assert(args[1].getBoundingClientRect().height > 500, 'A PDF-forrás magassága hibás a mérésekor.');
         assert(win.getComputedStyle(args[1]).position === 'static', 'A PDF-forrás nem vesz részt a lap méretezésében.');
         assert(win.scrollX === 0 && win.scrollY === 0, `Az export mérési origója nem stabil: ${win.scrollX}, ${win.scrollY}.`);
@@ -56,6 +60,18 @@
         for (let i=0; i<firstPage.length; i+=64) if (firstPage[i+3] && Math.min(firstPage[i],firstPage[i+1],firstPage[i+2]) < 120) firstPageInk++;
         assert(firstPageInk > 100, 'Az első A4-es oldal üres, a tartalom csak később kezdődik.');
         const pdf = await worker.get('pdf');
+        if (new URLSearchParams(location.search).has('many')) {
+          // A renderelő eltávolítja a DOM-klónt: a kész oldalképben mérjük
+          // a zöld csapatfejléceket, nem a már leválasztott DOM téglalapjait.
+          let bands = 0, run = 0;
+          const x = Math.floor(canvas.width * .85);
+          for (let y = 0; y < firstPageHeight; y++) {
+            const offset = (y * canvas.width + x) * 4;
+            const darkGreen = firstPage[offset] < 60 && firstPage[offset+1] < 110 && firstPage[offset+2] < 80;
+            if (darkGreen) run++; else { if (run > canvas.width * .015) bands++; run = 0; }
+          }
+          assert(bands >= 2, 'A következő csapat indokolatlanul új oldalra került.');
+        }
         if (!new URLSearchParams(location.search).has('many')) assert(pdf.internal.getNumberOfPages() === 1, 'Az egyoldalas tesztterv elé vagy mögé üres oldal került.');
         const pixels = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
         let colored = 0;
@@ -70,9 +86,29 @@
     if (new URLSearchParams(location.search).has('scrolled')) win.scrollTo({top:doc.documentElement.scrollHeight,behavior:'instant'});
     const originalScrollY = win.scrollY;
     const originalScrollBehavior = doc.documentElement.style.scrollBehavior;
-    doc.querySelector('#printButton').click();
+    const useDownload = new URLSearchParams(location.search).has('download');
+    const actionButton = doc.querySelector(useDownload ? '#printButton' : '#pdfPreviewButton');
+    actionButton.click();
     const size = await generated;
-    while (doc.querySelector('#printButton').disabled) await new Promise(resolve => requestAnimationFrame(resolve));
+    while (actionButton.disabled) await new Promise(resolve => requestAnimationFrame(resolve));
+    if (!useDownload) {
+    const preview = doc.querySelector('#pdfPreviewDialog');
+    assert(preview.open, 'Az elkészült PDF előnézete nem nyílt meg.');
+    const previewImages = [...doc.querySelectorAll('#pdfPreviewPages img')];
+    assert(previewImages.length > 0, 'Az előnézetből hiányoznak a PDF oldalképei.');
+    await Promise.all(previewImages.map(image => image.decode()));
+    assert(previewImages.every(image => image.naturalWidth > 100 && image.naturalHeight > 100), 'Az előnézet oldalképei nem nyithatók meg.');
+    let shared;
+    win.NapiPdfShare.shareFile = async (_navigator,file) => {shared=file;return true;};
+    doc.querySelector('#sharePdfPreviewButton').click();
+    await Promise.resolve();
+    assert(shared?.name === `napi-feladatok-${today}.pdf`, 'Az előnézet nem a kiválasztott nap PDF-fájlját osztja meg.');
+    assert(await win.NapiPdfShare.isReadablePdf(shared), 'A megosztott előnézet nem PDF.');
+    doc.querySelector('#discardPdfPreviewButton').click();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert(!preview.open && !doc.querySelector('#pdfPreviewPages').children.length, 'A bezárt előnézet nem engedi el a fájlt.');
+    assert(JSON.parse(localStorage.getItem('diszkertek-napi-adatok-v1')).plans.some(plan => plan.date === today), 'Az előnézet bezárása törölte a tervet.');
+    }
     const restoredScrollY = Math.min(originalScrollY, Math.max(0,doc.scrollingElement.scrollHeight - win.innerHeight));
     assert(Math.abs(win.scrollY - restoredScrollY) <= 1, `Az export nem állította vissza a felület eredeti görgetését: ${restoredScrollY} -> ${win.scrollY}.`);
     assert(doc.documentElement.style.scrollBehavior === originalScrollBehavior, 'Az export módosítva hagyta a felület görgetési stílusát.');

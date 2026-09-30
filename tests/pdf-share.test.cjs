@@ -20,6 +20,13 @@ class TestFile extends Blob {
   const generated = await pdfShare.createPdfBlob(() => worker, { id: "print-view" }, { jsPDF: { format: "a4" } });
   assert.equal(generated, validPdf);
   assert.equal(await pdfShare.isReadablePdf(generated), true, "A generált fájlnak valódi PDF-fejléccel kell rendelkeznie.");
+  const renderedCanvas = {width:1600,height:2262}; const renderedPdf = {pages:1};
+  worker.get = async key => key === 'canvas' ? renderedCanvas : renderedPdf;
+  let renderCallbackCount = 0;
+  await pdfShare.createPdfBlob(() => worker, {}, {}, (canvas,pdf) => {
+    assert.equal(canvas,renderedCanvas); assert.equal(pdf,renderedPdf); renderCallbackCount++;
+  });
+  assert.equal(renderCallbackCount,1,'Az előnézet ugyanazon renderelés oldalképét és PDF-jét kapja meg.');
 
   const file = await pdfShare.createPdfFile(generated, "napi-feladatok.pdf", TestFile);
   assert.equal(file.name, "napi-feladatok.pdf");

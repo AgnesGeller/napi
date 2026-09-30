@@ -11,10 +11,12 @@
     return String.fromCharCode(...signature) === "%PDF-";
   }
 
-  async function createPdfBlob(html2pdfFactory, element, options) {
+  async function createPdfBlob(html2pdfFactory, element, options, onRendered) {
     if (typeof html2pdfFactory !== "function") throw new Error("A PDF-készítő nem töltődött be.");
-    const blob = await html2pdfFactory().set(options).from(element).toPdf().outputPdf("blob");
+    const worker = html2pdfFactory().set(options).from(element).toPdf();
+    const blob = await worker.outputPdf("blob");
     if (!(await isReadablePdf(blob))) throw new Error("A létrehozott PDF-fájl nem olvasható.");
+    if (onRendered) await onRendered(await worker.get("canvas"), await worker.get("pdf"));
     return blob;
   }
 

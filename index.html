@@ -32,7 +32,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=20260929">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260930d">
+  <link rel="stylesheet" href="css/style.css?v=20260930f">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -145,11 +145,25 @@
     <div class="dock-buttons">
       <label class="action-date-picker" for="actionPlanDate"><span>Művelet napja</span><input class="form-control" id="actionPlanDate" type="date" aria-label="A mentéshez, küldéshez vagy másoláshoz választott nap"></label>
       <button class="btn btn-print" id="printButton" type="button" title="A napi terv mentése PDF-fájlként a számítógépre">PDF mentése a gépre</button>
+      <button class="btn btn-soft" id="pdfPreviewButton" type="button">PDF előnézet</button>
       <button class="btn btn-share" id="shareButton" type="button">PDF küldése Viberre</button>
       <button class="btn btn-copy" id="copyTextButton" type="button">Szöveg másolása</button>
     </div>
     </div>
   </div>
+
+  <dialog id="pdfPreviewDialog" class="app-dialog pdf-preview-dialog" aria-labelledby="pdfPreviewTitle">
+    <div class="dialog-frame">
+      <header class="dialog-header"><h2 id="pdfPreviewTitle">PDF előnézet</h2><button class="icon-button" id="closePdfPreviewButton" type="button" aria-label="Előnézet bezárása">×</button></header>
+      <div id="pdfPreviewPages" class="pdf-preview-pages" aria-label="A kiválasztott nap PDF-oldalai"></div>
+      <footer class="dialog-footer">
+        <a id="openPdfPreviewLink" class="btn btn-soft" target="_blank" rel="noopener">Megnyitás külön ablakban</a>
+        <button id="savePdfPreviewButton" class="btn btn-print" type="button">PDF mentése</button>
+        <button id="sharePdfPreviewButton" class="btn btn-share" type="button">PDF megosztása</button>
+        <button id="discardPdfPreviewButton" class="btn btn-secondary" type="button">Előnézet bezárása</button>
+      </footer>
+    </div>
+  </dialog>
 
   <dialog id="settingsDialog" class="app-dialog settings-dialog">
     <form method="dialog" class="dialog-frame">
@@ -378,7 +392,7 @@
   <script src="js/customer-directory.js?v=20260927c"></script>
   <script src="js/napi-domain.js?v=20260930b"></script>
   <script src="js/napi-sync.js?v=20260930"></script>
-  <script src="js/pdf-share.js?v=20260930"></script>
-  <script src="js/app.js?v=20260930e"></script>
+  <script src="js/pdf-share.js?v=20260930f"></script>
+  <script src="js/app.js?v=20260930f"></script>
 </body>
 </html>

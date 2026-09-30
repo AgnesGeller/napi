@@ -285,7 +285,7 @@ button, summary { touch-action: manipulation; }
 .action-dock { position: fixed; z-index: 50; left: 0; right: 0; bottom: 0; padding: .55rem max(.75rem, env(safe-area-inset-right)) calc(.55rem + env(safe-area-inset-bottom)) max(.75rem, env(safe-area-inset-left)); color: #fff; background: rgba(18,49,32,.97); border-top: 3px solid var(--orange); box-shadow: 0 -8px 28px rgba(0,0,0,.18); backdrop-filter: blur(10px); }
 .dock-toggle { display: none; }
 .save-state { width: min(1040px, 100%); margin: 0 auto .4rem; color: #e7ede8; font-size: .82rem; }
-.dock-buttons { width: min(1040px, 100%); margin: auto; display: grid; grid-template-columns: 1.25fr 1fr 1fr 1fr; gap: .45rem; }
+.dock-buttons { width: min(1040px, 100%); margin: auto; display: grid; grid-template-columns: 1.25fr repeat(4, 1fr); gap: .45rem; }
 .dock-buttons .btn { min-height: 48px; }
 .action-date-picker { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .45rem; padding: .3rem .45rem; color: #fff; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); font-size: .78rem; font-weight: 750; }
 .action-date-picker .form-control { width: 100%; min-width: 0; min-height: 44px; padding: .45rem; font-size: 16px; color-scheme: light; }
@@ -383,6 +383,11 @@ button, summary { touch-action: manipulation; }
 .print-view { display: none; }
 .pdf-export-host { position: fixed; top: 0; left: -10000px; width: 210mm; pointer-events: none; }
 .print-view.pdf-export-source { position: static; display: block; width: 210mm; }
+.pdf-preview-dialog { width: min(960px, calc(100vw - 1rem)); max-width: none; }
+.pdf-preview-pages { height: 65vh; height: 65dvh; min-height: 160px; flex: 1 1 auto; overflow: auto; background: #eee; }
+.pdf-preview-pages img { display: block; width: 100%; height: auto; margin: 0 auto 8px; }
+.pdf-preview-dialog .dialog-header, .pdf-preview-dialog .dialog-footer { flex-shrink: 0; }
+.pdf-preview-dialog .dialog-footer { flex-wrap: wrap; }
 
 @media (min-width: 761px) and (max-width: 980px) {
   .week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -473,7 +478,7 @@ button, summary { touch-action: manipulation; }
   .print-sheet::before { top: -13mm; right: -10mm; transform: rotate(18deg); }
   .print-sheet::after { bottom: -15mm; left: -12mm; transform: rotate(205deg); }
   .print-header { position: relative; z-index: 1; display: grid; grid-template-columns: 48mm 1fr; align-items: center; gap: 8mm; padding-bottom: 5mm; border-bottom: 2.5px solid var(--forest); }
-  .print-header img { width: 44mm; height: 24mm; object-fit: contain; object-position: left center; }
+  .print-header img { width: auto; height: 24mm; max-width: 44mm; justify-self: start; }
   .print-header h1 { margin: 1mm 0; color: var(--forest); font: 700 22pt/1.12 Georgia, serif; }
   .print-date { color: #263e2d; font-size: 12pt; font-weight: 800; }
   .print-departure { position: relative; z-index: 1; display: grid; grid-template-columns: .8fr 1.2fr; gap: 4mm; margin: 4mm 0 1mm; padding: 3mm 4mm; border-left: 2mm solid var(--orange); background: #fff5e3; }
@@ -481,7 +486,7 @@ button, summary { touch-action: manipulation; }
   .print-divider { position: relative; z-index: 1; margin: 5mm 0 -2mm; break-after: avoid-page; color: var(--orange); text-align: center; font-size: 7.5pt; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
   .print-divider::before, .print-divider::after { content: ""; display: inline-block; width: 31%; margin: 0 3mm 2px; border-top: .5mm solid #c67a4d; }
   .print-task { position: relative; z-index: 1; margin-top: 5mm; padding: 0 4mm 3mm; break-inside: auto; box-decoration-break: clone; -webkit-box-decoration-break: clone; border: .6mm solid var(--print-task-border, #8fa391); border-left: 2.5mm solid var(--print-task-border, var(--forest)); background: var(--print-task-color, rgba(255,255,255,.96)); }
-  .print-task-start { break-inside: avoid-page; }
+  .print-task-start { break-inside: auto; }
   .print-task-heading { display: flex; flex-wrap: wrap; gap: 2mm 3mm; align-items: center; margin: 0 -4mm 3mm; padding: 2.2mm 3mm; break-after: avoid-page; color: #fff; background: var(--print-task-accent, var(--forest)); }
   .print-heading-workers { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 1mm; }
   .print-index { display: inline-grid; place-items: center; min-width: 8mm; min-height: 8mm; color: #fff; background: var(--orange); font: 800 13pt Georgia, serif; }
