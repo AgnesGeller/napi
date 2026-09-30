@@ -32,7 +32,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=20260929">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260930c">
+  <link rel="stylesheet" href="css/style.css?v=20260930d">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -101,7 +101,7 @@
     </section>
 
     <details class="tasks-section" id="dayView" aria-labelledby="tasksHeading">
-      <summary class="tasks-overview-summary"><span><strong id="tasksHeading">A nap feladatai</strong><small>Autók, dolgozók és helyszínek · lenyitható</small></span><span class="weekly-chevron" aria-hidden="true">⌄</span></summary>
+      <summary class="tasks-overview-summary"><span><strong id="tasksHeading">Mai nap feladatai</strong><small id="tasksDate"></small><small>Autók, dolgozók és helyszínek · lenyitható</small></span><span class="weekly-chevron" aria-hidden="true">⌄</span></summary>
       <div class="tasks-section-content">
       <div class="section-heading">
         <button class="btn btn-add" id="addTaskButton" type="button">＋ Új autó / külön csapat</button>
@@ -143,7 +143,7 @@
     <div id="dockContent">
     <div class="save-state" id="saveState" role="status">Nincs mentetlen módosítás</div>
     <div class="dock-buttons">
-      <label class="action-date-picker" for="actionPlanDate"><span>Művelet napja</span><select class="form-select" id="actionPlanDate" aria-label="A mentéshez, küldéshez vagy másoláshoz választott nap"></select></label>
+      <label class="action-date-picker" for="actionPlanDate"><span>Művelet napja</span><input class="form-control" id="actionPlanDate" type="date" aria-label="A mentéshez, küldéshez vagy másoláshoz választott nap"></label>
       <button class="btn btn-print" id="printButton" type="button" title="A napi terv mentése PDF-fájlként a számítógépre">PDF mentése a gépre</button>
       <button class="btn btn-share" id="shareButton" type="button">PDF küldése Viberre</button>
       <button class="btn btn-copy" id="copyTextButton" type="button">Szöveg másolása</button>
@@ -379,6 +379,6 @@
   <script src="js/napi-domain.js?v=20260930b"></script>
   <script src="js/napi-sync.js?v=20260930"></script>
   <script src="js/pdf-share.js?v=20260930"></script>
-  <script src="js/app.js?v=20260930c"></script>
+  <script src="js/app.js?v=20260930d"></script>
 </body>
 </html>

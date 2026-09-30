@@ -288,7 +288,8 @@ button, summary { touch-action: manipulation; }
 .dock-buttons { width: min(1040px, 100%); margin: auto; display: grid; grid-template-columns: 1.25fr 1fr 1fr 1fr; gap: .45rem; }
 .dock-buttons .btn { min-height: 48px; }
 .action-date-picker { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .45rem; padding: .3rem .45rem; color: #fff; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); font-size: .78rem; font-weight: 750; }
-.action-date-picker .form-select { min-width: 0; min-height: 38px; padding-top: .35rem; padding-bottom: .35rem; font-size: .88rem; }
+.action-date-picker .form-control { width: 100%; min-width: 0; min-height: 44px; padding: .45rem; font-size: 16px; color-scheme: light; }
+.action-date-picker input::-webkit-calendar-picker-indicator { cursor: pointer; padding: .3rem; }
 .btn-save { background: #f7edd7; color: #24361f; border-color: #f7edd7; }
 .btn-save:hover { background: #fff7e8; color: #172517; }
 .task-save-button, .task-save-button:focus { color: #fff; border: 3px solid #7f2f12; background: #b64918; box-shadow: 0 7px 0 #713015, 0 14px 28px rgba(94,42,18,.24); font-size: clamp(1.08rem, 2.2vw, 1.28rem); font-weight: 900; letter-spacing: .025em; }
@@ -380,7 +381,8 @@ button, summary { touch-action: manipulation; }
 .app-toast { padding: .8rem 1rem; color: #fff; background: var(--forest); border-left: 5px solid #dca06b; box-shadow: var(--shadow); }
 .app-toast.error { background: #722622; }
 .print-view { display: none; }
-.print-view.pdf-export-source { position: fixed; top: 0; left: -10000px; display: block; width: 210mm; pointer-events: none; }
+.pdf-export-host { position: fixed; top: 0; left: -10000px; width: 210mm; pointer-events: none; }
+.print-view.pdf-export-source { position: static; display: block; width: 210mm; }
 
 @media (min-width: 761px) and (max-width: 980px) {
   .week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -442,7 +444,9 @@ button, summary { touch-action: manipulation; }
   .action-dock.is-open .dock-toggle { min-width: 0; min-height: 36px; margin: 0 0 .35rem auto; padding: .25rem .65rem; border-width: 1px; background: transparent; box-shadow: none; font-size: .85rem; }
   .action-dock.is-open #dockContent { display: block; }
   .dock-buttons { grid-template-columns: 1fr 1fr; }
-  .action-date-picker { grid-column: 1 / -1; }
+  .action-date-picker { grid-column: 1 / -1; grid-template-columns: 1fr; gap: .2rem; }
+  .dock-buttons .btn { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+  .action-dock.is-open { max-height: 80dvh; overflow-y: auto; }
   .form-grid { grid-template-columns: 1fr; }
   .form-grid .wide { grid-column: auto; }
 }

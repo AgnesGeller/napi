@@ -182,7 +182,7 @@
   }
 
   let data = createInitialData();
-  let workingPlan = blankPlan(dateOffset(isoToday(), 1));
+  let workingPlan = blankPlan(isoToday());
   let directoryHandle = null;
   let dirty = false;
   let activeSettingsTab = "workers";
@@ -491,7 +491,7 @@
       data.plans.sort((a, b) => b.date.localeCompare(a.date)); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
       refreshActionPlanOptions();
       const taskEditorActive = Boolean(document.activeElement?.closest?.("#taskList .task-card"));
-      if (currentDeleted || (currentChanged && !taskEditorActive)) loadPlan(workingPlan.date, { preserveCalendarPosition: true, selectForActions: false });
+      if (currentDeleted || (currentChanged && !taskEditorActive)) loadPlan(workingPlan.date, { preserveCalendarPosition: true });
       else if (dataChanged) { if (!dirty && !taskEditorActive) { renderTasks(); renderWorkItems(); } renderWeek(); renderMonth(); }
       return true;
     } catch (error) {
@@ -677,7 +677,7 @@
     button.setAttribute("aria-expanded", String(open)); button.textContent = open ? "Bezárás ×" : "Műveletek";
   }
   $("#dockToggleButton").addEventListener("click", () => setDockOpen(!document.querySelector(".action-dock").classList.contains("is-open")));
-  document.querySelector(".dock-buttons").addEventListener("click", () => { if (window.matchMedia("(max-width: 760px)").matches) setDockOpen(false); });
+  document.querySelector(".dock-buttons").addEventListener("click", event => { if (event.target.closest("button") && window.matchMedia("(max-width: 760px)").matches) setDockOpen(false); });
   window.matchMedia("(min-width: 761px)").addEventListener?.("change", event => { if (event.matches) setDockOpen(false); });
   function toast(message, error = false) {
     const element = document.createElement("div");
@@ -930,7 +930,7 @@
   }
   function setWeekAnchor(date) { weekAnchor = date; try { sessionStorage.setItem(WEEK_ANCHOR_KEY, date); } catch (_) { /* A nézet ettől még használható. */ } }
   function setMonthAnchor(month) { monthAnchor = month; try { sessionStorage.setItem(MONTH_ANCHOR_KEY, month); } catch (_) { /* A nézet ettől még használható. */ } }
-  function loadPlan(date, { preserveCalendarPosition = false, selectForActions = true } = {}) {
+  function loadPlan(date, { preserveCalendarPosition = false } = {}) {
     const stored = data.plans.find(plan => plan.date === date);
     workingPlan = stored ? deepCopy(stored) : blankPlan(date);
     activeTaskId = stored ? null : (workingPlan.tasks[0]?.id || null);
@@ -944,7 +944,7 @@
     renderWorkItems();
     renderTasks();
     renderPrintView();
-    refreshActionPlanOptions(selectForActions ? date : undefined);
+    refreshActionPlanOptions();
     if ($("#weekView").open) renderWeek();
     if ($("#monthView")?.open) renderMonth();
   }
@@ -1093,6 +1093,8 @@
     $("#workInboxList").innerHTML = window.NapiDomain.renderWorkItemsHTML(items, WORK_ITEM_TYPES);
   }
   function renderTasks() {
+    $("#tasksHeading").textContent = workingPlan.date === isoToday() ? "Mai nap feladatai" : "A kiválasztott nap feladatai";
+    $("#tasksDate").textContent = formatDate(workingPlan.date);
     const list = $("#taskList");
     const anchorCard = document.activeElement?.closest?.(".task-card") || (activeTaskId ? list.querySelector(`[data-task-id="${CSS.escape(activeTaskId)}"]`) : null);
     const anchorTaskId = anchorCard?.dataset.taskId || null;
@@ -1850,19 +1852,15 @@
   }
 
   function refreshActionPlanOptions(preferredDate = $("#actionPlanDate")?.value) {
-    const select = $("#actionPlanDate"); if (!select) return;
-    const plans = window.NapiDomain.availableActionPlans(data.plans, workingPlan);
-    select.replaceChildren(...plans.map(plan => {
-      const option = document.createElement("option"); option.value = plan.date;
-      option.textContent = formatDate(plan.date, { year: "numeric", month: "short", day: "numeric", weekday: "short" });
-      return option;
-    }));
-    const selectedDate = plans.some(plan => plan.date === preferredDate) ? preferredDate : plans.some(plan => plan.date === workingPlan.date) ? workingPlan.date : plans[0]?.date;
-    if (selectedDate) select.value = selectedDate;
+    const input = $("#actionPlanDate"); if (!input) return;
+    input.value = preferredDate || isoToday();
   }
   function selectedActionPlan() {
     refreshActionPlanOptions();
-    return window.NapiDomain.actionPlanForDate(data.plans, workingPlan, $("#actionPlanDate").value);
+    const date = $("#actionPlanDate").value;
+    const plan = window.NapiDomain.actionPlanForDate(data.plans, workingPlan, date);
+    if (!window.NapiDomain.planHasPrintableContent(plan)) throw new Error(`${formatDate(date)} napjára nincs feladat vagy előjegyzés. Válassz egy kitöltött napot.`);
+    return plan;
   }
   function planText(plan = workingPlan) {
     const lines = [`${formatDate(plan.date)} – Napi feladatok`, ""];
@@ -1931,8 +1929,8 @@
   function renderPrintView(plans = activePrintPlans || [workingPlan]) {
     $("#printView").innerHTML = plans.map(printPlanHTML).join("");
   }
-  async function waitForPrintLogos() {
-    const logos = [...document.querySelectorAll("#printView .print-header img")];
+  async function waitForPrintLogos(root = $("#printView")) {
+    const logos = [...root.querySelectorAll(".print-header img")];
     await Promise.all(logos.map(async logo => {
       try { if (logo.decode) await logo.decode(); else if (!logo.complete) await new Promise(resolve => { logo.addEventListener("load", resolve, { once: true }); logo.addEventListener("error", resolve, { once: true }); }); } catch (_) { /* A böngésző a gyorsítótárból is nyomtathat. */ }
     }));
@@ -1945,28 +1943,32 @@
     await waitForPrintLogos();
     window.print();
   }
-  function printableCssText() {
+  function printableCssText(exportId) {
     const rules = [];
     [...document.styleSheets].forEach(sheet => {
       let cssRules;
       try { cssRules = [...sheet.cssRules]; } catch (_) { return; }
       cssRules.forEach(rule => {
         if (rule.media?.mediaText?.split(",").some(media => media.trim() === "print")) {
-          rules.push(...[...rule.cssRules].map(nestedRule => nestedRule.cssText));
+          rules.push(...[...rule.cssRules].filter(nestedRule => nestedRule.selectorText).map(nestedRule => {
+            const selectors = nestedRule.selectorText.split(",").flatMap(selector => [`#${exportId}:is(${selector.trim()})`, `#${exportId} ${selector.trim()}`]);
+            return `${selectors.join(",")} { ${nestedRule.style.cssText} }`;
+          }));
         }
       });
     });
-    return `${rules.join("\n")}\n.print-view { display:block !important; }`;
+    return rules.join("\n");
   }
   async function createPlansPdfFile(plans, filename) {
     renderPrintView(plans);
-    await waitForPrintLogos();
     const source = $("#printView").cloneNode(true);
     source.id = `pdfExport-${Date.now()}`;
     source.classList.add("pdf-export-source");
-    document.body.append(source);
+    const host = document.createElement("div"); host.className = "pdf-export-host";
+    const style = document.createElement("style"); style.textContent = printableCssText(source.id);
+    host.append(style, source); document.body.append(host);
     try {
-      const promotedPrintCss = printableCssText();
+      await waitForPrintLogos(source);
       const blob = await window.NapiPdfShare.createPdfBlob(window.html2pdf, source, {
         margin: 0,
         filename,
@@ -1975,25 +1977,13 @@
           scale: 2,
           useCORS: true,
           logging: false,
-          backgroundColor: "#ffffff",
-          onclone: clonedDocument => {
-            const style = clonedDocument.createElement("style");
-            style.textContent = promotedPrintCss;
-            clonedDocument.head.append(style);
-            const clonedSource = clonedDocument.getElementById(source.id);
-            if (clonedSource) {
-              clonedSource.style.position = "static";
-              clonedSource.style.left = "auto";
-              clonedSource.style.top = "auto";
-              clonedSource.style.width = "210mm";
-            }
-          }
+          backgroundColor: "#ffffff"
         },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         pagebreak: { mode: ["css", "legacy"] }
       });
       return window.NapiPdfShare.createPdfFile(blob, filename);
-    } finally { source.remove(); }
+    } finally { host.remove(); }
   }
   function downloadPdfFile(file) {
     const url = URL.createObjectURL(file);
@@ -2034,7 +2024,9 @@
     finally { button.disabled = false; button.textContent = "PDF mentése a gépre"; }
   });
   async function copyText() {
-    const text = planText(selectedActionPlan());
+    let text;
+    try { text = planText(selectedActionPlan()); }
+    catch (error) { toast(readableError(error), true); return; }
     try { await navigator.clipboard.writeText(text); toast("A napi terv szövege a vágólapra került."); }
     catch (_) { const area = document.createElement("textarea"); area.value = text; area.style.position = "fixed"; area.style.opacity = "0"; document.body.append(area); area.select(); document.execCommand("copy"); area.remove(); toast("A napi terv szövege a vágólapra került."); }
   }
@@ -2367,7 +2359,7 @@
     if (event.key !== LOCAL_DATA_KEY || !event.newValue || dirty) return;
     try {
       data = normalizeData(JSON.parse(event.newValue));
-      loadPlan(workingPlan.date, { preserveCalendarPosition: true, selectForActions: false });
+      loadPlan(workingPlan.date, { preserveCalendarPosition: true });
       renderWeek(); renderMonth();
     } catch (_) { /* A kovetkezo hatterszinkron ujra probalkozik. */ }
   });
@@ -2377,14 +2369,14 @@
 
   async function initialize() {
     const today = isoToday();
-    let initialDate = dateOffset(today, 1);
+    let initialDate = today;
     const linkedDate = new URLSearchParams(window.location.search).get("date");
     if (/^\d{4}-\d{2}-\d{2}$/.test(linkedDate || "")) initialDate = linkedDate;
     try {
       const updateReloadDate = sessionStorage.getItem(UPDATE_RELOAD_DATE_KEY);
       sessionStorage.removeItem(UPDATE_RELOAD_DATE_KEY);
       if (/^\d{4}-\d{2}-\d{2}$/.test(updateReloadDate || "")) initialDate = updateReloadDate;
-    } catch (_) { /* Normál indításkor a holnapi nap nyílik meg. */ }
+    } catch (_) { /* Normál indításkor a mai nap nyílik meg. */ }
     $("#planDate").value = initialDate;
     try {
       const storedData = JSON.parse(localStorage.getItem(LOCAL_DATA_KEY));

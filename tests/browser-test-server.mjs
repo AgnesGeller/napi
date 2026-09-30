@@ -29,4 +29,4 @@ http.createServer(async (request, response) => {
     response.writeHead(200, { "Content-Type": contentTypes[path.extname(filename)] || "application/octet-stream", "Cache-Control": "no-store" });
     createReadStream(filename).pipe(response);
   } catch (_) { response.writeHead(404).end("Not found"); }
-}).listen(4174, "127.0.0.1", () => console.log("Browser test server: http://127.0.0.1:4174"));
+}).listen(Number(process.env.NAPI_TEST_PORT || 4174), "127.0.0.1", () => console.log(`Browser test server: http://127.0.0.1:${process.env.NAPI_TEST_PORT || 4174}`));

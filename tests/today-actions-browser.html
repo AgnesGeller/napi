@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="hu">
+<meta charset="utf-8">
+<title>Mai terv és PDF integrációs teszt</title>
+<output id="result">Teszt indítása…</output>
+<iframe id="app" style="width:100%;height:850px;border:0"></iframe>
+<script>
+(async () => {
+  const result = document.querySelector('#result');
+  try {
+    if (location.hostname !== '127.0.0.1' || location.port !== '4175') throw new Error('Kizárólag az elkülönített 4175-ös tesztporton futtatható.');
+    const iso = date => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const now = new Date(); const today = iso(now);
+    const yesterdayDate = new Date(now); yesterdayDate.setDate(now.getDate() - 1); const yesterday = iso(yesterdayDate);
+    const plan = (date, name) => ({id:date, date, tasks:Array.from({length:new URLSearchParams(location.search).has('many') ? 8 : 1}, (_,i)=>({id:`${date}-${i}`,teamId:`${date}-${i}`,customerName:name,address:'Teszt helyszín',notes:'Mai PDF tartalom',jobs:[],workerIds:[],vehicleIds:[],toolIds:[],materials:[]})),workItems:[{id:'appointment',type:'survey',customerName:'PDF előjegyzés',address:'Teszt cím',note:'Felmérés'}]});
+    localStorage.setItem('diszkertek-napi-adatok-v1', JSON.stringify({plans:[plan(today,'Mai tesztügyfél'),plan(yesterday,'Tegnapi tesztügyfél')]}));
+    const frame = document.querySelector('#app');
+    await new Promise(resolve => { frame.onload = resolve; frame.src = '../index.html'; });
+    const win = frame.contentWindow; const doc = win.document;
+    const assert = (value, message) => { if (!value) throw new Error(message); };
+    assert(doc.querySelector('#planDate').value === today, 'Nem a mai terv nyílt meg.');
+    assert(doc.querySelector('#tasksHeading').textContent === 'Mai nap feladatai', 'Hiányzik a mai nap címe.');
+    assert(doc.querySelector('#tasksDate').textContent.length > 5, 'Hiányzik a fejléc dátuma.');
+    assert(doc.querySelector('#taskList').textContent.includes('Mai tesztügyfél'), 'A napi lista nem tartalmazza a mai tervet.');
+    assert(doc.querySelector('#weekGrid').textContent.includes('Mai tesztügyfél'), 'A heti nézet eltér a napi listától.');
+    const calendar = doc.querySelector('#actionPlanDate');
+    assert(calendar.type === 'date' && calendar.value === today, 'A műveleti naptár nem a mai napot választja.');
+    doc.querySelector('#dockToggleButton').click();
+    calendar.click();
+    assert(doc.querySelector('.action-dock').classList.contains('is-open'), 'A naptárra kattintva bezárul a műveleti panel.');
+    doc.querySelector('#todayButton').click();
+    assert(doc.querySelector('#planDate').value !== today, 'A holnapi gomb nem váltott napot.');
+    assert(calendar.value === today, 'A holnapi szerkesztés elállította a PDF napját.');
+    calendar.value = yesterday; calendar.dispatchEvent(new win.Event('change', {bubbles:true}));
+    doc.querySelector('#todayButton').click();
+    assert(calendar.value === yesterday, 'A műveleti napválasztás nem maradt meg.');
+    calendar.value = today; calendar.dispatchEvent(new win.Event('change', {bubbles:true}));
+    const original = win.NapiPdfShare.createPdfBlob;
+    let resolvePdf, rejectPdf;
+    const generated = new Promise((resolve,reject) => {resolvePdf=resolve;rejectPdf=reject;});
+    win.NapiPdfShare.createPdfBlob = async (...args) => {
+      try {
+        assert(args[1].textContent.includes('Mai tesztügyfél'), 'A PDF nem a mai tervből készül.');
+        assert(args[1].getBoundingClientRect().height > 500, 'A PDF-forrás magassága hibás a mérésekor.');
+        assert(win.getComputedStyle(args[1]).position === 'static', 'A PDF-forrás nem vesz részt a lap méretezésében.');
+        let worker;
+        const blob = await original(() => { worker = args[0](); return worker; }, ...args.slice(1));
+        const canvas = await worker.get('canvas');
+        const pixels = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+        let colored = 0;
+        for (let i=0; i<pixels.length; i+=64) if (pixels[i+3] && Math.min(pixels[i],pixels[i+1],pixels[i+2]) < 220) colored++;
+        assert(colored > 100, 'Az elkészült PDF képe üres.');
+        assert(await win.NapiPdfShare.isReadablePdf(blob), 'A PDF nem megnyitható.');
+        const captured = await fetch('/__test_pdf_capture',{method:'POST',headers:{'Content-Type':'application/pdf'},body:blob});
+        assert(captured.ok, 'A PDF mentése sikertelen.');
+        resolvePdf(blob.size); return blob;
+      } catch (error) {rejectPdf(error);throw error;}
+    };
+    doc.querySelector('#printButton').click();
+    const size = await generated;
+    result.textContent = `TODAY_ACTIONS_OK: ${size} bájt; mai lista, dátum, holnapi gomb, független naptár és valódi PDF.`;
+  } catch (error) { result.textContent = `TODAY_ACTIONS_ERROR: ${error.message}`; }
+})();
+</script>
