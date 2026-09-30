@@ -20,6 +20,7 @@ http.createServer(async (request, response) => {
     return;
   }
   const pathname = decodeURIComponent(new URL(request.url, "http://127.0.0.1").pathname);
+  if (process.env.NAPI_TEST_PORT === "4175" && pathname === "/sw.js") { response.writeHead(404, {"Cache-Control":"no-store"}).end(); return; }
   const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
   const filename = path.resolve(root, relative);
   if (!filename.startsWith(`${path.resolve(root)}${path.sep}`)) { response.writeHead(403).end(); return; }

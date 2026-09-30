@@ -1960,6 +1960,8 @@
     return rules.join("\n");
   }
   async function createPlansPdfFile(plans, filename) {
+    const scrollPosition = { x: window.scrollX, y: window.scrollY };
+    const previousScrollBehavior = document.documentElement.style.scrollBehavior;
     renderPrintView(plans);
     const source = $("#printView").cloneNode(true);
     source.id = `pdfExport-${Date.now()}`;
@@ -1969,6 +1971,10 @@
     host.append(style, source); document.body.append(host);
     try {
       await waitForPrintLogos(source);
+      // The PDF library measures fixed elements against the viewport. Keep that
+      // origin stable while it measures page breaks and clones the document.
+      document.documentElement.style.scrollBehavior = "auto";
+      window.scrollTo({ left: 0, top: 0, behavior: "instant" });
       const blob = await window.NapiPdfShare.createPdfBlob(window.html2pdf, source, {
         margin: 0,
         filename,
@@ -1977,13 +1983,19 @@
           scale: 2,
           useCORS: true,
           logging: false,
+          scrollX: 0,
+          scrollY: 0,
           backgroundColor: "#ffffff"
         },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
         pagebreak: { mode: ["css", "legacy"] }
       });
       return window.NapiPdfShare.createPdfFile(blob, filename);
-    } finally { host.remove(); }
+    } finally {
+      host.remove();
+      window.scrollTo({ left: scrollPosition.x, top: scrollPosition.y, behavior: "instant" });
+      document.documentElement.style.scrollBehavior = previousScrollBehavior;
+    }
   }
   function downloadPdfFile(file) {
     const url = URL.createObjectURL(file);

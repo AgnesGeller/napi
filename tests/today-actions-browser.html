@@ -9,6 +9,8 @@
   const result = document.querySelector('#result');
   try {
     if (location.hostname !== '127.0.0.1' || location.port !== '4175') throw new Error('Kizárólag az elkülönített 4175-ös tesztporton futtatható.');
+    for (const registration of await navigator.serviceWorker.getRegistrations()) await registration.unregister();
+    for (const key of await caches.keys()) if (key.startsWith('diszkertek-napi-')) await caches.delete(key);
     const iso = date => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     const now = new Date(); const today = iso(now);
     const yesterdayDate = new Date(now); yesterdayDate.setDate(now.getDate() - 1); const yesterday = iso(yesterdayDate);
@@ -43,9 +45,18 @@
         assert(args[1].textContent.includes('Mai tesztügyfél'), 'A PDF nem a mai tervből készül.');
         assert(args[1].getBoundingClientRect().height > 500, 'A PDF-forrás magassága hibás a mérésekor.');
         assert(win.getComputedStyle(args[1]).position === 'static', 'A PDF-forrás nem vesz részt a lap méretezésében.');
+        assert(win.scrollX === 0 && win.scrollY === 0, `Az export mérési origója nem stabil: ${win.scrollX}, ${win.scrollY}.`);
+        assert(args[2].html2canvas.scrollX === 0 && args[2].html2canvas.scrollY === 0, 'A klónozott dokumentum örökli a felület görgetési eltolását.');
         let worker;
         const blob = await original(() => { worker = args[0](); return worker; }, ...args.slice(1));
         const canvas = await worker.get('canvas');
+        const firstPageHeight = Math.min(canvas.height, Math.floor(canvas.width * 297 / 210));
+        const firstPage = canvas.getContext('2d').getImageData(0,0,canvas.width,firstPageHeight).data;
+        let firstPageInk = 0;
+        for (let i=0; i<firstPage.length; i+=64) if (firstPage[i+3] && Math.min(firstPage[i],firstPage[i+1],firstPage[i+2]) < 120) firstPageInk++;
+        assert(firstPageInk > 100, 'Az első A4-es oldal üres, a tartalom csak később kezdődik.');
+        const pdf = await worker.get('pdf');
+        if (!new URLSearchParams(location.search).has('many')) assert(pdf.internal.getNumberOfPages() === 1, 'Az egyoldalas tesztterv elé vagy mögé üres oldal került.');
         const pixels = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
         let colored = 0;
         for (let i=0; i<pixels.length; i+=64) if (pixels[i+3] && Math.min(pixels[i],pixels[i+1],pixels[i+2]) < 220) colored++;
@@ -56,8 +67,15 @@
         resolvePdf(blob.size); return blob;
       } catch (error) {rejectPdf(error);throw error;}
     };
+    if (new URLSearchParams(location.search).has('scrolled')) win.scrollTo({top:doc.documentElement.scrollHeight,behavior:'instant'});
+    const originalScrollY = win.scrollY;
+    const originalScrollBehavior = doc.documentElement.style.scrollBehavior;
     doc.querySelector('#printButton').click();
     const size = await generated;
+    while (doc.querySelector('#printButton').disabled) await new Promise(resolve => requestAnimationFrame(resolve));
+    const restoredScrollY = Math.min(originalScrollY, Math.max(0,doc.scrollingElement.scrollHeight - win.innerHeight));
+    assert(Math.abs(win.scrollY - restoredScrollY) <= 1, `Az export nem állította vissza a felület eredeti görgetését: ${restoredScrollY} -> ${win.scrollY}.`);
+    assert(doc.documentElement.style.scrollBehavior === originalScrollBehavior, 'Az export módosítva hagyta a felület görgetési stílusát.');
     result.textContent = `TODAY_ACTIONS_OK: ${size} bájt; mai lista, dátum, holnapi gomb, független naptár és valódi PDF.`;
   } catch (error) { result.textContent = `TODAY_ACTIONS_ERROR: ${error.message}`; }
 })();
