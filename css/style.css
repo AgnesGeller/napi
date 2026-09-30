@@ -56,6 +56,15 @@ button, summary { touch-action: manipulation; }
 .btn-soft { min-height: 40px; color: var(--forest); border: 1px solid #c3d0c4; background: var(--leaf-light); }
 .btn-soft:hover { background: #d3e4d5; }
 .work-inbox-section, .tasks-section { margin-top: 1.3rem; }
+.tasks-section { border: 2px solid #1260b5; }
+.tasks-overview-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 68px; padding: 1rem 1.15rem; color: #fff; background: #1260b5; cursor: pointer; list-style: none; }
+.tasks-overview-summary::-webkit-details-marker { display: none; }
+.tasks-overview-summary strong, .tasks-overview-summary small { display: block; }
+.tasks-overview-summary strong { font: 700 1.35rem Georgia, serif; }
+.tasks-overview-summary small { margin-top: .2rem; }
+.tasks-overview-summary:focus-visible { outline: 3px solid #f7c948; outline-offset: -4px; }
+.tasks-section[open] > summary .weekly-chevron { transform: rotate(180deg); }
+.tasks-section-content { padding: .85rem; }
 .work-inbox-section { padding: 1rem; border: 1px solid #d8a09b; border-top: 6px solid #a92720; background: #fff0ee; box-shadow: var(--shadow); }
 .work-inbox-section .section-kicker { color: #a92720; }
 .work-alert-button { min-height: 44px; padding: .55rem 1rem; color: #fff; border: 2px solid #861b16; background: #b92f27; font-weight: 900; box-shadow: 0 3px 0 #861b16; }

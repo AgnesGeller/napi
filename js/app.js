@@ -182,7 +182,7 @@
   }
 
   let data = createInitialData();
-  let workingPlan = blankPlan(isoToday());
+  let workingPlan = blankPlan(dateOffset(isoToday(), 1));
   let directoryHandle = null;
   let dirty = false;
   let activeSettingsTab = "workers";
@@ -1598,6 +1598,7 @@
     const button = event?.currentTarget;
     if (button?.disabled) return;
     if (button) button.disabled = true;
+    $("#dayView").open = true;
     const task = blankTask();
     task.workLogRequired = true;
     workingPlan.tasks.push(task);
@@ -1794,7 +1795,7 @@
     $("#monthViewButton").classList.toggle("active", monthly); $("#monthViewButton").setAttribute("aria-pressed", String(monthly));
     if (weekly) { if (dirty) upsertWorkingPlan(); $("#weekView").open = true; renderWeek(); $("#weekView").scrollIntoView({ behavior: "smooth", block: "start" }); }
     else if (monthly) { if (dirty) upsertWorkingPlan(); $("#monthView").open = true; renderMonth(); $("#monthView").scrollIntoView({ behavior: "smooth", block: "start" }); }
-    else $("#dayView").scrollIntoView({ behavior: "smooth", block: "start" });
+    else { $("#dayView").open = true; $("#dayView").scrollIntoView({ behavior: "smooth", block: "start" }); }
   }
   $("#dayViewButton").addEventListener("click", () => switchView("day")); $("#weekViewButton").addEventListener("click", () => switchView("week")); $("#monthViewButton").addEventListener("click", () => switchView("month"));
   $("#weekGrid").addEventListener("click", async event => {
@@ -2217,7 +2218,7 @@
   $("#planDate").addEventListener("change", event => changeDate(event.target.value));
   $("#meetingInput").addEventListener("input", event => { workingPlan.meeting = event.target.value; markDirty(); });
   $("#stopsInput").addEventListener("input", event => { workingPlan.stops = event.target.value; markDirty(); });
-  $("#todayButton").addEventListener("click", () => changeDate(isoToday()));
+  $("#todayButton").addEventListener("click", () => changeDate(dateOffset(isoToday(), 1)));
   $("#folderButton").addEventListener("click", chooseFolder); $("#refreshButton").addEventListener("click", refreshApplication);
   function pushNotificationsSupported() {
     return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -2376,14 +2377,14 @@
 
   async function initialize() {
     const today = isoToday();
-    let initialDate = today;
+    let initialDate = dateOffset(today, 1);
     const linkedDate = new URLSearchParams(window.location.search).get("date");
     if (/^\d{4}-\d{2}-\d{2}$/.test(linkedDate || "")) initialDate = linkedDate;
     try {
       const updateReloadDate = sessionStorage.getItem(UPDATE_RELOAD_DATE_KEY);
       sessionStorage.removeItem(UPDATE_RELOAD_DATE_KEY);
       if (/^\d{4}-\d{2}-\d{2}$/.test(updateReloadDate || "")) initialDate = updateReloadDate;
-    } catch (_) { /* Normál indításkor a mai nap nyílik meg. */ }
+    } catch (_) { /* Normál indításkor a holnapi nap nyílik meg. */ }
     $("#planDate").value = initialDate;
     try {
       const storedData = JSON.parse(localStorage.getItem(LOCAL_DATA_KEY));

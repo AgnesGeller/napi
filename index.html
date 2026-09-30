@@ -32,7 +32,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=20260929">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260930b">
+  <link rel="stylesheet" href="css/style.css?v=20260930c">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -71,7 +71,7 @@
       <div class="date-controls">
         <label for="planDate">Dátum</label>
         <input class="form-control" id="planDate" type="date">
-        <button class="btn btn-outline-green" id="todayButton" type="button">Mai nap</button>
+        <button class="btn btn-outline-green" id="todayButton" type="button">Holnapi nap</button>
       </div>
       <div class="departure-details" aria-label="Napi indulási információk">
         <label>Találkozó<input class="form-control" id="meetingInput" type="text" maxlength="160" placeholder="Például: telephely, 6:30"></label>
@@ -100,12 +100,10 @@
       <div class="work-inbox-list" id="workInboxList"></div>
     </section>
 
-    <section class="tasks-section" id="dayView" aria-labelledby="tasksHeading">
+    <details class="tasks-section" id="dayView" aria-labelledby="tasksHeading">
+      <summary class="tasks-overview-summary"><span><strong id="tasksHeading">A nap feladatai</strong><small>Autók, dolgozók és helyszínek · lenyitható</small></span><span class="weekly-chevron" aria-hidden="true">⌄</span></summary>
+      <div class="tasks-section-content">
       <div class="section-heading">
-        <div>
-          <p class="section-kicker">Autók, dolgozók és helyszínek</p>
-          <h2 id="tasksHeading">A nap feladatai</h2>
-        </div>
         <button class="btn btn-add" id="addTaskButton" type="button">＋ Új autó / külön csapat</button>
       </div>
       <div id="emptyState" class="empty-state">
@@ -119,7 +117,8 @@
         <button class="btn btn-save task-save-button" id="saveButton" type="button"><span aria-hidden="true">✓</span> Mentés</button>
         <button class="btn task-delete-day-button" id="deleteDayButton" type="button" hidden>Teljes nap törlése</button>
       </div>
-    </section>
+      </div>
+    </details>
     <details class="week-section weekly-overview" id="weekView" open>
       <summary class="weekly-overview-summary"><span><strong id="weekHeading">Heti áttekintés</strong><small>Péntektől csütörtökig · lenyitható</small></span><span class="weekly-chevron" aria-hidden="true">⌄</span></summary>
       <div class="section-heading week-heading-content">
@@ -380,6 +379,6 @@
   <script src="js/napi-domain.js?v=20260930b"></script>
   <script src="js/napi-sync.js?v=20260930"></script>
   <script src="js/pdf-share.js?v=20260930"></script>
-  <script src="js/app.js?v=20260930b"></script>
+  <script src="js/app.js?v=20260930c"></script>
 </body>
 </html>
