@@ -48,6 +48,36 @@ assert.match(printHtml, /Előjegyzések/);
 assert.match(printHtml, /Kiss Kert/);
 assert.equal(domain.planHasPrintableContent({ tasks: [], workItems: [appointment] }), true);
 
+// A törlés után létrehozott, új azonosítójú terv a törlési szerververzióból
+// indulhat újra; a régi vagy üres helyi példány viszont nem támadhat fel.
+const tombstone = {
+  updated_at: "2026-09-30T08:00:00Z",
+  payload: { deleted: true, deletedPlanId: "old-plan" }
+};
+const recreatedPlan = { id: "new-plan", date: "2026-09-30", tasks: [{ id: "new-task" }], workItems: [] };
+const recreation = domain.resolvePlanConflict(tombstone, recreatedPlan, true);
+assert.equal(recreation.action, "retry-from-remote-version");
+assert.equal(recreation.plan.cloudUpdatedAt, tombstone.updated_at);
+assert.deepEqual(recreation.plan.tasks, recreatedPlan.tasks);
+
+assert.deepEqual(
+  domain.resolvePlanConflict(tombstone, { ...recreatedPlan, id: "old-plan" }, true),
+  { action: "accept-remote", plan: null },
+  "A törölt terv régi eszközön maradt példánya nem írhatja felül a törlést."
+);
+assert.deepEqual(
+  domain.resolvePlanConflict(tombstone, { id: "empty-plan", date: "2026-09-30", tasks: [], workItems: [] }, false),
+  { action: "accept-remote", plan: null },
+  "Üres helyi terv nem írhatja felül a szerver törlését."
+);
+
+const newerServerPlan = { updated_at: "2026-09-30T09:00:00Z", payload: { id: "server-plan", date: "2026-09-30", tasks: [{ id: "server-task" }], workItems: [] } };
+assert.deepEqual(
+  domain.resolvePlanConflict(newerServerPlan, recreatedPlan, true),
+  { action: "accept-remote", plan: newerServerPlan.payload },
+  "Párhuzamos teljes tervmódosításnál a frissebb szerverváltozat maradjon meg."
+);
+
 // 6. Az eltérő törzsadat-elemek párhuzamos módosítása nem írja felül egymást.
 const sharedConfig = {
   workers: [{ id: "worker-a", name: "Anna" }], vehicles: [{ id: "vehicle-a", name: "Autó" }],

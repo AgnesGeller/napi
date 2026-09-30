@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8">
+  <title>PDF böngészős regressziós teszt</title>
+  <style>
+    #source { box-sizing: border-box; width: 210mm; min-height: 296mm; padding: 14mm; color: #173f2b; background: #fff; font: 14px/1.45 Arial, sans-serif; }
+    h1 { font-family: Georgia, serif; }
+  </style>
+</head>
+<body>
+  <main id="source"><h1>Napi feladatok</h1><p>Árvíztűrő tükörfúrógép</p><p>Megosztható PDF regressziós teszt.</p></main>
+  <output id="result">PDF készítése…</output>
+  <a id="pdfLink" hidden>PDF megnyitása</a>
+  <script src="../assets/vendor/html2pdf.bundle.min.js"></script>
+  <script src="../js/pdf-share.js"></script>
+  <script>
+    (async () => {
+      try {
+        const blob = await NapiPdfShare.createPdfBlob(html2pdf, document.querySelector("#source"), {
+          margin: 0,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 1.25, backgroundColor: "#ffffff", logging: false },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+        });
+        const link = document.querySelector("#pdfLink");
+        link.href = URL.createObjectURL(blob); link.download = "napi-pdf-regresszio.pdf"; link.hidden = false;
+        const captured = await fetch("/__test_pdf_capture", { method: "POST", headers: { "Content-Type": "application/pdf" }, body: blob });
+        if (!captured.ok) throw new Error("A teszt-PDF mentése sikertelen.");
+        document.querySelector("#result").textContent = `PDF_OK:${blob.size}`;
+      } catch (error) { document.querySelector("#result").textContent = `PDF_ERROR:${error.message}`; }
+    })();
+  </script>
+</body>
+</html>

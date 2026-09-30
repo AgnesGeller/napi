@@ -1,8 +1,8 @@
-const CACHE_NAME = "diszkertek-napi-v99";
+const CACHE_NAME = "diszkertek-napi-v100";
 const APP_FILES = [
-  "./", "index.html", "css/style.css?v=20260929b", "js/customer-directory.js?v=20260927c", "js/napi-domain.js?v=20260929b", "js/napi-sync.js?v=20260929b", "js/app.js?v=20260929b", "manifest.webmanifest?v=20260929",
+  "./", "index.html", "css/style.css?v=20260930", "js/customer-directory.js?v=20260927c", "js/napi-domain.js?v=20260930", "js/napi-sync.js?v=20260929b", "js/pdf-share.js?v=20260930", "js/app.js?v=20260930", "manifest.webmanifest?v=20260929",
   "assets/favicon.svg?v=3", "assets/app-icon-180.png?v=20260929", "assets/app-icon-192.png?v=20260929", "assets/app-icon-512.png?v=20260929", "assets/app-icon-maskable-512.png?v=20260929", "assets/diszkertek-logo.png", "assets/botanical.svg",
-  "assets/vendor/bootstrap.min.css", "assets/vendor/bootstrap.bundle.min.js"
+  "assets/vendor/bootstrap.min.css", "assets/vendor/bootstrap.bundle.min.js", "assets/vendor/html2pdf.bundle.min.js", "assets/vendor/html2pdf.bundle.min.js.LICENSE.txt"
 ];
 
 self.addEventListener("install", event => {

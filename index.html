@@ -32,7 +32,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=20260929">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260929b">
+  <link rel="stylesheet" href="css/style.css?v=20260930">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -145,7 +145,7 @@
     <div class="save-state" id="saveState" role="status">Nincs mentetlen módosítás</div>
     <div class="dock-buttons">
       <button class="btn btn-print" id="printButton" type="button" title="A napi terv mentése PDF-fájlként a számítógépre">PDF mentése a gépre</button>
-      <button class="btn btn-share" id="shareButton" type="button">Viber megnyitása</button>
+      <button class="btn btn-share" id="shareButton" type="button">PDF küldése Viberre</button>
       <button class="btn btn-copy" id="copyTextButton" type="button">Szöveg másolása</button>
     </div>
     </div>
@@ -374,9 +374,11 @@
   <section id="printView" class="print-view" aria-hidden="true"></section>
 
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
+  <script src="assets/vendor/html2pdf.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260927c"></script>
-  <script src="js/napi-domain.js?v=20260929b"></script>
+  <script src="js/napi-domain.js?v=20260930"></script>
   <script src="js/napi-sync.js?v=20260929b"></script>
-  <script src="js/app.js?v=20260929b"></script>
+  <script src="js/pdf-share.js?v=20260930"></script>
+  <script src="js/app.js?v=20260930"></script>
 </body>
 </html>

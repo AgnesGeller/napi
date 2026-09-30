@@ -46,8 +46,8 @@ function extract(buffer, entry) {
 const expectedFiles = [
   "assets/app-icon-180.png", "assets/app-icon-192.png", "assets/app-icon-512.png", "assets/app-icon-maskable-512.png",
   "assets/botanical.svg", "assets/diszkertek-logo.png", "assets/favicon.svg",
-  "assets/vendor/bootstrap.bundle.min.js", "assets/vendor/bootstrap.min.css", "css/style.css",
-  "js/app.js", "js/customer-directory.js", "js/napi-domain.js", "js/napi-sync.js",
+  "assets/vendor/bootstrap.bundle.min.js", "assets/vendor/bootstrap.min.css", "assets/vendor/html2pdf.bundle.min.js", "assets/vendor/html2pdf.bundle.min.js.LICENSE.txt", "css/style.css",
+  "js/app.js", "js/customer-directory.js", "js/napi-domain.js", "js/napi-sync.js", "js/pdf-share.js",
   "index.html", "manifest.webmanifest", "sw.js", "README.md", "LICENSE"
 ].sort();
 const entries = entriesFromZip(archive);

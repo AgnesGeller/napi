@@ -45,6 +45,22 @@
     };
   }
 
+  function resolvePlanConflict(remoteRow, localPlan, hasLocalContent) {
+    const remotePayload = remoteRow?.payload;
+    if (!remotePayload || typeof remotePayload !== "object") return { action: "accept-remote", plan: null };
+    if (!remotePayload.deleted) return { action: "accept-remote", plan: remotePayload };
+
+    const deletedPlanId = String(remotePayload.deletedPlanId || "");
+    const localPlanId = String(localPlan?.id || "");
+    const isNewPlanAfterDeletion = Boolean(hasLocalContent && deletedPlanId && localPlanId && localPlanId !== deletedPlanId);
+    if (!isNewPlanAfterDeletion) return { action: "accept-remote", plan: null };
+
+    return {
+      action: "retry-from-remote-version",
+      plan: { ...localPlan, cloudUpdatedAt: remoteRow.updated_at || "" }
+    };
+  }
+
   function applyImportedData(currentData, incomingData, partial) {
     const previousByDate = new Map((currentData.plans || []).map(plan => [plan.date, plan]));
     const importedPlans = (incomingData.plans || []).map(plan => ({
@@ -141,5 +157,5 @@
     return result;
   }
 
-  return { applyConfigChanges, applyImportedData, configChangeEffects, configChangesBetween, mergeConfigChangeQueue, mergePendingWorkItems, mergeWorkItems, persistImportedData, planHasPrintableContent, printWorkItemsHTML, reconcileConfigChangeQueue, removeAcknowledgedConfigChanges, renderWorkItemsHTML };
+  return { applyConfigChanges, applyImportedData, configChangeEffects, configChangesBetween, mergeConfigChangeQueue, mergePendingWorkItems, mergeWorkItems, persistImportedData, planHasPrintableContent, printWorkItemsHTML, reconcileConfigChangeQueue, removeAcknowledgedConfigChanges, renderWorkItemsHTML, resolvePlanConflict };
 });

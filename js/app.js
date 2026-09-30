@@ -416,12 +416,24 @@
       remote.plans.forEach(row => {
         if (row.payload?.deleted) {
           remoteDates.add(row.plan_date);
-          // A törlés után ugyanarra a napra felvitt új tervet előbb meg kell
-          // próbálni közösen menteni; a szerver dönti el, melyik a frissebb.
-          if (pendingCloudPlanDates.has(row.plan_date)) return;
           const index = data.plans.findIndex(item => item.date === row.plan_date);
+          const local = data.plans[index];
+          if (pendingCloudPlanDates.has(row.plan_date)) {
+            const resolution = window.NapiDomain.resolvePlanConflict(row, local, planHasContent(local));
+            if (resolution.action === "retry-from-remote-version") {
+              data.plans[index] = resolution.plan;
+              if (row.plan_date === workingPlan.date) workingPlan = deepCopy(resolution.plan);
+              dataChanged = true;
+              return;
+            }
+            // Ugyanannak a törölt tervnek egy régi példánya vagy egy üres
+            // helyi terv nem írhatja felül a szerver törlési jelölését.
+            pendingCloudPlanDates.delete(row.plan_date);
+            pendingCloudWorkItemDates.delete(row.plan_date);
+          }
           if (index >= 0) { data.plans.splice(index, 1); dataChanged = true; }
           pendingCloudPlanDates.delete(row.plan_date);
+          pendingCloudWorkItemDates.delete(row.plan_date);
           pendingCloudDeletedDates.delete(row.plan_date);
           if (row.plan_date === workingPlan.date) {
             localStorage.removeItem(RECOVERY_KEY);
@@ -507,10 +519,34 @@
           if (pendingCloudDeletedDates.has(date)) { pendingCloudPlanDates.delete(date); pendingCloudWorkItemDates.delete(date); continue; }
           const plan = data.plans.find(item => item.date === date);
           if (!plan) { pendingCloudPlanDates.delete(date); pendingCloudWorkItemDates.delete(date); continue; }
-          const result = await window.NapiCloudSync.pushPlan(plan, { workItemsOnly: pendingCloudWorkItemDates.has(date) });
+          const workItemsOnly = pendingCloudWorkItemDates.has(date);
+          let result = await window.NapiCloudSync.pushPlan(plan, { workItemsOnly });
           if (result?.accepted === false) {
-            rejectedAsStale = true;
-            continue;
+            const resolution = window.NapiDomain.resolvePlanConflict(result, plan, planHasContent(plan));
+            if (resolution.action === "retry-from-remote-version") {
+              const retryPlan = resolution.plan;
+              const retryIndex = data.plans.findIndex(item => item.date === date);
+              if (retryIndex >= 0) data.plans[retryIndex] = retryPlan;
+              if (workingPlan.date === date) workingPlan = deepCopy(retryPlan);
+              result = await window.NapiCloudSync.pushPlan(retryPlan, { workItemsOnly });
+            }
+            if (result?.accepted === false) {
+              rejectedAsStale = true;
+              const remotePayload = result?.payload;
+              if (remotePayload?.deleted) {
+                data.plans = data.plans.filter(item => item.date !== date);
+                if (workingPlan.date === date) workingPlan = blankPlan(date);
+              } else if (remotePayload) {
+                const remotePlan = normalizedRemotePlan(remotePayload);
+                remotePlan.cloudUpdatedAt = result.updated_at || "";
+                const remoteIndex = data.plans.findIndex(item => item.date === date);
+                if (remoteIndex >= 0) data.plans[remoteIndex] = remotePlan; else data.plans.push(remotePlan);
+                if (workingPlan.date === date) workingPlan = deepCopy(remotePlan);
+              }
+              pendingCloudPlanDates.delete(date);
+              pendingCloudWorkItemDates.delete(date);
+              continue;
+            }
           }
           if (result?.payload && result?.updated_at) {
             const saved = normalizedRemotePlan(result.payload);
@@ -544,6 +580,8 @@
         await pullSharedData();
         localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
         persistPendingPlanDates();
+        persistPendingWorkItemDates();
+        toast("A tervet közben egy másik eszköz frissítette. A frissebb közös változatot töltöttem be.", true);
         return false;
       }
       return true;
@@ -1887,6 +1925,67 @@
     await waitForPrintLogos();
     window.print();
   }
+  function printableCssText() {
+    const rules = [];
+    [...document.styleSheets].forEach(sheet => {
+      let cssRules;
+      try { cssRules = [...sheet.cssRules]; } catch (_) { return; }
+      cssRules.forEach(rule => {
+        if (rule.media?.mediaText?.split(",").some(media => media.trim() === "print")) {
+          rules.push(...[...rule.cssRules].map(nestedRule => nestedRule.cssText));
+        }
+      });
+    });
+    return `${rules.join("\n")}\n.print-view { display:block !important; }`;
+  }
+  async function createPlansPdfFile(plans, filename) {
+    renderPrintView(plans);
+    await waitForPrintLogos();
+    const source = $("#printView").cloneNode(true);
+    source.id = `pdfExport-${Date.now()}`;
+    source.classList.add("pdf-export-source");
+    document.body.append(source);
+    try {
+      const promotedPrintCss = printableCssText();
+      const blob = await window.NapiPdfShare.createPdfBlob(window.html2pdf, source, {
+        margin: 0,
+        filename,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+          onclone: clonedDocument => {
+            const style = clonedDocument.createElement("style");
+            style.textContent = promotedPrintCss;
+            clonedDocument.head.append(style);
+            const clonedSource = clonedDocument.getElementById(source.id);
+            if (clonedSource) {
+              clonedSource.style.position = "static";
+              clonedSource.style.left = "auto";
+              clonedSource.style.top = "auto";
+              clonedSource.style.width = "210mm";
+            }
+          }
+        },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        pagebreak: { mode: ["css", "legacy"] }
+      });
+      return window.NapiPdfShare.createPdfFile(blob, filename);
+    } finally { source.remove(); }
+  }
+  function downloadPdfFile(file) {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url; link.download = file.name; document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  async function downloadPlansPdf(plans, filename) {
+    const file = await createPlansPdfFile(plans, filename);
+    downloadPdfFile(file);
+    return file;
+  }
   function periodPlans(period) {
     if (dirty) upsertWorkingPlan();
     const reference = workingPlan.date;
@@ -1898,7 +1997,8 @@
     const reference = workingPlan.date;
     const suffix = period === "week" ? `het-${startOfWeek(reference)}` : period === "month" ? `honap-${reference.slice(0, 7)}` : `ev-${reference.slice(0, 4)}`;
     $("#downloadsDialog").close();
-    await openPrintPreview(plans, `napi-feladatok-${suffix}`);
+    try { await downloadPlansPdf(plans, `napi-feladatok-${suffix}.pdf`); }
+    catch (error) { toast(`A PDF nem készíthető el: ${readableError(error)}`, true); }
   }
   window.addEventListener("beforeprint", () => renderPrintView(activePrintPlans || [workingPlan]));
   window.addEventListener("afterprint", () => {
@@ -1907,38 +2007,35 @@
     previousDocumentTitle = "";
     renderPrintView([workingPlan]);
   });
-  $("#printButton").addEventListener("click", () => openPrintPreview([workingPlan], `napi-feladatok-${workingPlan.date}`));
+  $("#printButton").addEventListener("click", async event => {
+    const button = event.currentTarget; button.disabled = true; button.textContent = "PDF készítése…";
+    try { await downloadPlansPdf([workingPlan], `napi-feladatok-${workingPlan.date}.pdf`); toast("A PDF-fájl elkészült és letöltődött."); }
+    catch (error) { toast(`A PDF nem készíthető el: ${readableError(error)}`, true); }
+    finally { button.disabled = false; button.textContent = "PDF mentése a gépre"; }
+  });
   async function copyText() {
     const text = planText();
     try { await navigator.clipboard.writeText(text); toast("A napi terv szövege a vágólapra került."); }
     catch (_) { const area = document.createElement("textarea"); area.value = text; area.style.position = "fixed"; area.style.opacity = "0"; document.body.append(area); area.select(); document.execCommand("copy"); area.remove(); toast("A napi terv szövege a vágólapra került."); }
   }
-  async function copyTextImmediately(text) {
-    if (navigator.clipboard?.writeText) {
-      try { await navigator.clipboard.writeText(text); return true; } catch (_) { /* Régebbi böngészőn az alábbi megoldás fut. */ }
-    }
-    const area = document.createElement("textarea");
-    area.value = text; area.style.position = "fixed"; area.style.opacity = "0"; document.body.append(area); area.select();
-    let copied = false; try { copied = document.execCommand("copy"); } catch (_) { copied = false; }
-    area.remove(); return copied;
-  }
   $("#copyTextButton").addEventListener("click", copyText);
   const shareButton = $("#shareButton");
-  const isAndroid = /Android/i.test(navigator.userAgent);
-  shareButton.textContent = isAndroid ? "Megosztás" : "Teljes szöveg Viberhez";
-  shareButton.title = isAndroid ? "A telefon megosztási ablakának megnyitása" : "A teljes napi terv másolása Viberbe illesztéshez";
+  shareButton.textContent = "PDF küldése Viberre";
+  shareButton.title = "A napi terv PDF-fájljának megosztása Viberre";
   shareButton.addEventListener("click", async () => {
-    const text = planText();
-    if (isAndroid && navigator.share) {
-      try { await navigator.share({ title: `${workingPlan.date} – Napi feladatok`, text }); }
-      catch (error) { if (error?.name !== "AbortError") { await copyText(); toast("A megosztás helyett a szöveget a vágólapra másoltam."); } }
-      return;
-    }
-
-    // A böngésző külső alkalmazást megnyitó ablaka nem fordítható le az appból.
-    // PC-n ezért a teljes tervet másoljuk, így nem jelenik meg angol rendszerüzenet.
-    const copied = await copyTextImmediately(text);
-    toast(copied ? "A teljes napi tervet kimásoltam. Nyisd meg a Vibert, majd illeszd be az üzenetbe." : "A másolás nem sikerült. Használd a Szöveg másolása gombot.", !copied);
+    shareButton.disabled = true; shareButton.textContent = "PDF készítése…";
+    try {
+      const title = `${workingPlan.date} – Napi feladatok`;
+      const file = await createPlansPdfFile([workingPlan], `napi-feladatok-${workingPlan.date}.pdf`);
+      if (window.NapiPdfShare.supportsFileShare(navigator, file)) {
+        await window.NapiPdfShare.shareFile(navigator, file, title);
+      } else {
+        downloadPdfFile(file);
+        toast("Ez a böngésző nem tud fájlt közvetlenül megosztani. A PDF-et letöltöttem; csatold a Viberben.");
+      }
+    } catch (error) {
+      if (error?.name !== "AbortError") toast(`A PDF megosztása nem sikerült: ${readableError(error)}`, true);
+    } finally { shareButton.disabled = false; shareButton.textContent = "PDF küldése Viberre"; }
   });
 
   function settingsType() {
