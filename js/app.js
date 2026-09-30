@@ -435,7 +435,7 @@
           pendingCloudPlanDates.delete(row.plan_date);
           pendingCloudWorkItemDates.delete(row.plan_date);
           pendingCloudDeletedDates.delete(row.plan_date);
-          if (row.plan_date === workingPlan.date) {
+          if (row.plan_date === workingPlan.date && planHasContent(workingPlan)) {
             localStorage.removeItem(RECOVERY_KEY);
             dirty = false;
             currentChanged = true;
@@ -452,7 +452,9 @@
         const deletedWorkItemIds = new Set([...(local?.deletedWorkItemIds || []), ...(plan.deletedWorkItemIds || [])]);
         plan.deletedWorkItemIds = [...deletedWorkItemIds];
         plan.workItems = (plan.workItems || []).filter(item => !deletedWorkItemIds.has(item.id));
-        if (deletedWorkItemIds.size && local) {
+        if (deletedWorkItemIds.size && local && !window.NapiDomain.samePlanContent(local, {
+          ...local, deletedWorkItemIds: [...deletedWorkItemIds], workItems: (local.workItems || []).filter(item => !deletedWorkItemIds.has(item.id))
+        })) {
           local.deletedWorkItemIds = [...deletedWorkItemIds];
           local.workItems = (local.workItems || []).filter(item => !deletedWorkItemIds.has(item.id));
           if (local.date === workingPlan.date) {
@@ -477,9 +479,13 @@
         // feltöltésre váró módosítás, mindig a szerver válasza az aktuális;
         // így az eltérően járó telefon- és PC-órák nem akadályozzák a szinkront.
         if (!local || !pendingCloudPlanDates.has(row.plan_date)) {
+          const contentChanged = !window.NapiDomain.samePlanContent(local, plan);
           if (index >= 0) data.plans[index] = plan; else data.plans.push(plan);
-          dataChanged = true;
-          if (plan.date === workingPlan.date && !dirty) currentChanged = true;
+          dataChanged ||= contentChanged;
+          if (plan.date === workingPlan.date && !dirty) {
+            currentChanged = !window.NapiDomain.samePlanContent(workingPlan, plan);
+            if (!currentChanged) { workingPlan.updatedAt = plan.updatedAt; workingPlan.cloudUpdatedAt = plan.cloudUpdatedAt; }
+          }
         }
       });
       persistPendingPlanDates();
@@ -491,7 +497,7 @@
       data.plans.sort((a, b) => b.date.localeCompare(a.date)); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
       refreshActionPlanOptions();
       const taskEditorActive = Boolean(document.activeElement?.closest?.("#taskList .task-card"));
-      if (currentDeleted || (currentChanged && !taskEditorActive)) loadPlan(workingPlan.date, { preserveCalendarPosition: true });
+      if (currentDeleted || (currentChanged && !taskEditorActive)) loadPlan(workingPlan.date, { preserveCalendarPosition: true, preserveEditorState: !currentDeleted });
       else if (dataChanged) { if (!dirty && !taskEditorActive) { renderTasks(); renderWorkItems(); } renderWeek(); renderMonth(); }
       return true;
     } catch (error) {
@@ -930,11 +936,13 @@
   }
   function setWeekAnchor(date) { weekAnchor = date; try { sessionStorage.setItem(WEEK_ANCHOR_KEY, date); } catch (_) { /* A nézet ettől még használható. */ } }
   function setMonthAnchor(month) { monthAnchor = month; try { sessionStorage.setItem(MONTH_ANCHOR_KEY, month); } catch (_) { /* A nézet ettől még használható. */ } }
-  function loadPlan(date, { preserveCalendarPosition = false } = {}) {
+  function loadPlan(date, { preserveCalendarPosition = false, preserveEditorState = false } = {}) {
+    const keepEditor = preserveEditorState && workingPlan.date === date;
+    const previousTaskIds = new Set(workingPlan.tasks.map(task => task.id));
     const stored = data.plans.find(plan => plan.date === date);
     workingPlan = stored ? deepCopy(stored) : blankPlan(date);
-    activeTaskId = stored ? null : (workingPlan.tasks[0]?.id || null);
-    collapsedTaskIds = new Set(stored ? workingPlan.tasks.map(task => task.id) : []);
+    activeTaskId = keepEditor ? (workingPlan.tasks.some(task => task.id === activeTaskId) ? activeTaskId : null) : (stored ? null : (workingPlan.tasks[0]?.id || null));
+    collapsedTaskIds = new Set(keepEditor ? workingPlan.tasks.filter(task => !previousTaskIds.has(task.id) || collapsedTaskIds.has(task.id)).map(task => task.id) : (stored ? workingPlan.tasks.map(task => task.id) : []));
     $("#planDate").value = date;
     $("#meetingInput").value = workingPlan.meeting ?? DEFAULT_MEETING;
     $("#stopsInput").value = workingPlan.stops ?? DEFAULT_STOPS;
@@ -1825,7 +1833,7 @@
       const date = deleteButton.dataset.deleteDate;
       await deleteDay(date); return;
     }
-    const button = event.target.closest("[data-open-date]"); if (!button) return; loadPlan(button.dataset.openDate); switchView("day");
+    const button = event.target.closest("[data-open-date]"); if (!button) return; loadPlan(button.dataset.openDate); refreshActionPlanOptions(button.dataset.openDate); switchView("day");
   });
   $("#weekView").addEventListener("toggle", () => { if ($("#weekView").open) renderWeek(); });
   $("#previousWeekButton").addEventListener("click", () => { setWeekAnchor(dateOffset(weekAnchor, -7)); renderWeek(); });
@@ -1838,7 +1846,7 @@
   $("#monthGrid").addEventListener("click", async event => {
     const deleteButton = event.target.closest("[data-month-delete]");
     if (deleteButton) { await deleteDay(deleteButton.dataset.monthDelete); return; }
-    const day = event.target.closest("[data-month-date]"); if (!day) return; loadPlan(day.dataset.monthDate); switchView("day");
+    const day = event.target.closest("[data-month-date]"); if (!day) return; loadPlan(day.dataset.monthDate); refreshActionPlanOptions(day.dataset.monthDate); switchView("day");
   });
 
   function jobDescriptions(task) {
@@ -2038,16 +2046,18 @@
   });
   let previewPdfFile = null;
   let previewPdfUrl = null;
+  let viberPdfSaved = false;
+  const windowsDesktop = /Windows/i.test(navigator.userAgent || "");
   const pdfPreviewDialog = $("#pdfPreviewDialog");
   pdfPreviewDialog.addEventListener("close", () => {
     $("#pdfPreviewPages").replaceChildren();
     $("#openPdfPreviewLink").removeAttribute("href");
     if (previewPdfUrl) URL.revokeObjectURL(previewPdfUrl);
-    previewPdfUrl = null; previewPdfFile = null;
+    previewPdfUrl = null; previewPdfFile = null; viberPdfSaved = false;
   });
   ["#closePdfPreviewButton", "#discardPdfPreviewButton"].forEach(selector => $(selector).addEventListener("click", () => pdfPreviewDialog.close()));
-  $("#pdfPreviewButton").addEventListener("click", async event => {
-    const button = event.currentTarget; button.disabled = true;
+  async function showPdfPreview({ saveForViber = false } = {}) {
+    const button = $("#pdfPreviewButton"); button.disabled = true;
     try {
       const plan = selectedActionPlan();
       previewPdfFile = await createPlansPdfFile([plan], `napi-feladatok-${plan.date}.pdf`, (canvas, pdf) => {
@@ -2064,15 +2074,26 @@
       previewPdfUrl = URL.createObjectURL(previewPdfFile);
       $("#pdfPreviewTitle").textContent = `${formatDate(plan.date)} – PDF előnézet`;
       $("#openPdfPreviewLink").href = previewPdfUrl;
+      $("#openViberButton").hidden = !windowsDesktop;
+      $("#viberFileHelp").hidden = !windowsDesktop;
+      $("#sharePdfPreviewButton").hidden = windowsDesktop;
+      if (saveForViber) { downloadPdfFile(previewPdfFile); viberPdfSaved = true; }
       pdfPreviewDialog.showModal();
     } catch (error) {
       if (previewPdfUrl) URL.revokeObjectURL(previewPdfUrl);
       previewPdfUrl = null; previewPdfFile = null;
+      viberPdfSaved = false;
       $("#pdfPreviewPages").replaceChildren();
       toast(`Az előnézet nem készíthető el: ${readableError(error)}`, true);
     } finally { button.disabled = false; }
+  }
+  $("#pdfPreviewButton").addEventListener("click", () => showPdfPreview());
+  $("#savePdfPreviewButton").addEventListener("click", () => { if (previewPdfFile) { downloadPdfFile(previewPdfFile); viberPdfSaved = true; } });
+  $("#openViberButton").addEventListener("click", () => {
+    if (!windowsDesktop || !previewPdfFile) return;
+    if (!viberPdfSaved) { downloadPdfFile(previewPdfFile); viberPdfSaved = true; }
+    window.location.href = "viber://forward?text=";
   });
-  $("#savePdfPreviewButton").addEventListener("click", () => { if (previewPdfFile) downloadPdfFile(previewPdfFile); });
   $("#sharePdfPreviewButton").addEventListener("click", async event => {
     if (!previewPdfFile) return;
     const button = event.currentTarget; button.disabled = true;
@@ -2094,11 +2115,13 @@
   }
   $("#copyTextButton").addEventListener("click", copyText);
   const shareButton = $("#shareButton");
-  shareButton.textContent = "PDF küldése Viberre";
-  shareButton.title = "A napi terv PDF-fájljának megosztása Viberre";
+  const shareButtonLabel = windowsDesktop ? "PDF mentése Viberhez" : "PDF küldése Viberre";
+  shareButton.textContent = shareButtonLabel;
+  shareButton.title = windowsDesktop ? "PDF mentése; a Viber az előnézetből nyitható meg a fájl csatolásához" : "A napi terv PDF-fájljának megosztása Viberre";
   shareButton.addEventListener("click", async () => {
     shareButton.disabled = true; shareButton.textContent = "PDF készítése…";
     try {
+      if (windowsDesktop) { await showPdfPreview({ saveForViber: true }); return; }
       const plan = selectedActionPlan();
       const title = `${plan.date} – Napi feladatok`;
       const file = await createPlansPdfFile([plan], `napi-feladatok-${plan.date}.pdf`);
@@ -2110,7 +2133,7 @@
       }
     } catch (error) {
       if (error?.name !== "AbortError") toast(`A PDF megosztása nem sikerült: ${readableError(error)}`, true);
-    } finally { shareButton.disabled = false; shareButton.textContent = "PDF küldése Viberre"; }
+    } finally { shareButton.disabled = false; shareButton.textContent = shareButtonLabel; }
   });
 
   function settingsType() {
@@ -2421,7 +2444,7 @@
     if (event.key !== LOCAL_DATA_KEY || !event.newValue || dirty) return;
     try {
       data = normalizeData(JSON.parse(event.newValue));
-      loadPlan(workingPlan.date, { preserveCalendarPosition: true });
+      loadPlan(workingPlan.date, { preserveCalendarPosition: true, preserveEditorState: true });
       renderWeek(); renderMonth();
     } catch (_) { /* A kovetkezo hatterszinkron ujra probalkozik. */ }
   });

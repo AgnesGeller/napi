@@ -32,7 +32,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=20260929">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20260930f">
+  <link rel="stylesheet" href="css/style.css?v=20260930g">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -157,9 +157,11 @@
       <header class="dialog-header"><h2 id="pdfPreviewTitle">PDF előnézet</h2><button class="icon-button" id="closePdfPreviewButton" type="button" aria-label="Előnézet bezárása">×</button></header>
       <div id="pdfPreviewPages" class="pdf-preview-pages" aria-label="A kiválasztott nap PDF-oldalai"></div>
       <footer class="dialog-footer">
+        <p id="viberFileHelp" class="pdf-preview-viber-help" hidden>A PDF a Letöltések mappába kerül. A Viberben válaszd ki a beszélgetést, majd csatold a mentett PDF-fájlt.</p>
         <a id="openPdfPreviewLink" class="btn btn-soft" target="_blank" rel="noopener">Megnyitás külön ablakban</a>
         <button id="savePdfPreviewButton" class="btn btn-print" type="button">PDF mentése</button>
         <button id="sharePdfPreviewButton" class="btn btn-share" type="button">PDF megosztása</button>
+        <button id="openViberButton" class="btn btn-share" type="button" hidden>Viber megnyitása</button>
         <button id="discardPdfPreviewButton" class="btn btn-secondary" type="button">Előnézet bezárása</button>
       </footer>
     </div>
@@ -390,9 +392,9 @@
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="assets/vendor/html2pdf.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260927c"></script>
-  <script src="js/napi-domain.js?v=20260930b"></script>
+  <script src="js/napi-domain.js?v=20260930g"></script>
   <script src="js/napi-sync.js?v=20260930"></script>
   <script src="js/pdf-share.js?v=20260930f"></script>
-  <script src="js/app.js?v=20260930f"></script>
+  <script src="js/app.js?v=20260930g"></script>
 </body>
 </html>

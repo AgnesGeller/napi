@@ -388,6 +388,8 @@ button, summary { touch-action: manipulation; }
 .pdf-preview-pages img { display: block; width: 100%; height: auto; margin: 0 auto 8px; }
 .pdf-preview-dialog .dialog-header, .pdf-preview-dialog .dialog-footer { flex-shrink: 0; }
 .pdf-preview-dialog .dialog-footer { flex-wrap: wrap; }
+.pdf-preview-dialog [hidden] { display: none; }
+.pdf-preview-viber-help { flex-basis: 100%; margin: 0; color: var(--forest); font-size: .9rem; }
 
 @media (min-width: 761px) and (max-width: 980px) {
   .week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

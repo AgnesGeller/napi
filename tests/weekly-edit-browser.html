@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="hu"><meta charset="utf-8"><title>Heti szerkesztés regressziós teszt</title>
+<output id="result">Teszt indítása…</output><iframe id="app" style="width:100%;height:850px;border:0"></iframe>
+<script>
+(async()=>{
+ const result=document.querySelector('#result');
+ try {
+  if(location.hostname!=='127.0.0.1'||location.port!=='4175') throw new Error('Csak elkülönített tesztporton futtatható.');
+  for(const registration of await navigator.serviceWorker.getRegistrations()) await registration.unregister();
+  const iso=date=>new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  const now=new Date();const earlier=new Date(now);earlier.setDate(now.getDate()-1);const date=iso(earlier);
+  const task={id:'task-1',teamId:'team',customerName:'Korábbi ügyfél',address:'Megőrzött cím',startTime:'08:30',notes:'Megőrzött megjegyzés',workerIds:[],vehicleIds:[],toolIds:[],materials:[{name:'Föld',quantity:'3',unit:'zsák'}],jobs:[{id:'job-1',name:'Kertgondozás',note:'Feladatjegyzet',steps:['Első lépés','Második lépés']}]};
+  localStorage.setItem('diszkertek-napi-adatok-v1',JSON.stringify({plans:[{id:date,date,tasks:[task],workItems:[]}]}));
+  const frame=document.querySelector('#app');await new Promise(resolve=>{frame.onload=resolve;frame.src='../index.html';});
+  const win=frame.contentWindow,doc=win.document;
+  const assert=(value,message)=>{if(!value)throw new Error(message);};
+  const saved=JSON.parse(localStorage.getItem('diszkertek-napi-adatok-v1'));
+  const remotePlan=JSON.parse(JSON.stringify(saved.plans.find(plan=>plan.date===date)));
+  let pulls=0;
+  win.NapiCustomerDirectory.hasSession=()=>true;
+  win.NapiCloudSync.pull=async()=>{pulls++;return {config:null,plans:[{plan_date:date,updated_at:'revision-1',payload:remotePlan}]};};
+  // Csak a szinkron lekérési útját teszteljük. Élő mentés nem megengedett.
+  win.NapiCloudSync.pushPlan=async()=>{throw new Error('A teszt nem írhat élő adatot.');};
+  doc.querySelector(`[data-open-date="${date}"]`).click();
+  assert(doc.querySelector('#planDate').value===date,'Nem a heti nézetből kiválasztott nap nyílt meg.');
+  assert(doc.querySelector('#actionPlanDate').value===date,'A PDF műveleti napja nem követte a megnyitott tervet.');
+  doc.querySelector('.edit-task').click();
+  const card=doc.querySelector('.task-card');
+  assert(!card.classList.contains('is-collapsed'),'A szerkesztés nem nyitotta ki a feladatot.');
+  assert(card.querySelector('.customer-input').value===task.customerName,'Az ügyfél hiányzik.');
+  assert(card.querySelector('.address-input').value===task.address,'A cím hiányzik.');
+  assert(card.querySelector('.start-time-input').value===task.startTime,'A kezdési idő hiányzik.');
+  assert(card.querySelector('.notes-input').value===task.notes,'A megjegyzés hiányzik.');
+  assert(card.textContent.includes('Kertgondozás')&&card.querySelector('.material-name').value==='Föld','Feladat vagy anyag hiányzik.');
+  const deadline=Date.now()+7000;
+  while(pulls<2&&Date.now()<deadline) await new Promise(resolve=>setTimeout(resolve,100));
+  assert(pulls>=2,'Nem futott le kétszer a háttérszinkron.');
+  assert(doc.querySelector('.task-card')===card,'Változatlan szerveradat lecserélte a szerkesztőt.');
+  assert(!card.classList.contains('is-collapsed'),'A háttérszinkron becsukta a szerkesztőt.');
+  const notes=card.querySelector('.notes-input');notes.value='Új helyi megjegyzés';notes.dispatchEvent(new win.Event('input',{bubbles:true}));
+  assert(JSON.parse(localStorage.getItem('diszkertek-napi-adatok-v1')).plans.find(plan=>plan.date===date).tasks[0].notes==='Új helyi megjegyzés','A helyi szerkesztés nem maradt meg.');
+  const createPdf=win.NapiPdfShare.createPdfBlob;
+  let exportedPastDate=false;
+  win.NapiPdfShare.createPdfBlob=(factory,source,options,onRendered)=>{
+   exportedPastDate=source.textContent.includes('Korábbi ügyfél')&&source.textContent.includes('Új helyi megjegyzés');
+   return createPdf(factory,source,options,onRendered);
+  };
+  doc.querySelector('#pdfPreviewButton').click();
+  const pdfDeadline=Date.now()+20000;
+  while(doc.querySelector('#pdfPreviewButton').disabled&&Date.now()<pdfDeadline) await new Promise(resolve=>setTimeout(resolve,100));
+  assert(exportedPastDate,'A PDF nem a heti nézetből kiválasztott, szerkesztett napból készül.');
+  assert(doc.querySelector('#pdfPreviewDialog').open&&doc.querySelector('#pdfPreviewPages img')?.naturalWidth>100,'A kiválasztott nap PDF-je nem készült el.');
+  doc.querySelector('#discardPdfPreviewButton').click();
+  result.textContent=`WEEKLY_EDIT_OK: ${pulls} háttérlekérés; korábbi nap, minden mező, nyitott szerkesztő, helyi mentés és valódi PDF.`;
+ } catch(error){result.textContent=`WEEKLY_EDIT_ERROR: ${error.message}`;}
+})();
+</script></html>
