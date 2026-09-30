@@ -20,11 +20,13 @@
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/${resource}`, {
         method,
+        ...(method === "GET" ? { cache: "no-store" } : {}),
         headers: {
           apikey: PUBLISHABLE_KEY,
           Authorization: `Bearer ${accessToken}`,
           Accept: "application/json",
           "Content-Type": "application/json",
+          ...(method === "GET" ? { "Cache-Control": "no-cache" } : {}),
           ...(prefer ? { Prefer: prefer } : {})
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) })
