@@ -14,10 +14,12 @@ const context = vm.createContext({
 });
 vm.runInContext(source.slice(source.indexOf('  function printPlanHTML('), source.indexOf('  function renderPrintView(')), context);
 const task = {customerName:'Ügyfél', address:'Cím', vehicleIds:[], workerIds:[], toolIds:[], materials:[]};
-const plan = {date:'2026-09-30', tasks:[task, {...task, customerName:'Másik ügyfél'}], workItems:[{customerName:'Vezetői titkos előjegyzés'}]};
+const plan = {date:'2026-09-30', generalNote:'A kaput induláskor zárjátok be.', tasks:[task, {...task, customerName:'Másik ügyfél'}], workItems:[{customerName:'Vezetői titkos előjegyzés'}]};
 const html = context.printPlanHTML(plan);
 assert.ok(html.includes('Ügyfél') && html.includes('Másik ügyfél'));
 assert.ok(html.includes('Következő csapat'));
+assert.ok(html.includes('print-general-note') && html.includes('A kaput induláskor zárjátok be.'));
+assert.ok(!html.includes('Egyéb megjegyzés'), 'A PDF-en csak a beírt szöveg jelenjen meg, mezőcím ne.');
 assert.ok(!html.includes('Vezetői titkos előjegyzés') && !html.includes('Előjegyzések'));
 assert.equal(plan.workItems.length,1,'A PDF elkészítése nem törölheti az előjegyzést.');
 assert.ok(context.printPlanHTML({...plan,tasks:[]}).includes('Nincs feladat erre a napra.'));

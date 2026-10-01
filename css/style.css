@@ -182,6 +182,8 @@ button, summary { touch-action: manipulation; }
 .team-add-customer { width: 100%; min-height: 48px; color: var(--forest); border: 2px dashed var(--team-border, var(--leaf)); background: rgba(255,255,255,.78); font-weight: 850; }
 .team-block .task-card + .task-card::before { content: "Következő ügyfél"; top: -1.2rem; }
 .btn-add-bottom { width: 100%; margin-top: 1rem; min-height: 52px; }
+.day-general-note { display: grid; gap: .4rem; margin-top: 1rem; padding: .8rem; color: #234a78; border: 1px solid #aeb3b8; background: #fff5b8; font-family: Georgia, serif; font-weight: 800; }
+.day-general-note textarea { min-height: 86px; resize: vertical; font-family: Arial, Helvetica, sans-serif; font-weight: 400; }
 .task-primary-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .7rem; margin-top: .7rem; }
 .task-save-button { width: 100%; min-height: 62px; }
 .task-delete-day-button { min-height: 62px; padding-inline: 1.2rem; color: #fff; border: 2px solid #7b1d19; background: #a92f28; font-weight: 850; }
@@ -517,4 +519,5 @@ button, summary { touch-action: manipulation; }
   .print-work-expectations { margin-top: 1.5mm !important; }
   .print-worker { display: inline-block; padding: 1mm 2mm; color: var(--print-worker-text, #fff); background: var(--print-worker-color); border: .3mm solid rgba(255,255,255,.75); border-radius: 2mm; font-size: 9pt; font-weight: 800; }
   .print-footer-note { position: relative; z-index: 1; margin-top: 7mm; padding: 4mm; break-inside: avoid; color: #70291c; border: .6mm solid #b65b2b; background: #fff1dc; text-align: center; font: 800 11pt/1.35 Georgia, serif; }
+  .print-general-note { position: relative; z-index: 1; margin-top: 3mm; padding: 3.5mm 4mm; break-inside: avoid; white-space: pre-wrap; overflow-wrap: anywhere; color: #24578f; border: .35mm solid #8c9298; background: #fff1a8; text-align: center; font: 800 11pt/1.35 Georgia, serif; }
 }

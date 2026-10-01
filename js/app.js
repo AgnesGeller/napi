@@ -230,7 +230,7 @@
     const id = uid();
     return { id, teamId: id, customerId: null, locationId: null, customerName: "", address: "", startTime: "", workerIds: [], vehicleIds: [], jobs: [], toolIds: [], toolQuantities: {}, extraTools: "", materials: [], workLogRequired: true, workIntensity: 3, workQuality: 3, notes: "" };
   }
-  function blankPlan(date) { return { id: uid(), date, meeting: DEFAULT_MEETING, stops: DEFAULT_STOPS, workItems: [], deletedWorkItemIds: [], tasks: [] }; }
+  function blankPlan(date) { return { id: uid(), date, meeting: DEFAULT_MEETING, stops: DEFAULT_STOPS, generalNote: "", workItems: [], deletedWorkItemIds: [], tasks: [] }; }
   function normalizeData(candidate) {
     if (!candidate || typeof candidate !== "object") throw new Error("Az adatfájl nem megfelelő formátumú.");
     const initial = createInitialData();
@@ -279,6 +279,7 @@
         ...plan,
         meeting: typeof plan.meeting === "string" ? plan.meeting : DEFAULT_MEETING,
         stops: typeof plan.stops === "string" ? plan.stops : DEFAULT_STOPS,
+        generalNote: String(plan.generalNote || ""),
         workItems: Array.isArray(plan.workItems) ? plan.workItems.map(item => ({
           id: item.id || uid(),
           type: ["work", "survey", "meeting"].includes(item.type) ? item.type : "work",
@@ -946,6 +947,7 @@
     $("#planDate").value = date;
     $("#meetingInput").value = workingPlan.meeting ?? DEFAULT_MEETING;
     $("#stopsInput").value = workingPlan.stops ?? DEFAULT_STOPS;
+    $("#generalNoteInput").value = workingPlan.generalNote || "";
     if (!preserveCalendarPosition) { setWeekAnchor(date); setMonthAnchor(date.slice(0, 7)); }
     dirty = false;
     $("#saveState").textContent = stored ? "Betöltve • nincs mentetlen módosítás" : "Új napi terv";
@@ -986,7 +988,7 @@
   }
   function planHasTasks(plan) { return Boolean(plan && Array.isArray(plan.tasks) && plan.tasks.length); }
   function planHasContent(plan) {
-    return Boolean(plan && (planHasTasks(plan) || plan.workItems?.length || plan.meeting !== DEFAULT_MEETING || plan.stops !== DEFAULT_STOPS));
+    return Boolean(plan && (planHasTasks(plan) || plan.workItems?.length || String(plan.generalNote || "").trim() || plan.meeting !== DEFAULT_MEETING || plan.stops !== DEFAULT_STOPS));
   }
   function vehicleNumberingKey(task) {
     return `team:${task.teamId || task.id}`;
@@ -1916,7 +1918,9 @@
         lines.push("");
       });
     });
-    lines.push(FINAL_NOTE); return lines.join("\n");
+    lines.push(FINAL_NOTE);
+    if (String(plan.generalNote || "").trim()) lines.push("", String(plan.generalNote).trim());
+    return lines.join("\n");
   }
   function printPlanHTML(plan) {
     const departure = plan.meeting || plan.stops ? `<div class="print-departure">${plan.meeting ? `<p><strong>Találkozó:</strong> ${escapeHTML(plan.meeting)}</p>` : ""}${plan.stops ? `<p><strong>Megálló:</strong> ${escapeHTML(plan.stops)}</p>` : ""}</div>` : "";
@@ -1945,7 +1949,8 @@
       const printTask = `<article class="print-task" style="--print-task-color:${printTheme.background};--print-task-border:${printTheme.border};--print-task-accent:${printTheme.accent}"><div class="print-task-start"><div class="print-task-heading"><h2>${escapeHTML(vehicles || "Autó nélkül")}</h2><div class="print-heading-workers">${workers || `<span>Nincs dolgozó kiválasztva</span>`}</div></div>${firstClient}</div>${remainingClients.join("")}</article>`;
       return `${groupIndex ? `<div class="print-divider">Következő csapat</div>` : ""}${printTask}`;
     }).join("");
-    return `<section class="print-sheet">${printHeader}${departure}${tasks || `<p>Nincs feladat erre a napra.</p>`}${tasks ? `<div class="print-footer-note">${FINAL_NOTE}</div>` : ""}</section>`;
+    const generalNote = String(plan.generalNote || "").trim();
+    return `<section class="print-sheet">${printHeader}${departure}${tasks || `<p>Nincs feladat erre a napra.</p>`}${tasks ? `<div class="print-footer-note">${FINAL_NOTE}</div>` : ""}${generalNote ? `<div class="print-general-note">${escapeHTML(generalNote)}</div>` : ""}</section>`;
   }
   function renderPrintView(plans = activePrintPlans || [workingPlan]) {
     $("#printView").innerHTML = plans.map(printPlanHTML).join("");
@@ -2333,6 +2338,7 @@
   $("#planDate").addEventListener("change", event => changeDate(event.target.value));
   $("#meetingInput").addEventListener("input", event => { workingPlan.meeting = event.target.value; markDirty(); });
   $("#stopsInput").addEventListener("input", event => { workingPlan.stops = event.target.value; markDirty(); });
+  $("#generalNoteInput").addEventListener("input", event => { workingPlan.generalNote = event.target.value; markDirty(); });
   $("#todayButton").addEventListener("click", () => changeDate(dateOffset(isoToday(), 1)));
   $("#folderButton").addEventListener("click", chooseFolder); $("#refreshButton").addEventListener("click", refreshApplication);
   function pushNotificationsSupported() {
@@ -2515,7 +2521,8 @@
             workingPlan = recovered;
             workingPlan.meeting = typeof workingPlan.meeting === "string" ? workingPlan.meeting : DEFAULT_MEETING;
             workingPlan.stops = typeof workingPlan.stops === "string" ? workingPlan.stops : DEFAULT_STOPS;
-            $("#meetingInput").value = workingPlan.meeting; $("#stopsInput").value = workingPlan.stops; dirty = true;
+            workingPlan.generalNote = String(workingPlan.generalNote || "");
+            $("#meetingInput").value = workingPlan.meeting; $("#stopsInput").value = workingPlan.stops; $("#generalNoteInput").value = workingPlan.generalNote; dirty = true;
           } else localStorage.removeItem(RECOVERY_KEY);
         }
       } catch (_) { /* Hibás helyreállítási adatot figyelmen kívül hagyunk. */ }

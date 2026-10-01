@@ -32,7 +32,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=20260929">
   <link rel="preload" as="image" href="assets/diszkertek-logo.png">
   <link href="assets/vendor/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20261001a">
+  <link rel="stylesheet" href="css/style.css?v=20261001b">
 </head>
 <body>
   <a class="skip-link" href="#planner">Ugrás a napi tervhez</a>
@@ -113,6 +113,9 @@
       </div>
       <div id="taskList" class="task-list"></div>
       <button class="btn btn-add btn-add-bottom" id="addTaskBottomButton" type="button" hidden>＋ Új autó / külön csapat</button>
+      <label class="day-general-note">Egyéb megjegyzés
+        <textarea class="form-control" id="generalNoteInput" rows="3" maxlength="1200" placeholder="A teljes napi feladathoz tartozó fontos megjegyzés"></textarea>
+      </label>
       <div class="task-primary-actions">
         <button class="btn btn-save task-save-button" id="saveButton" type="button"><span aria-hidden="true">✓</span> Mentés</button>
         <button class="btn task-delete-day-button" id="deleteDayButton" type="button" hidden>Teljes nap törlése</button>
@@ -411,6 +414,6 @@
   <script src="js/napi-domain.js?v=20260930g"></script>
   <script src="js/napi-sync.js?v=20260930"></script>
   <script src="js/pdf-share.js?v=20260930f"></script>
-  <script src="js/app.js?v=20261001b"></script>
+  <script src="js/app.js?v=20261001c"></script>
 </body>
 </html>
