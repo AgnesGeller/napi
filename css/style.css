@@ -508,7 +508,9 @@ button, summary { touch-action: manipulation; }
   .print-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5mm 7mm; }
   .print-section { margin: 2mm 0; break-inside: avoid; }
   .print-section.wide { grid-column: 1 / -1; }
+  .print-section.print-jobs { break-inside: auto; }
   .print-section h3 { margin: 0 0 1mm; color: var(--orange); font: 800 8.5pt Arial, sans-serif; letter-spacing: .07em; text-transform: uppercase; }
+  .print-job-description { break-inside: avoid; }
   .print-job-description + .print-job-description { margin-top: 2mm; }
   .print-job-description h4 { margin: 0 0 .8mm; color: var(--forest); font: 800 9pt Arial, sans-serif; }
   .print-section p, .print-section ul, .print-section ol { margin: 0; padding-left: 5mm; }

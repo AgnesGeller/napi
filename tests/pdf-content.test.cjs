@@ -8,7 +8,7 @@ const context = vm.createContext({
   formatDate: value => value,
   tasksByTeam: plan => plan.tasks.map(task => ({tasks:[task]})),
   data: {workers:[], vehicles:[], tools:[]}, byId: () => undefined,
-  jobDescriptions: () => [], clientNumberForVehicle: () => 1,
+  jobDescriptions: () => [{name:'Tesztfeladat',note:'',steps:[]}], clientNumberForVehicle: () => 1,
   validRating: () => 'normal', INTENSITY_DESCRIPTIONS: {normal:'Normál tempó'},
   QUALITY_DESCRIPTIONS: {normal:'Normál minőség'}, FINAL_NOTE:'Nap vége',
 });
@@ -18,6 +18,7 @@ const plan = {date:'2026-09-30', generalNote:'A kaput induláskor zárjátok be.
 const html = context.printPlanHTML(plan);
 assert.ok(html.includes('Ügyfél') && html.includes('Másik ügyfél'));
 assert.ok(html.includes('Következő csapat'));
+assert.ok(html.includes('print-section print-jobs wide'), 'A hosszú feladatlista tördelhető PDF-blokkja hiányzik.');
 assert.ok(html.includes('print-general-note') && html.includes('A kaput induláskor zárjátok be.'));
 assert.ok(!html.includes('Egyéb megjegyzés'), 'A PDF-en csak a beírt szöveg jelenjen meg, mezőcím ne.');
 assert.ok(!html.includes('Vezetői titkos előjegyzés') && !html.includes('Előjegyzések'));
