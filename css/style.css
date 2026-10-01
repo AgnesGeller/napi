@@ -511,8 +511,8 @@ button, summary { touch-action: manipulation; }
   .print-job-description h4 { margin: 0 0 .8mm; color: var(--forest); font: 800 9pt Arial, sans-serif; }
   .print-section p, .print-section ul, .print-section ol { margin: 0; padding-left: 5mm; }
   .print-section p { padding-left: 0; }
-  .print-worklog-required { display: flex; align-items: center; gap: 2.5mm; margin: 1.5mm 0 2.5mm; padding: 2.5mm 3mm; break-inside: avoid; color: #6f2da8; border: 1.2mm solid #ffd400; background: #ffe5e5; font-size: 12pt; font-weight: 900; letter-spacing: .02em; }
-  .print-worklog-check { display: inline-grid; flex: 0 0 auto; place-items: center; width: 7mm; height: 7mm; color: #fff; border-radius: 50%; background: #16853f; font-size: 13pt; font-weight: 900; line-height: 1; }
+  .print-worklog-required { display: flex; align-items: center; gap: 1.8mm; margin: 1.2mm 0 2mm; padding: 1.3mm 2mm; break-inside: avoid; color: #6f2da8; border: .35mm solid #e7c600; background: #fff1f1; font-size: 10pt; font-weight: 850; letter-spacing: .01em; }
+  .print-worklog-check { display: inline-grid; flex: 0 0 auto; place-items: center; width: 5.5mm; height: 5.5mm; color: #fff; border-radius: 50%; background: #16853f; font-size: 10pt; font-weight: 900; line-height: 1; }
   .print-worklog-not-required { display: block; margin: 1mm 0 2mm; font-weight: 800; }
   .print-work-expectations { margin-top: 1.5mm !important; }
   .print-worker { display: inline-block; padding: 1mm 2mm; color: var(--print-worker-text, #fff); background: var(--print-worker-color); border: .3mm solid rgba(255,255,255,.75); border-radius: 2mm; font-size: 9pt; font-weight: 800; }
