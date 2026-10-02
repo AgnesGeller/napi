@@ -1938,7 +1938,7 @@
         const materials = task.materials.filter(item => item.name);
         const jobs = jobDescriptions(task).map(item => `<div class="print-job-description"><h4>${escapeHTML(item.name)}</h4>${item.note ? `<p>${escapeHTML(item.note)}</p>` : ""}${item.steps.length ? `<ul>${item.steps.map(step => `<li>${escapeHTML(step.replaceAll("–", "-"))}</li>`).join("")}</ul>` : ""}</div>`).join("");
         const workLogNotice = task.workLogRequired === false
-          ? `<span class="print-worklog-not-required">Munkanaplót nem kell megírni.</span>`
+          ? `<span class="print-worklog-not-required"><span>Munkanaplót nem kell megírni.</span><span class="print-worklog-cross" aria-hidden="true">×</span></span>`
           : `<span class="print-worklog-required"><span>Munkanaplót megírni</span><span class="print-worklog-check" aria-hidden="true">✓</span></span>`;
         const intensityRating = validRating(task.workIntensity);
         const qualityRating = validRating(task.workQuality);
