@@ -180,7 +180,7 @@ button, summary { touch-action: manipulation; }
 .team-delete-button:hover, .team-delete-button:focus-visible { background: #6f1e1a; outline: 3px solid rgba(255,255,255,.28); }
 .team-block .task-list-inner { display: grid; gap: 1.4rem; }
 .team-add-customer { width: 100%; min-height: 48px; color: var(--forest); border: 2px dashed var(--team-border, var(--leaf)); background: rgba(255,255,255,.78); font-weight: 850; }
-.team-block .task-card + .task-card::before { content: "Következő ügyfél"; top: -1.2rem; }
+.team-block .task-card + .task-card::before { content: "Következő napi tétel"; top: -1.2rem; }
 .btn-add-bottom { width: 100%; margin-top: 1rem; min-height: 52px; }
 .day-general-note { display: grid; gap: .4rem; margin-top: 1rem; padding: .8rem; color: #234a78; border: 1px solid #aeb3b8; background: #fff5b8; font-family: Georgia, serif; font-weight: 800; }
 .day-general-note textarea { min-height: 86px; resize: vertical; font-family: Arial, Helvetica, sans-serif; font-weight: 400; }
@@ -223,6 +223,7 @@ button, summary { touch-action: manipulation; }
 .step-label h4, .step-label strong { margin: 0; font-size: 1.03rem; font-weight: 800; }
 .step-customer { display: grid; grid-template-columns: 1.2fr 1fr; gap: .7rem; align-items: end; }
 .step-customer .step-label { grid-column: 1 / -1; margin-bottom: 0; }
+.entry-type-field { grid-column: 1 / -1; width: min(240px, 100%); }
 .customer-picker { position: relative; }
 .customer-field-label { display: block; margin-bottom: .35rem; color: #294b35; font-size: .88rem; font-weight: 750; }
 .customer-picker-row { display: grid; grid-template-columns: 1fr 46px; }
@@ -260,16 +261,15 @@ button, summary { touch-action: manipulation; }
 .job-template-suggestions button:hover, .job-template-suggestions button:focus { background: var(--leaf-light); outline: 0; }
 .job-template-suggestions b, .job-template-suggestions small { display: block; }
 .job-template-suggestions small { color: var(--muted); }
-.new-job-row { display: grid; grid-template-columns: minmax(150px, .8fr) minmax(220px, 1.2fr) auto; gap: .5rem; margin-top: .75rem; }
-.new-job-row .btn { min-height: 46px; white-space: nowrap; }
-.job-workflows { display: grid; gap: .7rem; }
-.job-workflow { display: grid; gap: .35rem; padding: .7rem; border-left: 4px solid var(--orange); background: #f6f8f3; }
-.job-workflow > span { color: var(--forest); font-weight: 800; }
-.job-workflow-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
-.job-workflow-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.jobs-list { display: grid; gap: .7rem; margin: .75rem 0; }
+.job-row { display: grid; grid-template-columns: minmax(130px,.7fr) minmax(180px,1fr) minmax(240px,1.4fr) auto; gap: .55rem; align-items: end; padding: .7rem; border-left: 4px solid var(--orange); background: #f6f8f3; }
+.job-row-template { align-self: stretch; padding: .55rem; border: 1px solid #ccd6cc; background: #fff; }
+.job-row-template small, .job-row-template strong { display: block; }
+.job-row-template small { color: var(--muted); }
+.job-description-field textarea { min-height: 46px; resize: vertical; }
+.job-row-actions { display: flex; gap: .35rem; align-items: flex-end; }
 .job-info-button, .remove-job-button { min-height: 38px; }
 .remove-job-button { color: #8d251f; }
-.job-workflow textarea { min-height: 108px; resize: vertical; }
 .empty-detail { margin: 0; padding: .7rem; color: var(--muted); background: #f6f8f3; }
 .materials-list { display: grid; gap: .5rem; margin-bottom: .65rem; }
 .material-row { display: grid; grid-template-columns: minmax(140px, 1.2fr) minmax(130px, 1fr) minmax(90px, .65fr) minmax(80px, .55fr) 42px; gap: .45rem; }
@@ -398,6 +398,8 @@ button, summary { touch-action: manipulation; }
 }
 
 @media (max-width: 760px) {
+  .job-row { grid-template-columns: 1fr; }
+  .job-row-actions { justify-content: flex-end; }
   .reminder-add-row { grid-template-columns: 1fr; }
   body { padding-bottom: 78px; }
   body.actions-open { padding-bottom: 225px; }
@@ -465,7 +467,6 @@ button, summary { touch-action: manipulation; }
   .copy-actions { display: grid; grid-template-columns: 1fr; }
   .choice-chip { flex: 1 1 calc(50% - .5rem); }
   .detail-content { padding-left: 0; }
-  .new-job-row { grid-template-columns: 1fr; }
   .header-actions .btn { font-size: .9rem; }
   .settings-row { grid-template-columns: 1fr; }
   .settings-row-actions { justify-content: flex-end; }

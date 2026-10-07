@@ -32,17 +32,20 @@
   assert(card.querySelector('.address-input').value===task.address,'A cím hiányzik.');
   assert(card.querySelector('.start-time-input').value===task.startTime,'A kezdési idő hiányzik.');
   assert(card.querySelector('.notes-input').value===task.notes,'A megjegyzés hiányzik.');
-  assert(card.textContent.includes('Kertgondozás')&&card.querySelector('.material-name').value==='Föld','Feladat vagy anyag hiányzik.');
+  assert(card.querySelector('.job-name-input').value==='Kertgondozás'&&card.querySelector('.material-name').value==='Föld','Feladat vagy anyag hiányzik.');
   const visible=element=>element.getClientRects().length>0&&element.getBoundingClientRect().height>0;
-  for(const name of ['jobs','tools','materials','workflow','expectations']) {
+  for(const name of ['jobs','tools','materials','notes','expectations']) {
    const detail=card.querySelector(`[data-detail="${name}"]`);if(!detail.open)detail.querySelector('summary').click();
    assert(detail.open&&visible(detail.querySelector('.detail-content')),`${name}: a tartalom nem látható lenyitáskor.`);
   }
-  assert(visible(card.querySelector('.selected-jobs strong'))&&card.querySelector('.selected-jobs').textContent.includes('Kertgondozás'),'A mentett feladat a Feladatok részben nem látszik.');
+  assert(visible(card.querySelector('.job-name-input'))&&card.querySelector('.job-name-input').value==='Kertgondozás','A mentett feladat a Feladatok részben nem látszik.');
   assert(visible(card.querySelector('.tool-quantity-input'))&&card.querySelector('.tool-quantity-input').value==='2','Az eszköz és mennyisége nem látszik.');
-  assert(visible(card.querySelector('.material-name'))&&visible(card.querySelector('.job-steps-input')),'Anyag vagy feladatleírás nem látható.');
-  assert(card.querySelector('.job-steps-input').value.includes('Első lépés'),'Hiányzó kivitelezési adat.');
-  for(const name of ['jobs','tools','materials','workflow','expectations']) {
+  assert(visible(card.querySelector('.material-name'))&&visible(card.querySelector('.job-note-input')),'Anyag vagy feladatleírás nem látható.');
+  assert(card.querySelector('.job-note-input').value==='Feladatjegyzet','Hiányzó napi feladatleírás.');
+  card.querySelector('.job-info-button').click();
+  assert(doc.querySelector('#jobInfoDialog').open&&doc.querySelector('#jobInfoDialog').textContent.includes('Első lépés'),'A sablon kivitelezési útmutatója nem nyitható meg.');
+  doc.querySelector('#jobInfoDialog').close();
+  for(const name of ['jobs','tools','materials','notes','expectations']) {
    const detail=card.querySelector(`[data-detail="${name}"]`);detail.querySelector('summary').click();
    assert(!detail.open,`${name}: nem csukható vissza.`);detail.querySelector('summary').click();
   }

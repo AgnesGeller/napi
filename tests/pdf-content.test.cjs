@@ -9,6 +9,8 @@ const context = vm.createContext({
   tasksByTeam: plan => plan.tasks.map(task => ({tasks:[task]})),
   data: {workers:[], vehicles:[], tools:[]}, byId: () => undefined,
   jobDescriptions: () => [{name:'Tesztfeladat',note:'',steps:[]}], clientNumberForVehicle: () => 1,
+  taskEntryLabel: task => task.entryType === 'todo' ? 'Teendő' : 'Ügyfél',
+  taskDisplayName: task => task.customerName || (task.entryType === 'todo' ? 'Nincs megnevezve' : 'Nincs kiválasztva'),
   validRating: () => 'normal', INTENSITY_DESCRIPTIONS: {normal:'Normál tempó'},
   QUALITY_DESCRIPTIONS: {normal:'Normál minőség'}, FINAL_NOTE:'Nap vége',
 });
@@ -24,4 +26,8 @@ assert.ok(!html.includes('Egyéb megjegyzés'), 'A PDF-en csak a beírt szöveg 
 assert.ok(!html.includes('Vezetői titkos előjegyzés') && !html.includes('Előjegyzések'));
 assert.equal(plan.workItems.length,1,'A PDF elkészítése nem törölheti az előjegyzést.');
 assert.ok(context.printPlanHTML({...plan,tasks:[]}).includes('Nincs feladat erre a napra.'));
+const todoHtml = context.printPlanHTML({...plan,tasks:[{...task,entryType:'todo',customerName:'Telephely',workLogRequired:true}]});
+assert.ok(todoHtml.includes('1. Teendő') && todoHtml.includes('Telephely'), 'A teendő megnevezése hibás a PDF-ben.');
+assert.ok(!todoHtml.includes('Munkanaplót'), 'Teendőnél nem jelenhet meg munkanapló-jelzés.');
+assert.ok(todoHtml.includes('Normál tempó') && todoHtml.includes('Normál minőség'), 'Teendőnél is meg kell maradnia az intenzitásnak és a minőségnek.');
 console.log('PDF tartalom, vezetői előjegyzések kizárása, több csapat: OK');

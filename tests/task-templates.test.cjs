@@ -10,10 +10,13 @@ const customJobSource = app.slice(customJobStart, customJobEnd);
 
 assert.match(html, /data-settings-tab="templates">Sablonok</, "A külön Sablonok fül hiányzik.");
 assert.match(html, /class="form-control job-template-search"/, "A napi sablonkereső hiányzik.");
-assert.match(html, /class="form-control new-job-note"/, "Az egyszeri feladat megjegyzésmezője hiányzik.");
+assert.match(html, /class="jobs-list"/, "A napi feladatsorok helye hiányzik.");
+assert.match(html, /class="btn btn-soft add-custom-job"/, "Az egyszeri feladat hozzáadása hiányzik.");
 assert.doesNotMatch(customJobSource, /data\.templates\.push|template\s*=\s*\{/, "Az egyszeri feladat nem menthető automatikusan sablonként.");
 assert.match(customJobSource, /templateId:\s*null/, "Az egyszeri feladatot sablonkapcsolat nélkül kell tárolni.");
 assert.doesNotMatch(app, /template\.steps\s*=\s*deepCopy\(job\.steps\)/, "A napi leírás nem írhatja át a sablont.");
 assert.match(app, /item\.note = \$\("#settingNote"\)\.value\.trim\(\)/, "A sablon megjegyzésének mentése hiányzik.");
+assert.match(app, /job-name-input/, "A feladat megnevezésének szerkesztése hiányzik.");
+assert.match(app, /job-note-input/, "A feladat leírásának szerkesztése hiányzik.");
 
 console.log("Feladatsablon-kezelési regressziós teszt: OK");
