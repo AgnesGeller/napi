@@ -67,29 +67,29 @@
     });
   }
 
-  async function removePlanReminders(dates) {
-    const { ownerId } = await sessionDetails();
-    const filter = [...new Set(dates)].filter(Boolean).map(date => encodeURIComponent(date)).join(",");
-    if (filter) await request(`napi_notification_reminders?owner_id=eq.${ownerId}&plan_date=in.(${filter})`, { method: "DELETE", prefer: "return=minimal" });
-  }
-
-  async function deletePlans(dates) {
+  async function deletePlans(dates, localPlans = []) {
     const uniqueDates = [...new Set(dates)].filter(Boolean);
     if (!uniqueDates.length) return;
     const filter = uniqueDates.map(date => encodeURIComponent(date)).join(",");
     const currentRows = await request(`napi_daily_plans?select=plan_date,updated_at,payload&plan_date=in.(${filter})`);
     const currentByDate = new Map((currentRows || []).map(row => [row.plan_date, row]));
-    await Promise.all(uniqueDates.map(date => {
+    const results = await Promise.all(uniqueDates.map(async date => {
       const current = currentByDate.get(date);
       const currentTimestamp = Date.parse(current?.updated_at || "") || 0;
       const deletedAt = new Date(Math.max(Date.now(), currentTimestamp + 1)).toISOString();
-      return pushPlan({ date, deleted: true, deletedPlanId: current?.payload?.id || current?.payload?.deletedPlanId || null, updatedAt: deletedAt, cloudUpdatedAt: current?.updated_at || null });
+      const local = localPlans.find(plan => plan.date === date);
+      const deletedIds = [...new Set([...(current?.payload?.deletedWorkItemIds || []), ...(local?.deletedWorkItemIds || [])])];
+      const workItems = window.NapiDomain.mergeWorkItems(local?.workItems, current?.payload?.workItems, deletedIds);
+      const payload = workItems.length
+        ? { ...window.NapiDomain.clearDailyTasks(current?.payload?.deleted ? local || { date } : current?.payload || local || { date }), date, workItems, deletedWorkItemIds: deletedIds, deleted: false }
+        : { date, deleted: true, deletedPlanId: current?.payload?.id || current?.payload?.deletedPlanId || null };
+      const result = await pushPlan({ ...payload, updatedAt: deletedAt, cloudUpdatedAt: current?.updated_at || null });
+      if (result?.accepted === false) throw new Error("A nap közben megváltozott. A frissebb közös adat megmaradt; a törlést újrapróbáljuk.");
+      return { plan_date: date, payload: result?.payload, updated_at: result?.updated_at };
     }));
-    const rows = await request(`napi_daily_plans?select=plan_date,payload&plan_date=in.(${filter})`);
-    const confirmed = new Set((rows || []).filter(row => row.payload?.deleted).map(row => row.plan_date));
-    if (uniqueDates.some(date => !confirmed.has(date))) throw new Error("A teljes nap törlésének közös megerősítése nem sikerült.");
-    await removePlanReminders(uniqueDates);
-    return rows;
+    if (results.some(row => !row.payload || (!row.payload.deleted && row.payload.tasks?.length))) throw new Error("A napi terv törlésének közös megerősítése nem sikerült.");
+    // Az emlékeztetőket a mentési RPC a megőrzött előjegyzésekből kezeli atomikusan.
+    return results;
   }
 
   async function savePushSubscription(subscription, deviceName) {

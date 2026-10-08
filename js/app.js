@@ -519,7 +519,14 @@
         data.updatedAt = new Date().toISOString(); localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
         if (pendingCloudDeletedDates.size) {
           const deletedDates = [...pendingCloudDeletedDates];
-          await window.NapiCloudSync.deletePlans(deletedDates);
+          const deletedRows = await window.NapiCloudSync.deletePlans(deletedDates, data.plans);
+          (deletedRows || []).forEach(row => {
+            if (pendingCloudPlanDates.has(row.plan_date)) return;
+            data.plans = data.plans.filter(plan => plan.date !== row.plan_date);
+            if (row.payload && !row.payload.deleted) data.plans.push({ ...normalizedRemotePlan(row.payload), cloudUpdatedAt: row.updated_at });
+            if (workingPlan.date === row.plan_date && !dirty) loadPlan(row.plan_date, { preserveCalendarPosition: true });
+          });
+          localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
           deletedDates.forEach(date => pendingCloudDeletedDates.delete(date));
           persistPendingDeletionDates();
         }
@@ -853,8 +860,9 @@
     const labels = { week: "kiválasztott hét", month: "kiválasztott hónap", year: "kiválasztott év", all: "összes napi terv" };
     const matching = data.plans.filter(plan => planMatchesPeriod(plan, period, workingPlan.date));
     if (!matching.length) { toast("Ebben az időszakban nincs törölhető napi terv."); return; }
-    if (!confirm(`Biztosan törlöd a(z) ${labels[period]} terveit (${matching.length} nap)? A törlés előtt töltsd le az adatmentést.`)) return;
+    if (!confirm(`Biztosan törlöd a(z) ${labels[period]} terveit (${matching.length} nap)? Az előjegyzések és emlékeztetőik megmaradnak. A törlés előtt töltsd le az adatmentést.`)) return;
     const dates = new Set(matching.map(plan => plan.date)); data.plans = data.plans.filter(plan => !dates.has(plan.date));
+    data.plans.push(...matching.filter(plan => plan.workItems?.length).map(plan => window.NapiDomain.clearDailyTasks(plan)));
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
     syncDeletedDates([...dates]);
     if (dates.has(workingPlan.date)) { localStorage.removeItem(RECOVERY_KEY); dirty = false; loadPlan(workingPlan.date, { preserveCalendarPosition: true }); }
@@ -1780,8 +1788,11 @@
     }).join("");
   }
   async function deleteDay(date) {
-    if (!confirm(`Biztosan törlöd a(z) ${formatDate(date)} teljes napi tervét? Előtte mentsd le PDF-ként, ha meg szeretnéd őrizni.`)) return false;
+    if (!confirm(`Biztosan törlöd a(z) ${formatDate(date)} napi feladatait? Az előjegyzések és emlékeztetőik megmaradnak. Előtte mentsd le PDF-ként, ha meg szeretnéd őrizni a tervet.`)) return false;
+    const previous = workingPlan.date === date ? workingPlan : data.plans.find(plan => plan.date === date);
+    const retained = previous ? window.NapiDomain.clearDailyTasks(deepCopy(previous)) : null;
     data.plans = data.plans.filter(plan => plan.date !== date);
+    if (retained?.workItems?.length) data.plans.push(retained);
     data.updatedAt = new Date().toISOString();
     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
     try {
@@ -1789,15 +1800,16 @@
       if (recovery?.workingPlan?.date === date) localStorage.removeItem(RECOVERY_KEY);
       else if (recovery?.data?.plans) {
         recovery.data.plans = recovery.data.plans.filter(plan => plan.date !== date);
+        if (retained?.workItems?.length) recovery.data.plans.push(retained);
         recovery.data.updatedAt = data.updatedAt;
         localStorage.setItem(RECOVERY_KEY, JSON.stringify(recovery));
       }
     } catch (_) { localStorage.removeItem(RECOVERY_KEY); }
-    const syncPromise = syncDeletedDates([date]);
     if (workingPlan.date === date) { localStorage.removeItem(RECOVERY_KEY); dirty = false; loadPlan(date, { preserveCalendarPosition: true }); }
-    renderWeek(); renderMonth(); toast("A teljes napi terv törölve • szinkronizálás folyamatban.");
+    const syncPromise = syncDeletedDates([date]);
+    renderWeek(); renderMonth(); toast("A napi feladatok törölve, az előjegyzések megmaradnak • szinkronizálás folyamatban.");
     const synced = await syncPromise;
-    if (synced) toast("A teljes napi terv minden eszközről törölve.");
+    if (synced) toast("A napi feladatok minden eszközről törölve. Az előjegyzések megmaradtak.");
     else {
       toast("A nap helyben törölve, de a közös törlés még nem sikerült. Ellenőrizd az internetet és a közös adatok csatlakoztatását.", true);
       queueCloudSync(2000);

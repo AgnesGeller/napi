@@ -60,6 +60,9 @@
     (incomingItems || []).forEach(item => { if (item?.id && !deleted.has(item.id)) merged.set(item.id, item); });
     return [...merged.values()];
   }
+  function clearDailyTasks(plan) {
+    return { ...plan, tasks: [], meeting: "", stops: "", generalNote: "" };
+  }
 
   function mergePendingWorkItems(remotePlan, localPlan) {
     const deletedWorkItemIds = [...new Set([...(remotePlan?.deletedWorkItemIds || []), ...(localPlan?.deletedWorkItemIds || [])])];
@@ -182,5 +185,5 @@
     return result;
   }
 
-  return { actionPlanForDate, applyConfigChanges, applyImportedData, availableActionPlans, configChangeEffects, configChangesBetween, mergeConfigChangeQueue, mergePendingWorkItems, mergeWorkItems, persistImportedData, planHasPrintableContent, printWorkItemsHTML, reconcileConfigChangeQueue, removeAcknowledgedConfigChanges, renderWorkItemsHTML, resolvePlanConflict, samePlanContent };
+  return { actionPlanForDate, applyConfigChanges, applyImportedData, availableActionPlans, clearDailyTasks, configChangeEffects, configChangesBetween, mergeConfigChangeQueue, mergePendingWorkItems, mergeWorkItems, persistImportedData, planHasPrintableContent, printWorkItemsHTML, reconcileConfigChangeQueue, removeAcknowledgedConfigChanges, renderWorkItemsHTML, resolvePlanConflict, samePlanContent };
 });

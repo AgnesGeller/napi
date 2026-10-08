@@ -12,7 +12,7 @@ assert.match(app, /reminderTimes:[\s\S]*?\.sort\(\)/, "Az értesítési időpont
 assert.match(app, /\["survey", "meeting"\]\.includes\(type\)/, "Csak felméréshez és megbeszéléshez készülhet értesítés.");
 assert.match(sync, /rpc\/napi_save_daily_plan/, "A napi tervnek az atomikus mentési RPC-t kell használnia.");
 assert.doesNotMatch(sync, /replacePlanReminders|napi_notification_reminders\?[^`]+DELETE/, "A kliens nem törölheti külön lépésben a nap emlékeztetőit.");
-assert.match(sync, /removePlanReminders\(uniqueDates\)/, "A teljes nap törlésekor az értesítéseket is törölni kell.");
+assert.doesNotMatch(sync, /removePlanReminders\(uniqueDates\)/, "A napi terv törlése nem törölheti a megőrzött előjegyzések emlékeztetőit.");
 assert.match(worker, /addEventListener\("push"/, "A service workerből hiányzik a háttérértesítés.");
 assert.match(worker, /addEventListener\("notificationclick"/, "Az értesítés megnyitási kezelése hiányzik.");
 assert.match(html, /id="notificationButton"/, "Az eszköz értesítési kapcsolója hiányzik.");
