@@ -1198,9 +1198,17 @@
     return activeSorted(data.templates).filter(template => !needle || searchKey(`${template.name} ${template.note || ""}`).includes(needle)).slice(0, 12);
   }
   function showTemplateSuggestions(card, query, showAll = false) {
+    closeTemplateSuggestions();
     const box = card.querySelector(".job-template-suggestions"); const matches = templateMatches(query, showAll);
     box.innerHTML = matches.map(template => `<button type="button" data-template-choice="${escapeHTML(template.id)}"><b>${escapeHTML(template.name)}</b>${template.note ? `<small>${escapeHTML(template.note)}</small>` : ""}</button>`).join("");
     box.hidden = matches.length === 0;
+    card.querySelector(".job-template-dropdown").setAttribute("aria-expanded", String(!box.hidden));
+  }
+  function closeTemplateSuggestions() {
+    document.querySelectorAll(".job-template-suggestions").forEach(box => {
+      box.hidden = true;
+      box.closest(".job-template-picker").querySelector(".job-template-dropdown").setAttribute("aria-expanded", "false");
+    });
   }
   function addCustomJob(task, name, note = "") {
     const cleanedName = String(name || "").trim();
@@ -1567,7 +1575,11 @@
     }
     if (event.target.closest(".customer-dropdown")) { if (!customerDirectory.length) openCustomerAuth(); else showCustomerSuggestions(card, "", true); return; }
     if (event.target.closest(".add-customer")) { if (window.NapiCustomerDirectory?.hasSession?.()) syncCustomerDirectory({ notify: true }); else openCustomerAuth(); return; }
-    if (event.target.closest(".job-template-dropdown")) { showTemplateSuggestions(card, "", true); return; }
+    if (event.target.closest(".job-template-dropdown")) {
+      if (card.querySelector(".job-template-suggestions").hidden) showTemplateSuggestions(card, "", true);
+      else closeTemplateSuggestions();
+      return;
+    }
     if (event.target.closest(".add-custom-job")) { addCustomJob(task); return; }
     if (event.target.closest(".add-material")) { task.materials.push({ materialId: null, source: "", name: "", quantity: "", unit: "" }); markDirty(); renderTasks(); return; }
     const materialRow = event.target.closest(".material-row");
@@ -1615,6 +1627,10 @@
   });
   $("#taskList").addEventListener("wheel", event => { if (event.target.closest(".start-time-input")) event.preventDefault(); }, { passive: false });
   document.addEventListener("click", event => { if (!event.target.closest(".customer-picker")) document.querySelectorAll(".customer-suggestions").forEach(box => box.hidden = true); });
+  document.addEventListener("click", event => { if (!event.target.closest(".job-template-picker")) closeTemplateSuggestions(); });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && event.target.closest(".job-template-picker")) closeTemplateSuggestions();
+  });
 
   function addTask(event) {
     event?.preventDefault();
