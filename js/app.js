@@ -1037,6 +1037,7 @@
     const teamIndex = groupTasks.indexOf(task);
     card.querySelector(".move-up").disabled = teamIndex === 0; card.querySelector(".move-down").disabled = teamIndex === groupTasks.length - 1;
     const isTodo = task.entryType === "todo";
+    card.querySelector(".expectations").hidden = isTodo;
     card.querySelector(".task-entry-type").value = isTodo ? "todo" : "customer";
     card.querySelector(".customer-picker-label").textContent = isTodo ? "Hely vagy ügyfél keresése" : "Ügyfél keresése";
     card.querySelector(".customer-input").setAttribute("aria-label", isTodo ? "Hely vagy ügyfél keresése" : "Ügyfél keresése");
@@ -1931,10 +1932,12 @@
         const materials = task.materials.filter(item => item.name);
         if (materials.length) { lines.push("Anyagok:"); materials.forEach(item => lines.push(`- ${item.source ? `${item.source}: ` : ""}${item.name}${item.quantity ? ` – ${item.quantity}${item.unit ? ` ${item.unit}` : ""}` : ""}`)); }
         if (task.notes) lines.push(`Megjegyzés: ${task.notes}`);
-        lines.push("Munkavégzés:");
-        if (task.entryType !== "todo") lines.push(task.workLogRequired === false ? "Munkanaplót nem kell megírni." : "Munkanaplót megírni.");
-        lines.push(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)]);
-        lines.push(QUALITY_DESCRIPTIONS[validRating(task.workQuality)]);
+        if (task.entryType !== "todo") {
+          lines.push("Munkavégzés:");
+          lines.push(task.workLogRequired === false ? "Munkanaplót nem kell megírni." : "Munkanaplót megírni.");
+          lines.push(INTENSITY_DESCRIPTIONS[validRating(task.workIntensity)]);
+          lines.push(QUALITY_DESCRIPTIONS[validRating(task.workQuality)]);
+        }
         lines.push("");
       });
     });
@@ -1962,7 +1965,7 @@
           : `<span class="print-worklog-required"><span>Munkanaplót megírni</span><span class="print-worklog-check" aria-hidden="true">✓</span></span>`;
         const intensityRating = validRating(task.workIntensity);
         const qualityRating = validRating(task.workQuality);
-        const expectations = `<section class="print-section wide print-expectations"><h3>Munkavégzés</h3>${workLogNotice}<p class="print-work-expectations"><strong>${intensityRating}</strong> - ${escapeHTML(INTENSITY_DESCRIPTIONS[intensityRating].replaceAll("–", "-"))}<br><strong>${qualityRating}</strong> - ${escapeHTML(QUALITY_DESCRIPTIONS[qualityRating].replaceAll("–", "-"))}</p></section>`;
+        const expectations = task.entryType === "todo" ? "" : `<section class="print-section wide print-expectations"><h3>Munkavégzés</h3>${workLogNotice}<p class="print-work-expectations"><strong>${intensityRating}</strong> - ${escapeHTML(INTENSITY_DESCRIPTIONS[intensityRating].replaceAll("–", "-"))}<br><strong>${qualityRating}</strong> - ${escapeHTML(QUALITY_DESCRIPTIONS[qualityRating].replaceAll("–", "-"))}</p></section>`;
         return `<section class="print-client-block${clientIndex ? " has-divider" : ""}"><div class="print-client-heading">${clientIndex ? `<div class="print-client-divider">Következő ${taskEntryLabel(task).toLocaleLowerCase("hu-HU")}</div>` : ""}<div class="print-client-row"><section><small>${clientNumberForVehicle(task, plan)}. ${taskEntryLabel(task)}</small><strong>${escapeHTML(taskDisplayName(task))}</strong></section><section><small>Cím${task.startTime ? ` · Kezdés: ${escapeHTML(task.startTime)}` : ""}</small><strong>${escapeHTML(task.address || "Nincs megadva")}</strong></section></div></div><div class="print-grid">${jobs ? `<section class="print-section print-jobs wide"><h3>Feladatok</h3>${jobs}</section>` : ""}${tools.length ? `<section class="print-section"><h3>Szükséges eszközök</h3><ul>${tools.map(item => `<li>${escapeHTML(item)}</li>`).join("")}</ul></section>` : ""}${materials.length ? `<section class="print-section"><h3>Anyagok</h3><ul>${materials.map(item => `<li>${item.source ? `<strong>${escapeHTML(item.source)}:</strong> ` : ""}${escapeHTML(item.name)}${item.quantity ? ` - ${escapeHTML(item.quantity)}${item.unit ? ` ${escapeHTML(item.unit)}` : ""}` : ""}</li>`).join("")}</ul></section>` : ""}${task.notes ? `<section class="print-section wide"><h3>Megjegyzés</h3><p>${escapeHTML(task.notes)}</p></section>` : ""}${expectations}</div></section>`;
       });
       const [firstClient = "", ...remainingClients] = clientBlocks;

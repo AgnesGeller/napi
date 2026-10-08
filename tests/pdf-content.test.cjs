@@ -29,5 +29,6 @@ assert.ok(context.printPlanHTML({...plan,tasks:[]}).includes('Nincs feladat erre
 const todoHtml = context.printPlanHTML({...plan,tasks:[{...task,entryType:'todo',customerName:'Telephely',workLogRequired:true}]});
 assert.ok(todoHtml.includes('1. Teendő') && todoHtml.includes('Telephely'), 'A teendő megnevezése hibás a PDF-ben.');
 assert.ok(!todoHtml.includes('Munkanaplót'), 'Teendőnél nem jelenhet meg munkanapló-jelzés.');
-assert.ok(todoHtml.includes('Normál tempó') && todoHtml.includes('Normál minőség'), 'Teendőnél is meg kell maradnia az intenzitásnak és a minőségnek.');
+assert.ok(!todoHtml.includes('Normál tempó') && !todoHtml.includes('Normál minőség') && !todoHtml.includes('print-expectations'), 'Teendőhöz nem tartozhat munkavégzési vagy minőségi elvárás.');
+assert.ok(html.includes('Normál tempó') && html.includes('Normál minőség'), 'Ügyfélmunkánál meg kell maradniuk az elvárásoknak.');
 console.log('PDF tartalom, vezetői előjegyzések kizárása, több csapat: OK');

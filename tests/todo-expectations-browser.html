@@ -1,0 +1,39 @@
+<!doctype html><html lang="hu"><meta charset="utf-8"><title>Teendő elvárások teszt</title>
+<output id="result">Teszt folyamatban…</output><iframe id="app" style="width:100%;height:850px;border:0"></iframe>
+<script>
+(async()=>{
+ try {
+  if(location.hostname!=='127.0.0.1'||location.port!=='4175')throw new Error('Csak elkülönített tesztporton futtatható.');
+  const date='2026-10-08';
+  const task={id:'todo-1',teamId:'team',entryType:'todo',customerName:'Telephelyi teendő',jobs:[{id:'job-1',name:'Eszközök ellenőrzése',note:'Leltár egyeztetése',steps:[]}],workIntensity:5,workQuality:4};
+  localStorage.setItem('diszkertek-napi-adatok-v1',JSON.stringify({plans:[{id:date,date,tasks:[task,{...task,id:'customer-1',entryType:'customer',customerName:'Ügyfélmunka'}],workItems:[]}]}));
+  const frame=document.querySelector('#app');await new Promise(resolve=>{frame.onload=resolve;frame.src='../index.html';});
+  const win=frame.contentWindow,doc=win.document;
+  win.NapiCloudSync.pushPlan=async()=>{throw new Error('Élő adat nem írható.');};
+  const assert=(value,message)=>{if(!value)throw new Error(message);};
+  doc.querySelector(`[data-open-date="${date}"]`).click();
+  doc.querySelector('[data-task-id="todo-1"] .edit-task').click();
+  const field=()=>doc.querySelector('[data-task-id="todo-1"] .expectations');
+  assert(win.getComputedStyle(field()).display==='none','Teendő elvárásai látszanak.');
+  const selectType=value=>{const select=doc.querySelector('[data-task-id="todo-1"] .task-entry-type');select.value=value;select.dispatchEvent(new win.Event('change',{bubbles:true}));};
+  selectType('customer');assert(!field().hidden,'Ügyfélre visszaváltás hibás.');
+  assert(doc.querySelector('[data-task-id="todo-1"] .work-intensity').value==='5','Intenzitás elveszett.');
+  selectType('todo');assert(win.getComputedStyle(field()).display==='none','Ismételt típusváltás hibás.');
+  const create=win.NapiPdfShare.createPdfBlob;
+  win.NapiPdfShare.createPdfBlob=async(factory,source,options,onRendered)=>{
+   const clients=source.querySelectorAll('.print-client-block');
+   assert(!clients[0].querySelector('.print-expectations'),'Teendő PDF-jében elvárások maradtak.');
+   assert(clients[1].querySelector('.print-expectations'),'Ügyfél PDF-jéből eltűntek az elvárások.');
+   const blob=await create(factory,source,options,onRendered);
+   const response=await fetch('/__test_pdf_capture',{method:'POST',body:blob});
+   assert(response.ok,'PDF mentése hibás.');return blob;
+  };
+  doc.querySelector('#pdfPreviewButton').click();
+  const deadline=Date.now()+20000;
+  while(doc.querySelector('#pdfPreviewButton').disabled&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,100));
+  assert(doc.querySelector('#pdfPreviewDialog').open,'PDF nem készült el.');
+  doc.querySelector('#discardPdfPreviewButton').click();
+  document.querySelector('#result').textContent='TODO_OK: típusváltás, megőrzött értékek, rejtett elvárások és valódi vegyes PDF.';
+ }catch(error){document.querySelector('#result').textContent=`TODO_ERROR: ${error.message}`;}
+})();
+</script></html>
