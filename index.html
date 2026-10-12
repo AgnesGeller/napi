@@ -223,12 +223,14 @@
       <header class="dialog-header"><div><p class="section-kicker">Gyors előjegyzés</p><h2 id="workItemDialogTitle">Új előjegyzés</h2></div><button class="icon-button" type="button" data-close-work-item aria-label="Bezárás">×</button></header>
       <div class="dialog-body form-grid">
         <label>Dátum<input class="form-control" id="workItemDate" name="date" type="date" required></label>
-        <label>Típus<select class="form-select" id="workItemType" name="type" required><option value="work">Munka</option><option value="survey">Felmérés</option><option value="meeting">Megbeszélés</option></select></label>
+        <label>Típus<select class="form-select" id="workItemType" name="type" required><option value="work">Munka</option><option value="survey">Felmérés</option><option value="meeting">Megbeszélés</option><option value="personal">Személyes</option></select></label>
         <label class="wide">Ügyfél<input class="form-control" id="workItemCustomer" name="customerName" type="search" list="workItemCustomerOptions" maxlength="120" autocomplete="off" required placeholder="Kezdj el írni egy ügyfélnevet…"></label>
         <datalist id="workItemCustomerOptions"></datalist>
         <label class="wide">Cím<input class="form-control" id="workItemAddress" name="address" type="text" maxlength="240" required placeholder="A helyszín címe"></label>
         <label class="wide">Megjegyzés<textarea class="form-control" id="workItemNote" name="note" rows="4" maxlength="1000" placeholder="Mit kell elvégezni vagy miről lesz szó?"></textarea></label>
         <section class="wide reminder-editor" id="workItemReminderEditor" hidden>
+          <label>Találkozó tervezett időpontja<input class="form-control" id="workItemAppointmentTime" type="time"></label>
+          <p>A dátumhoz megadott találkozó előtt automatikusan 1 órával jelez. További értesítési időpontokat is megadhatsz.</p>
           <h3>Telefonos emlékeztető</h3>
           <p>Adj hozzá egy vagy több időpontot. Minden engedélyezett telefon ugyanazt az értesítést kapja.</p>
           <div class="reminder-add-row"><label>Értesítés ideje<input class="form-control" id="workItemReminderTime" type="time"></label><button class="btn btn-soft" id="addReminderTimeButton" type="button">＋ Időpont hozzáadása</button></div>
@@ -243,7 +245,7 @@
     <form method="dialog" class="dialog-frame">
       <header class="dialog-header"><div><p class="section-kicker">Ez az eszköz</p><h2>Telefonos értesítések</h2></div><button class="icon-button" value="cancel" aria-label="Bezárás">×</button></header>
       <div class="dialog-body">
-        <p class="directory-intro">Ezen a telefonon külön kell engedélyezni az értesítéseket. Ezután a felmérések és megbeszélések beállított időpontban jelennek meg.</p>
+        <p class="directory-intro">Ezen a telefonon külön kell engedélyezni az értesítéseket. Ezután a felmérések, megbeszélések és személyes találkozók beállított időpontban jelennek meg.</p>
         <label>Eszköz neve<input class="form-control" id="notificationDeviceName" type="text" maxlength="80" placeholder="Például: Tamás telefonja"></label>
         <p class="directory-message" id="notificationStatus" role="status"></p>
       </div>
@@ -408,9 +410,9 @@
   <script src="assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="assets/vendor/html2pdf.bundle.min.js"></script>
   <script src="js/customer-directory.js?v=20260927c"></script>
-  <script src="js/napi-domain.js?v=20261008c"></script>
+  <script src="js/napi-domain.js?v=20261012a"></script>
   <script src="js/napi-sync.js?v=20261008c"></script>
   <script src="js/pdf-share.js?v=20260930f"></script>
-  <script src="js/app.js?v=20261008c"></script>
+  <script src="js/app.js?v=20261012a"></script>
 </body>
 </html>

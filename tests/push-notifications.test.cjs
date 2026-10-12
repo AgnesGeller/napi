@@ -9,7 +9,7 @@ const html = fs.readFileSync("index.html", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20260928094018_napi_push_notifications.sql", "utf8");
 
 assert.match(app, /reminderTimes:[\s\S]*?\.sort\(\)/, "Az értesítési időpontok normalizálása hiányzik.");
-assert.match(app, /\["survey", "meeting"\]\.includes\(type\)/, "Csak felméréshez és megbeszéléshez készülhet értesítés.");
+assert.match(app, /\["survey", "meeting", "personal"\]\.includes\(type\)/, "Csak felméréshez és megbeszéléshez készülhet értesítés.");
 assert.match(sync, /rpc\/napi_save_daily_plan/, "A napi tervnek az atomikus mentési RPC-t kell használnia.");
 assert.doesNotMatch(sync, /replacePlanReminders|napi_notification_reminders\?[^`]+DELETE/, "A kliens nem törölheti külön lépésben a nap emlékeztetőit.");
 assert.doesNotMatch(sync, /removePlanReminders\(uniqueDates\)/, "A napi terv törlése nem törölheti a megőrzött előjegyzések emlékeztetőit.");

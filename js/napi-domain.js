@@ -8,18 +8,22 @@
   const escapeHTML = value => String(value ?? "").replace(/[&<>"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[character]);
   const CONFIG_COLLECTIONS = ["workers", "vehicles", "tools", "materials", "templates", "customers", "recurrences"];
 
-  function renderWorkItemsHTML(items, types) {
+  function appointmentLabel(item, date) {
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(item?.appointmentTime || "") ? `Találkozó: ${date || ""} ${item.appointmentTime}` : "";
+  }
+
+  function renderWorkItemsHTML(items, types, date) {
     return (items || []).map(item => {
       const type = types[item.type] || types.work;
-      return `<article class="work-inbox-item" data-work-item-id="${escapeHTML(item.id)}" style="--work-type-color:${escapeHTML(type.color)}"><span class="work-inbox-type">${escapeHTML(type.label)}</span><div class="work-inbox-copy"><strong>${escapeHTML(item.customerName || "Nincs megadva")}</strong><span>${escapeHTML(item.address || "Nincs megadott cím")}</span>${item.note ? `<small>${escapeHTML(item.note)}</small>` : ""}</div><div class="work-inbox-actions">${item.type === "work" ? `<button class="btn btn-outline-green work-assign" type="button">Kiosztás</button>` : ""}<button class="btn btn-soft work-edit" type="button">Szerkesztés</button><button class="btn work-remove" type="button">Törlés</button></div></article>`;
+      return `<article class="work-inbox-item" data-work-item-id="${escapeHTML(item.id)}" style="--work-type-color:${escapeHTML(type.color)}"><span class="work-inbox-type">${escapeHTML(type.label)}</span><div class="work-inbox-copy"><strong>${escapeHTML(item.customerName || "Nincs megadva")}</strong><span>${escapeHTML(item.address || "Nincs megadott cím")}</span>${item.appointmentTime ? `<small>${escapeHTML(appointmentLabel(item, date))}</small>` : ""}${item.note ? `<small>${escapeHTML(item.note)}</small>` : ""}</div><div class="work-inbox-actions">${item.type === "work" ? `<button class="btn btn-outline-green work-assign" type="button">Kiosztás</button>` : ""}<button class="btn btn-soft work-edit" type="button">Szerkesztés</button><button class="btn work-remove" type="button">Törlés</button></div></article>`;
     }).join("");
   }
 
-  function printWorkItemsHTML(items, types) {
+  function printWorkItemsHTML(items, types, date) {
     if (!(items || []).length) return "";
     const rows = items.map(item => {
       const type = types[item.type] || types.work;
-      return `<article class="print-work-item"><strong>${escapeHTML(type.label)}: ${escapeHTML(item.customerName || "Nincs megadva")}</strong><span>${escapeHTML(item.address || "Nincs megadott cím")}</span>${item.note ? `<small>${escapeHTML(item.note)}</small>` : ""}</article>`;
+      return `<article class="print-work-item"><strong>${escapeHTML(type.label)}: ${escapeHTML(item.customerName || "Nincs megadva")}</strong><span>${escapeHTML(item.address || "Nincs megadott cím")}</span>${item.appointmentTime ? `<small>${escapeHTML(appointmentLabel(item, date))}</small>` : ""}${item.note ? `<small>${escapeHTML(item.note)}</small>` : ""}</article>`;
     }).join("");
     return `<section class="print-work-items"><h2>Előjegyzések</h2>${rows}</section>`;
   }
@@ -185,5 +189,5 @@
     return result;
   }
 
-  return { actionPlanForDate, applyConfigChanges, applyImportedData, availableActionPlans, clearDailyTasks, configChangeEffects, configChangesBetween, mergeConfigChangeQueue, mergePendingWorkItems, mergeWorkItems, persistImportedData, planHasPrintableContent, printWorkItemsHTML, reconcileConfigChangeQueue, removeAcknowledgedConfigChanges, renderWorkItemsHTML, resolvePlanConflict, samePlanContent };
+  return { appointmentLabel, actionPlanForDate, applyConfigChanges, applyImportedData, availableActionPlans, clearDailyTasks, configChangeEffects, configChangesBetween, mergeConfigChangeQueue, mergePendingWorkItems, mergeWorkItems, persistImportedData, planHasPrintableContent, printWorkItemsHTML, reconcileConfigChangeQueue, removeAcknowledgedConfigChanges, renderWorkItemsHTML, resolvePlanConflict, samePlanContent };
 });

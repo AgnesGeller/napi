@@ -15,10 +15,10 @@ Az alkalmazás címe: <https://agnesgeller.github.io/napi/>
 
 ## Telefonos értesítések
 
-Az értesítés a **Felmérés** és **Megbeszélés** típusú előjegyzésekhez használható. Nem SMS, ezért nincs üzenetküldési díja, és Firebase-regisztráció sem szükséges.
+Az értesítés a **Felmérés**, **Megbeszélés** és **Személyes** típusú előjegyzésekhez használható. Nem SMS, ezért nincs üzenetküldési díja, és Firebase-regisztráció sem szükséges.
 
 1. Nyisd meg a felmérést vagy megbeszélést.
-2. A **Telefonos emlékeztető** résznél adj hozzá egy vagy több időpontot.
+2. Add meg a **Találkozó tervezett időpontját** az előjegyzés dátumához. Automatikusan 1 órával előtte jelez, akár az előző napon. A jelzésben a találkozó pontos dátuma és ideje is látható. A **Telefonos emlékeztető** résznél további időpontokat is hozzáadhatsz.
 3. Mentsd az előjegyzést.
 4. Minden értesítést fogadó Android-telefonon egyszer nyomd meg a fejlécben az **Értesítések** gombot, majd az **Értesítések bekapcsolása** gombot.
 5. Engedélyezd az értesítéseket a böngésző kérdésénél.
@@ -57,7 +57,7 @@ A kulcsértékeket tilos a repositoryba vagy frontendkódba írni. A cron felada
 ## Ellenőrzési lista
 
 - Android Chrome-ban az app telepíthető, az értesítési engedély külön bekapcsolható.
-- Felméréshez és megbeszéléshez több, egymástól eltérő időpont adható és törölhető.
+- Felméréshez, megbeszéléshez és személyes találkozóhoz több, egymástól eltérő időpont adható és törölhető.
 - Munka típushoz nem készül értesítés.
 - Módosításkor a régi, még el nem küldött időpontok lecserélődnek.
 - Előjegyzés vagy teljes nap törlésekor a hozzá tartozó várakozó értesítések is törlődnek.

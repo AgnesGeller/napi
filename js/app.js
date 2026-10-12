@@ -23,7 +23,8 @@
   const WORK_ITEM_TYPES = {
     work: { label: "Munka", color: "#2f6944" },
     survey: { label: "Felmérés", color: "#a84a16" },
-    meeting: { label: "Megbeszélés", color: "#5b4a91" }
+    meeting: { label: "Megbeszélés", color: "#5b4a91" },
+    personal: { label: "Személyes", color: "#287b83" }
   };
   const INTENSITY_DESCRIPTIONS = {
     1: "Lassú tempó – kényelmesebb munkavégzés, több pihenőidővel.",
@@ -282,12 +283,13 @@
         generalNote: String(plan.generalNote || ""),
         workItems: Array.isArray(plan.workItems) ? plan.workItems.map(item => ({
           id: item.id || uid(),
-          type: ["work", "survey", "meeting"].includes(item.type) ? item.type : "work",
+          type: ["work", "survey", "meeting", "personal"].includes(item.type) ? item.type : "work",
           customerId: item.customerId || null,
           locationId: item.locationId || null,
           customerName: String(item.customerName || ""),
           address: String(item.address || ""),
           note: String(item.note || ""),
+          appointmentTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(item.appointmentTime || "") ? item.appointmentTime : "",
           reminderTimes: [...new Set(Array.isArray(item.reminderTimes) ? item.reminderTimes.filter(time => /^([01]\d|2[0-3]):[0-5]\d$/.test(time)) : [])].sort()
         })) : [],
         deletedWorkItemIds: Array.isArray(plan.deletedWorkItemIds) ? [...new Set(plan.deletedWorkItemIds.filter(Boolean))] : [],
@@ -1120,7 +1122,7 @@
   function renderWorkItems() {
     const items = workingPlan.workItems || [];
     $("#workInboxEmpty").hidden = items.length > 0;
-    $("#workInboxList").innerHTML = window.NapiDomain.renderWorkItemsHTML(items, WORK_ITEM_TYPES);
+    $("#workInboxList").innerHTML = window.NapiDomain.renderWorkItemsHTML(items, WORK_ITEM_TYPES, workingPlan.date);
   }
   function renderTasks() {
     $("#tasksHeading").textContent = workingPlan.date === isoToday() ? "Mai nap feladatai" : "A kiválasztott nap feladatai";
@@ -1381,6 +1383,7 @@
     $("#workItemAddress").value = item?.address || "";
     $("#workItemNote").value = item?.note || "";
     $("#workItemReminderTime").value = "";
+    $("#workItemAppointmentTime").value = item?.appointmentTime || "";
     editingReminderTimes = [...(item?.reminderTimes || [])];
     updateReminderEditor();
     $("#deleteWorkItemButton").hidden = !item;
@@ -1390,7 +1393,7 @@
   }
   function closeWorkItemDialog() { $("#workItemDialog").close(); editingWorkItemId = null; editingWorkItemDate = null; editingReminderTimes = []; }
   function updateReminderEditor() {
-    const enabled = ["survey", "meeting"].includes($("#workItemType").value);
+    const enabled = ["survey", "meeting", "personal"].includes($("#workItemType").value);
     $("#workItemReminderEditor").hidden = !enabled;
     $("#workItemReminderTimes").innerHTML = editingReminderTimes.length
       ? editingReminderTimes.map(time => `<span class="reminder-time-chip">${escapeHTML(time)}<button type="button" data-remove-reminder="${escapeHTML(time)}" aria-label="${escapeHTML(time)} értesítés törlése">×</button></span>`).join("")
@@ -1471,7 +1474,7 @@
     const address = $("#workItemAddress").value.trim();
     const directoryMatch = customerDirectory.find(customer => searchKey(customer.name) === searchKey(customerName) && (!address || searchKey(customer.address) === searchKey(address))) || customerDirectory.find(customer => searchKey(customer.name) === searchKey(customerName));
     const type = $("#workItemType").value;
-    targetPlan.workItems.push({ id: existing?.id || uid(), type, customerId: directoryMatch?.customerId || null, locationId: directoryMatch?.locationId || null, customerName, address, note: $("#workItemNote").value.trim(), reminderTimes: ["survey", "meeting"].includes(type) ? [...editingReminderTimes] : [] });
+    targetPlan.workItems.push({ id: existing?.id || uid(), type, customerId: directoryMatch?.customerId || null, locationId: directoryMatch?.locationId || null, customerName, address, note: $("#workItemNote").value.trim(), appointmentTime: ["survey", "meeting", "personal"].includes(type) ? $("#workItemAppointmentTime").value : "", reminderTimes: ["survey", "meeting", "personal"].includes(type) ? [...editingReminderTimes] : [] });
     persistWorkPlans([sourcePlan, targetPlan]);
     setWeekAnchor(targetDate); setMonthAnchor(targetDate.slice(0, 7));
     $("#weekView").open = true;
@@ -1773,7 +1776,7 @@
       const workItems = plan?.workItems || [];
       const workHTML = workItems.map(item => {
         const type = WORK_ITEM_TYPES[item.type] || WORK_ITEM_TYPES.work;
-        return `<div class="week-work-item" style="--work-type-color:${type.color}"><button class="week-work-open" type="button" data-edit-work-date="${date}" data-edit-work-id="${escapeHTML(item.id)}"><strong>${escapeHTML(type.label)}: ${escapeHTML(item.customerName || "Nincs megadva")}</strong><small>${escapeHTML(item.address || "Nincs megadott cím")}${item.note ? ` · ${escapeHTML(item.note)}` : ""}</small></button><div class="week-work-actions">${item.type === "work" ? `<button class="week-work-assign" type="button" data-assign-work-date="${date}" data-assign-work-id="${escapeHTML(item.id)}">Kiosztás</button>` : ""}<button class="week-work-delete" type="button" data-delete-work-date="${date}" data-delete-work-id="${escapeHTML(item.id)}">Törlés</button></div></div>`;
+        return `<div class="week-work-item" style="--work-type-color:${type.color}"><button class="week-work-open" type="button" data-edit-work-date="${date}" data-edit-work-id="${escapeHTML(item.id)}"><strong>${escapeHTML(type.label)}: ${escapeHTML(item.customerName || "Nincs megadva")}</strong><small>${escapeHTML(window.NapiDomain.appointmentLabel(item, date))}${item.appointmentTime ? " · " : ""}${escapeHTML(item.address || "Nincs megadott cím")}${item.note ? ` · ${escapeHTML(item.note)}` : ""}</small></button><div class="week-work-actions">${item.type === "work" ? `<button class="week-work-assign" type="button" data-assign-work-date="${date}" data-assign-work-id="${escapeHTML(item.id)}">Kiosztás</button>` : ""}<button class="week-work-delete" type="button" data-delete-work-date="${date}" data-delete-work-id="${escapeHTML(item.id)}">Törlés</button></div></div>`;
       }).join("");
       const taskHTML = tasks.length ? tasksByTeam(plan).map(group => {
         const lead = group.tasks[0];
@@ -1835,7 +1838,7 @@
         const customers = group.tasks.map(task => `${taskEntryLabel(task)}: ${taskDisplayName(task)}`).join(", ");
         return `${vehicle}: ${customers}`;
       }).join(" • ") : "";
-      const workDetails = workItems.map(item => `${WORK_ITEM_TYPES[item.type]?.label || "Munka"}: ${item.customerName || "Nincs megadva"}`).join(" • ");
+      const workDetails = workItems.map(item => `${WORK_ITEM_TYPES[item.type]?.label || "Munka"}: ${item.customerName || "Nincs megadva"}${item.appointmentTime ? ` – ${window.NapiDomain.appointmentLabel(item, date)}` : ""}`).join(" • ");
       const classes = `month-day${date.slice(0, 7) !== monthAnchor ? " outside" : ""}${date === isoToday() ? " today" : ""}${holiday ? " holiday" : ""}${workItems.length ? " has-work-items" : ""}`;
       return `<article class="${classes}"><button class="month-day-open" type="button" data-month-date="${date}" aria-label="${escapeHTML(formatDate(date))}${clients ? `, ${clients} napi tétel` : ""}${workItems.length ? `, ${workItems.length} előjegyzés` : ""}"><span class="month-day-number">${Number(date.slice(8, 10))}</span>${holiday ? `<strong>${escapeHTML(holiday)}</strong>` : ""}${workItems.length ? `<small class="month-work-count">${escapeHTML(workDetails)}</small>` : ""}${clients ? `<small>${escapeHTML(details)}</small>` : ""}</button>${plan ? `<button class="month-day-delete" type="button" data-month-delete="${date}" aria-label="${escapeHTML(formatDate(date))} teljes napi tervének törlése">Törlés</button>` : ""}</article>`;
     }).join("");
@@ -1922,7 +1925,7 @@
       lines.push("Munkák:");
       plan.workItems.forEach(item => {
         const type = WORK_ITEM_TYPES[item.type]?.label || "Munka";
-        lines.push(`- ${type}: ${item.customerName || "nincs megadva"}${item.address ? ` – ${item.address}` : ""}${item.note ? ` – ${item.note}` : ""}`);
+        lines.push(`- ${type}: ${item.customerName || "nincs megadva"}${item.appointmentTime ? ` – ${window.NapiDomain.appointmentLabel(item, plan.date)}` : ""}${item.address ? ` – ${item.address}` : ""}${item.note ? ` – ${item.note}` : ""}`);
       });
       lines.push("");
     }
