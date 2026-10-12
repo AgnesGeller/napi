@@ -18,12 +18,12 @@ Az alkalmazás címe: <https://agnesgeller.github.io/napi/>
 Az értesítés a **Felmérés**, **Megbeszélés** és **Személyes** típusú előjegyzésekhez használható. Nem SMS, ezért nincs üzenetküldési díja, és Firebase-regisztráció sem szükséges.
 
 1. Nyisd meg a felmérést vagy megbeszélést.
-2. Add meg a **Találkozó tervezett időpontját** az előjegyzés dátumához. Automatikusan 1 órával előtte jelez, akár az előző napon. A jelzésben a találkozó pontos dátuma és ideje is látható. A **Telefonos emlékeztető** résznél további időpontokat is hozzáadhatsz.
+2. Add meg a **Találkozó tervezett időpontját** az előjegyzés dátumához. Automatikusan 1 órával előtte jelez, akár az előző napon. A jelzés címének elején a találkozó pontos ideje látható, utána a típus és a megnevezés; a dátum nem foglal helyet. A **Telefonos emlékeztető** résznél további időpontokat is hozzáadhatsz.
 3. Mentsd az előjegyzést.
 4. Minden értesítést fogadó Android-telefonon egyszer nyomd meg a fejlécben az **Értesítések** gombot, majd az **Értesítések bekapcsolása** gombot.
 5. Engedélyezd az értesítéseket a böngésző kérdésénél.
 
-Minden engedélyezett telefon ugyanazt az értesítést kapja. Egy telefon a **Kikapcsolás ezen a telefonon** gombbal leválasztható. A csipogás és rezgés erősségét az Android rendszer értesítési beállításai szabályozzák. Az értesítéshez internetkapcsolat kell; a bezárt telepített alkalmazás mellett is megérkezhet.
+Minden engedélyezett telefon ugyanazt az értesítést kapja. Egy telefon a **Kikapcsolás ezen a telefonon** gombbal leválasztható. Az értesítés piros felkiáltójeles ikont használ; a felső sávhoz külön, átlátszó hátterű felkiáltójel tartozik, amelynek színét a telefon szabályozza. Három hosszabb rezgést kér, és ahol támogatott, a felugró jelzés bezárásig látható marad. A hangot és a tényleges rezgést az Android és a böngésző értesítési beállításai szabályozzák. Az értesítéshez internetkapcsolat kell; a bezárt telepített alkalmazás mellett is megérkezhet.
 
 ## Technikai felépítés
 

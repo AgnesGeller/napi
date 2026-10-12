@@ -1,7 +1,7 @@
-const CACHE_NAME = "diszkertek-napi-v118";
+const CACHE_NAME = "diszkertek-napi-v119";
 const APP_FILES = [
   "./", "index.html", "css/style.css?v=20261007a", "js/customer-directory.js?v=20260927c", "js/napi-domain.js?v=20261012a", "js/napi-sync.js?v=20261008c", "js/pdf-share.js?v=20260930f", "js/app.js?v=20261012a", "manifest.webmanifest?v=20260929",
-  "assets/favicon.svg?v=3", "assets/app-icon-180.png?v=20260929", "assets/app-icon-192.png?v=20260929", "assets/app-icon-512.png?v=20260929", "assets/app-icon-maskable-512.png?v=20260929", "assets/diszkertek-logo.png", "assets/botanical.svg",
+  "assets/notification-alert-192.png", "assets/notification-badge-96.png", "assets/favicon.svg?v=3", "assets/app-icon-180.png?v=20260929", "assets/app-icon-192.png?v=20260929", "assets/app-icon-512.png?v=20260929", "assets/app-icon-maskable-512.png?v=20260929", "assets/diszkertek-logo.png", "assets/botanical.svg",
   "assets/vendor/bootstrap.min.css", "assets/vendor/bootstrap.bundle.min.js", "assets/vendor/html2pdf.bundle.min.js", "assets/vendor/html2pdf.bundle.min.js.LICENSE.txt"
 ];
 
@@ -46,11 +46,12 @@ self.addEventListener("push", event => {
   try { message = event.data?.json?.() || {}; } catch (_) { message = { body: event.data?.text?.() || "" }; }
   event.waitUntil(self.registration.showNotification(message.title || "Díszkertek – Napi feladatok", {
     body: message.body || "Emlékeztető érkezett.",
-    icon: "assets/app-icon-192.png",
-    badge: "assets/app-icon-192.png",
+    icon: "assets/notification-alert-192.png",
+    badge: "assets/notification-badge-96.png",
     tag: message.tag || "napi-emlekezteto",
     data: { url: message.url || "./" },
-    vibrate: [180, 80, 180]
+    vibrate: [600, 200, 600, 200, 600],
+    requireInteraction: true
   }));
 });
 

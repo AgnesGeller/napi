@@ -22,6 +22,28 @@ assert.match(app, /item\.reminderTimes = \[\.\.\.editingReminderTimes\][\s\S]*?a
 assert.match(migration, /enable row level security/g, "Az értesítési táblák RLS-védelme hiányzik.");
 assert.doesNotMatch(sync, /privateKey|private_key/, "A VAPID privát kulcs nem kerülhet a frontendbe.");
 
+
+// Verify the actual background notification options without a running app.
+const workerHandlers = {};
+let notification;
+vm.runInNewContext(worker, {
+  self: {
+    addEventListener: (name, handler) => { workerHandlers[name] = handler; },
+    registration: { showNotification: (title, options) => { notification = { title, options }; return Promise.resolve(); } }
+  }
+});
+workerHandlers.push({ data: { json: () => ({title: '14:30 – Személyes: Találkozó', body: 'Fő utca 1.', tag: 'test', url: './?date=2026-10-13'}) }, waitUntil(){} });
+assert.equal(notification.title, '14:30 – Személyes: Találkozó');
+assert.equal(notification.options.icon, 'assets/notification-alert-192.png');
+assert.equal(notification.options.badge, 'assets/notification-badge-96.png');
+assert.equal(notification.options.requireInteraction, true);
+assert.deepEqual(Array.from(notification.options.vibrate), [600, 200, 600, 200, 600]);
+assert.equal(notification.options.data.url, './?date=2026-10-13');
+for (const icon of [notification.options.icon, notification.options.badge]) {
+  assert.ok(fs.existsSync(icon));
+  assert.ok(worker.includes('"' + icon + '"'), 'Az értesítési ikon legyen az offline csomagban is.');
+}
+
 const calls = [];
 const tokenPayload = Buffer.from(JSON.stringify({ sub: "00000000-0000-0000-0000-000000000001" })).toString("base64url");
 const context = {
