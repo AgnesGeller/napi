@@ -27,6 +27,25 @@ class TestFile extends Blob {
     assert.equal(canvas,renderedCanvas); assert.equal(pdf,renderedPdf); renderCallbackCount++;
   });
   assert.equal(renderCallbackCount,1,'Az előnézet ugyanazon renderelés oldalképét és PDF-jét kapja meg.');
+  const draws=[];
+  const safeCanvas={width:100,height:250,ownerDocument:{createElement:()=>({getContext:()=>({fillRect(){},drawImage(...args){draws.push(args);}})})}};
+  const clone={querySelector:()=>({getBoundingClientRect:()=>({top:0,width:100}),querySelectorAll:()=>[]}),
+    createTreeWalker:()=>({currentNode:{textContent:'Árvíztűrő'},nextNode(){if(this.done)return false;this.done=true;return true;}}),
+    createRange:()=>({selectNodeContents(){},getClientRects:()=>[{top:95,bottom:110,height:15}]})};
+  const safeWorker={
+    set(options){if(options.canvas)this.canvas=options.canvas;else this.options=options;return this;},
+    from(){return this;},
+    async toCanvas(){await this.options.html2canvas.onclone(clone);this.canvas=safeCanvas;},
+    get:async function(key){return key==='canvas'?this.canvas:key==='pageSize'?{inner:{ratio:1}}:renderedPdf;},
+    toPdf(){return this;},outputPdf:async()=>validPdf
+  };
+  let cloneCalls=0;
+  await pdfShare.createPdfBlob(()=>safeWorker,{}, {safeTextPageBreaks:true,html2canvas:{onclone(){cloneCalls++;}}},(canvas,_pdf,layout)=>{
+    assert.equal(canvas.height,259,'A szöveg előtti hézag egész oldalszeletbe kerül.');
+    assert.deepEqual(layout.cuts,[0,91,191,250]);
+  });
+  assert.equal(cloneCalls,1,'A korábbi klónozási callback nem veszhet el.');
+  assert.equal(draws.reduce((height,args)=>height+args[4],0),250,'Minden forrássor bekerül a PDF-be.');
 
   const file = await pdfShare.createPdfFile(generated, "napi-feladatok.pdf", TestFile);
   assert.equal(file.name, "napi-feladatok.pdf");

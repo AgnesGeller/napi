@@ -2052,6 +2052,7 @@
           backgroundColor: "#ffffff"
         },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        safeTextPageBreaks: true,
         pagebreak: { mode: ["css", "legacy"], avoid: [".print-task-heading", ".print-client-heading"] }
       }, onRendered);
       return window.NapiPdfShare.createPdfFile(blob, filename);
