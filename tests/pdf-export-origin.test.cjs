@@ -18,6 +18,7 @@ async function run(fail) {
       assert.equal(options.html2canvas.scrollY,0);
       assert.equal(options.margin,0);
       assert.equal(options.jsPDF.format,'a4');
+      assert.ok(!options.pagebreak.avoid.includes('.print-section'),'A generátor nem írhatja felül a hosszú feladatlista CSS-tördelését.');
       if (fail) throw new Error('Test rendering failure');
       return 'rendered';
     },createPdfFile:(blob,name)=>({blob,name})

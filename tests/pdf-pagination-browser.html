@@ -1,0 +1,58 @@
+<!doctype html><html lang="hu"><meta charset="utf-8"><title>Többoldalas PDF tördelési teszt</title>
+<output id="result">Teszt folyamatban…</output><iframe id="app" style="width:100%;height:850px;border:0"></iframe>
+<script>
+(async()=>{
+ try {
+  if(location.hostname!=='127.0.0.1'||location.port!=='4175')throw new Error('Csak elkülönített tesztporton futtatható.');
+  const date='2026-10-14';
+  const tasks=Array.from({length:6},(_,i)=>({id:`task-${i}`,teamId:`team-${i}`,entryType:i%2?'todo':'customer',customerName:`Tördelési ügyfél ${i+1}`,address:'Ellenőrzési helyszín',jobs:Array.from({length:8},(_,j)=>({id:`job-${i}-${j}`,name:`${i+1}. csapat ${j+1}. feladata`,note:'A kijelölt terület előkészítése és rendbetétele. A szükséges eszközök és anyagok ellenőrzése, majd a munka elvégzése. '.repeat(2),steps:[]})),toolIds:[],materials:[]}));
+  localStorage.setItem('diszkertek-napi-adatok-v1',JSON.stringify({plans:[{id:date,date,tasks,workItems:[]}]}));
+  const frame=document.querySelector('#app');await new Promise(resolve=>{frame.onload=resolve;frame.src='../index.html';});
+  const win=frame.contentWindow,doc=win.document;
+  win.NapiCloudSync.pushPlan=async()=>{throw new Error('Élő adat nem írható.');};
+  doc.querySelector('#actionPlanDate').value=date;
+  doc.querySelector('#actionPlanDate').dispatchEvent(new win.Event('change',{bubbles:true}));
+  const assert=(condition,message)=>{if(!condition)throw new Error(message);};
+  const original=win.NapiPdfShare.createPdfBlob;
+  let resolve,reject;
+  const finished=new Promise((res,rej)=>{resolve=res;reject=rej;});
+  win.NapiPdfShare.createPdfBlob=async(factory,source,options,onRendered)=>{
+   try {
+    assert(source.querySelectorAll('.print-job-description').length===48,'Feladat veszett el a PDF-forrásból.');
+    const gaps=[];
+    options.html2canvas.onclone=clone=>{
+     const blocks=clone.querySelectorAll('.html2pdf__container .print-client-block');
+     for(const block of blocks){
+      const heading=block.querySelector('.print-client-heading');
+      const jobs=block.querySelector('.print-jobs');
+      if(jobs)gaps.push(Math.round(jobs.getBoundingClientRect().top-heading.getBoundingClientRect().bottom));
+     }
+    };
+    let pageCount=0,ink=[];
+    const blob=await original(factory,source,options,async(canvas,pdf)=>{
+     pageCount=pdf.internal.getNumberOfPages();
+     const pageHeight=Math.floor(canvas.width*297/210);
+     for(let page=0;page<pageCount;page++){
+      const h=Math.min(pageHeight,canvas.height-page*pageHeight);
+      const pixels=canvas.getContext('2d').getImageData(0,page*pageHeight,canvas.width,h).data;
+      let count=0;for(let i=0;i<pixels.length;i+=64)if(pixels[i+3]&&Math.min(pixels[i],pixels[i+1],pixels[i+2])<100)count++;
+      ink.push(count);
+     }
+     if(onRendered)await onRendered(canvas,pdf);
+    });
+    const captured=await fetch('/__test_pdf_capture',{method:'POST',body:blob});
+    assert(captured.ok,'PDF mentési hiba.');
+    assert(pageCount>=3,'A teszt nem többoldalas.');
+    assert(gaps.length===6,`Hiányzó tördelési mérések: ${gaps.length}`);
+    assert(Math.max(...gaps)<100,`A fejléc és feladatai széthúzódnak: ${gaps.join(', ')} px; ${pageCount} oldal.`);
+    assert(ink.every(count=>count>100),'Üres PDF-oldal keletkezett.');
+    resolve(`PAGINATION_OK: ${pageCount} oldal, 6 csapat, hézagok: ${gaps.join(', ')} px.`);
+    return blob;
+   }catch(error){reject(error);throw error;}
+  };
+  doc.querySelector('#pdfPreviewButton').click();
+  document.querySelector('#result').textContent=await finished;
+  doc.querySelector('#discardPdfPreviewButton').click();
+ }catch(error){document.querySelector('#result').textContent=`PAGINATION_ERROR: ${error.message}`;}
+})();
+</script></html>
