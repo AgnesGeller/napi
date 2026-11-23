@@ -1731,7 +1731,7 @@
     const pin = form.elements.pin.value;
     button.disabled = true; $("#customerAuthMessage").textContent = "Csatlakozás…";
     try {
-      await window.NapiCustomerDirectory.signIn(pin);
+      await window.NapiCustomerDirectory.signIn(pin, form.elements.account?.value || "tamas");
       if (!(await syncCustomerDirectory())) throw new Error("A belépés sikerült, de az ügyféllista nem tölthető be.");
       await pullSharedData({ initial: true });
       form.elements.pin.value = ""; $("#customerAuthDialog").close(); updateCustomerDirectoryButtons(); toast("A közös adatok szinkronizálása bekapcsolva ezen az eszközön.");

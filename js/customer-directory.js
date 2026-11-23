@@ -35,7 +35,7 @@
 
   function authError(result, fallback) {
     const message = String(result?.msg || result?.message || "").toLocaleLowerCase("hu-HU");
-    if (message.includes("invalid login credentials")) return new Error("Hibás PIN-kód, vagy Tamás Napi-fiókja még nincs aktiválva.");
+    if (message.includes("invalid login credentials")) return new Error("Hibás felhasználó vagy PIN-kód.");
     if (message.includes("rate limit")) return new Error("Túl sok belépési próbálkozás történt. Próbáld újra később.");
     return new Error(result?.msg || result?.message || fallback);
   }
@@ -71,6 +71,11 @@
   async function activeSession() {
     let session = storedSession();
     if (!session) throw new Error("Az ügyféllista csatlakoztatása szükséges.");
+    const accessUntil = session.user?.app_metadata?.napi_access_until;
+    if (accessUntil && !(Date.parse(accessUntil) > Date.now())) {
+      clearSession();
+      throw new Error("A Napi apphoz kapott időszakos hozzáférés lejárt.");
+    }
     const expiresAt = Number(session.expires_at || 0);
     if (!expiresAt || expiresAt > Math.floor(Date.now() / 1000) + 60) return session;
     try {
@@ -118,9 +123,12 @@
     }
   }
 
-  async function signIn(pin) {
-    if (!pin) throw new Error("Add meg Tamás PIN-kódját.");
-    const session = await authRequest("token?grant_type=password", { email: NAPI_ACCOUNT_EMAIL, password: pin });
+  async function signIn(pin, account = "tamas") {
+    if (!["tamas", "ferenc"].includes(account)) throw new Error("Ismeretlen Napi-felhasználó.");
+    if (!pin) throw new Error("Add meg a PIN-kódodat.");
+    const session = await authRequest("token?grant_type=password", { email: account === "ferenc" ? "ferenc@napi.diszkertek.hu" : NAPI_ACCOUNT_EMAIL, password: pin });
+    const accessUntil = session.user?.app_metadata?.napi_access_until;
+    if (accessUntil && !(Date.parse(accessUntil) > Date.now())) throw new Error("A Napi apphoz kapott időszakos hozzáférés lejárt.");
     rememberSession(session);
     return session;
   }

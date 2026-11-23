@@ -1,6 +1,6 @@
-export function pendingSubscriptions(subscriptions, deliveredSubscriptionIds) {
+export function pendingSubscriptions(subscriptions, deliveredSubscriptionIds, now = Date.now()) {
   const delivered = new Set(deliveredSubscriptionIds || []);
-  return (subscriptions || []).filter(subscription => !delivered.has(subscription.id));
+  return (subscriptions || []).filter(subscription => !delivered.has(subscription.id) && (!subscription.access_until || Date.parse(subscription.access_until) > now));
 }
 
 export function pushFailureType(status) {

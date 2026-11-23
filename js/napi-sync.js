@@ -11,7 +11,7 @@
     const session = await window.NapiCustomerDirectory?.session?.();
     if (!session?.access_token) throw new Error("A közös adatokhoz csatlakozás szükséges.");
     const tokenPart = session.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    const ownerId = session.user?.id || JSON.parse(atob(tokenPart.padEnd(Math.ceil(tokenPart.length / 4) * 4, "="))).sub;
+    const ownerId = session.user?.app_metadata?.napi_owner_id || session.user?.id || JSON.parse(atob(tokenPart.padEnd(Math.ceil(tokenPart.length / 4) * 4, "="))).sub;
     return { accessToken: session.access_token, ownerId };
   }
 

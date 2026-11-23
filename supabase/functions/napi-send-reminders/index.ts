@@ -33,7 +33,7 @@ Deno.serve(async request => {
     let delivered = 0;
     for (const reminder of reminders || []) {
       const subscriptions = pendingSubscriptions(
-        await rest(`napi_push_subscriptions?owner_id=eq.${encodeURIComponent(reminder.owner_id)}&enabled=eq.true&select=id,endpoint,p256dh,auth`),
+        await rest(`napi_push_subscriptions?owner_id=eq.${encodeURIComponent(reminder.owner_id)}&enabled=eq.true&select=id,endpoint,p256dh,auth,access_until`),
         reminder.delivered_subscription_ids
       );
       const deliveredSubscriptionIds: string[] = [];
