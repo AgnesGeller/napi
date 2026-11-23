@@ -18,5 +18,7 @@ assert.doesNotMatch(app, /template\.steps\s*=\s*deepCopy\(job\.steps\)/, "A napi
 assert.match(app, /item\.note = \$\("#settingNote"\)\.value\.trim\(\)/, "A sablon megjegyzésének mentése hiányzik.");
 assert.match(app, /job-name-input/, "A feladat megnevezésének szerkesztése hiányzik.");
 assert.match(app, /job-note-input/, "A feladat leírásának szerkesztése hiányzik.");
+assert.doesNotMatch(app, /name:\s*String\(job\.name \|\| "Feladat"\)/, "Üres egyedi feladat neve nem írható át automatikusan „Feladat” szövegre.");
+assert.match(app, /function captureTaskEditorState\(/, "Az újrarajzolás előtti mezőrögzítés hiányzik.");
 
 console.log("Feladatsablon-kezelési regressziós teszt: OK");

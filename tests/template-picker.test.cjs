@@ -17,7 +17,7 @@ const context = vm.createContext({
   document:{querySelectorAll:() => cards.map(card => card.box), addEventListener:(name, handler) => {documentEvents[name] = handler;}},
   searchKey:value => value.toLowerCase(), activeSorted:items => items, escapeHTML:value => value,
   findTaskFromElement:() => task, clientIndexInTeam:() => 0, setActiveTask(){},
-  taskJobs:task => task.jobs, markDirty:() => saves++, renderTasks:() => renders++
+  taskJobs:task => task.jobs, captureTaskEditorState:() => false, markDirty:() => saves++, renderTasks:() => renders++
 });
 vm.runInContext(source.slice(source.indexOf('  function templateMatches('), source.indexOf('  function addCustomJob(')), context);
 vm.runInContext(source.slice(source.indexOf('  $("#taskList").addEventListener("click"'), source.indexOf('  $("#taskList").addEventListener("input"')), context);

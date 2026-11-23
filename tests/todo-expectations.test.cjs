@@ -19,7 +19,7 @@ const context = vm.createContext({
   applyTaskVehicleTheme(){},updateTaskSummary(){},taskJobs:task=>task.jobs,
   renderJobRows(){},renderToolQuantities(){},renderRatingSelect(){},updateRatingDescriptions(){},
   INTENSITY_DESCRIPTIONS:{5:'Intenzív'},QUALITY_DESCRIPTIONS:{4:'Precíz'},
-  findTaskFromElement:()=>task, markDirty:()=>saves++,
+  findTaskFromElement:()=>task, captureTaskEditorState:()=>false, markDirty:()=>saves++,
   renderTasks:()=>{rendered=context.renderTask(task,0,0,true);}
 });
 vm.runInContext(source.slice(source.indexOf('  function renderTask('),source.indexOf('  function renderToolQuantities(')),context);

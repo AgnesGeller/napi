@@ -26,7 +26,7 @@
   assert(doc.querySelector('#planDate').value===date,'Nem a heti nézetből kiválasztott nap nyílt meg.');
   assert(doc.querySelector('#actionPlanDate').value===date,'A PDF műveleti napja nem követte a megnyitott tervet.');
   doc.querySelector('.edit-task').click();
-  const card=doc.querySelector('.task-card');
+  let card=doc.querySelector('.task-card');
   assert(!card.classList.contains('is-collapsed'),'A szerkesztés nem nyitotta ki a feladatot.');
   assert(card.querySelector('.customer-input').value===task.customerName,'Az ügyfél hiányzik.');
   assert(card.querySelector('.address-input').value===task.address,'A cím hiányzik.');
@@ -42,6 +42,19 @@
   assert(visible(card.querySelector('.tool-quantity-input'))&&card.querySelector('.tool-quantity-input').value==='2','Az eszköz és mennyisége nem látszik.');
   assert(visible(card.querySelector('.material-name'))&&visible(card.querySelector('.job-note-input')),'Anyag vagy feladatleírás nem látható.');
   assert(card.querySelector('.job-note-input').value==='Feladatjegyzet','Hiányzó napi feladatleírás.');
+  card.querySelector('.job-name-input').value='Félkész egyedi feladat';
+  card.querySelector('.job-note-input').value='Félkész leírás';
+  card.querySelector('.add-custom-job').click();
+  card=doc.querySelector('.task-card');
+  assert(card.querySelectorAll('.job-row').length===2,'Az új egyedi feladatsor nem jött létre.');
+  assert(card.querySelectorAll('.job-name-input')[0].value==='Félkész egyedi feladat','Új egyedi feladat hozzáadásakor elveszett az aktív feladatnév.');
+  assert(card.querySelectorAll('.job-note-input')[0].value==='Félkész leírás','Új egyedi feladat hozzáadásakor elveszett az aktív feladatleírás.');
+  assert(card.querySelectorAll('.job-name-input')[1].value==='','Az üres új sorba az app önállóan szöveget írt.');
+  card.querySelector('.material-source').value='Félkész beszerzési cím';
+  card.querySelector('.add-material').click();
+  card=doc.querySelector('.task-card');
+  assert(card.querySelectorAll('.material-row').length===2,'Az új anyagsor nem jött létre.');
+  assert(card.querySelector('.material-source').value==='Félkész beszerzési cím','Új anyagsor hozzáadásakor elveszett az aktív mező tartalma.');
   card.querySelector('.job-info-button').click();
   assert(doc.querySelector('#jobInfoDialog').open&&doc.querySelector('#jobInfoDialog').textContent.includes('Első lépés'),'A sablon kivitelezési útmutatója nem nyitható meg.');
   doc.querySelector('#jobInfoDialog').close();

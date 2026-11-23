@@ -250,7 +250,7 @@
       const jobs = existingJobs.length ? existingJobs.map((job, index) => ({
         id: job.id || `${task.id || "task"}-job-${index}`,
         templateId: job.templateId || null,
-        name: String(job.name || "Feladat").trim(),
+        name: String(job.name || "").trim(),
         note: String(job.note || ""),
         steps: Array.isArray(job.steps) ? job.steps.filter(step => !searchKey(step).includes("munkanaplo")) : []
       })) : (task.templateId || task.title || task.steps?.length ? [{
@@ -760,6 +760,7 @@
     return true;
   }
   async function saveCurrentPlan() {
+    if (captureTaskEditorState()) markDirty("A beírt mezők rögzítve • mentés folyamatban");
     saveDataLocally();
     markSaved();
     await waitForCurrentCloudSync();
@@ -1156,6 +1157,41 @@
     }
   }
   function findTaskFromElement(element) { return workingPlan.tasks.find(task => task.id === element.closest(".task-card")?.dataset.taskId); }
+  function captureTaskEditorState(root = $("#taskList")) {
+    let changed = false;
+    root?.querySelectorAll(".task-card").forEach(card => {
+      const task = findTaskFromElement(card); if (!task) return;
+      const before = JSON.stringify(task);
+      const customerInput = card.querySelector(".customer-input");
+      if (customerInput && customerInput.value !== task.customerName) {
+        task.customerId = null; task.locationId = null; task.customerName = customerInput.value;
+      }
+      task.entryType = card.querySelector(".task-entry-type")?.value === "todo" ? "todo" : "customer";
+      task.address = card.querySelector(".address-input")?.value ?? task.address;
+      task.startTime = card.querySelector(".start-time-input")?.value ?? task.startTime;
+      task.extraTools = card.querySelector(".extra-tools-input")?.value ?? task.extraTools;
+      task.notes = card.querySelector(".notes-input")?.value ?? task.notes;
+      task.workIntensity = validRating(card.querySelector(".work-intensity")?.value ?? task.workIntensity);
+      task.workQuality = validRating(card.querySelector(".work-quality")?.value ?? task.workQuality);
+      const workLog = card.querySelector(".worklog-required");
+      if (workLog) task.workLogRequired = workLog.checked;
+      card.querySelectorAll(".tool-quantity-input").forEach(input => { task.toolQuantities[input.dataset.toolId] = input.value; });
+      card.querySelectorAll(".job-row[data-job-id]").forEach(row => {
+        const job = taskJobs(task).find(item => item.id === row.dataset.jobId); if (!job) return;
+        job.name = row.querySelector(".job-name-input")?.value ?? job.name;
+        job.note = row.querySelector(".job-note-input")?.value ?? job.note;
+      });
+      card.querySelectorAll(".material-row[data-material-index]").forEach(row => {
+        const material = task.materials[Number(row.dataset.materialIndex)]; if (!material) return;
+        material.source = row.querySelector(".material-source")?.value ?? material.source;
+        material.name = row.querySelector(".material-name")?.value ?? material.name;
+        material.quantity = row.querySelector(".material-quantity")?.value ?? material.quantity;
+        material.unit = row.querySelector(".material-unit")?.value ?? material.unit;
+      });
+      if (JSON.stringify(task) !== before) changed = true;
+    });
+    return changed;
+  }
   function setActiveTask(card, task) {
     if (!card || !task || activeTaskId === task.id) return;
     activeTaskId = task.id;
@@ -1512,6 +1548,7 @@
   });
 
   $("#taskList").addEventListener("click", event => {
+    if (captureTaskEditorState()) markDirty("A beírt mezők rögzítve • mentés szükséges");
     const teamRemove = event.target.closest("[data-remove-team]");
     if (teamRemove) {
       const group = tasksByTeam().find(item => item.id === teamRemove.dataset.removeTeam); if (!group) return;
@@ -1625,6 +1662,7 @@
     updateTaskSummary(card, task, clientNumberForVehicle(task) - 1); markDirty();
   });
   $("#taskList").addEventListener("change", event => {
+    if (captureTaskEditorState()) markDirty("A beírt mezők rögzítve • mentés szükséges");
     const card = event.target.closest(".task-card"); if (!card) return; const task = findTaskFromElement(card); if (!task) return;
     if (event.target.matches(".task-entry-type")) { task.entryType = event.target.value === "todo" ? "todo" : "customer"; markDirty("A napi tétel típusa módosítva • mentés szükséges"); renderTasks(); return; }
     if (event.target.matches(".worklog-required")) { task.workLogRequired = event.target.checked; markDirty(); }
@@ -1650,6 +1688,7 @@
     const button = event?.currentTarget;
     if (button?.disabled) return;
     if (button) button.disabled = true;
+    if (captureTaskEditorState()) markDirty("A beírt mezők rögzítve • mentés szükséges");
     $("#dayView").open = true;
     const task = blankTask();
     task.workLogRequired = true;
