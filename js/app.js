@@ -1159,6 +1159,10 @@
   function findTaskFromElement(element) { return workingPlan.tasks.find(task => task.id === element.closest(".task-card")?.dataset.taskId); }
   function captureTaskEditorState(root = $("#taskList")) {
     let changed = false;
+    [["#meetingInput", "meeting"], ["#stopsInput", "stops"], ["#generalNoteInput", "generalNote"]].forEach(([selector, field]) => {
+      const input = $(selector);
+      if (input && input.value !== workingPlan[field]) { workingPlan[field] = input.value; changed = true; }
+    });
     root?.querySelectorAll(".task-card").forEach(card => {
       const task = findTaskFromElement(card); if (!task) return;
       const before = JSON.stringify(task);
@@ -1675,6 +1679,11 @@
     if (searchKey(event.target.value).length >= 2) showCustomerSuggestions(card, event.target.value);
     syncCustomerDirectory().then(synced => { if (synced && card?.isConnected) showCustomerSuggestions(card, event.target.value); });
   });
+  // Minden kattintásos művelet előtt, még az állapotmódosító kezelők futása
+  // és az esetleges újrarajzolás előtt rögzítjük a késleltetett mezőértékeket.
+  document.addEventListener("click", () => {
+    if (captureTaskEditorState()) markDirty("A beírt mezők rögzítve • mentés szükséges");
+  }, true);
   $("#taskList").addEventListener("wheel", event => { if (event.target.closest(".start-time-input")) event.preventDefault(); }, { passive: false });
   document.addEventListener("click", event => { if (!event.target.closest(".customer-picker")) document.querySelectorAll(".customer-suggestions").forEach(box => box.hidden = true); });
   document.addEventListener("click", event => { if (!event.target.closest(".job-template-picker")) closeTemplateSuggestions(); });

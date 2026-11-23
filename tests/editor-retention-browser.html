@@ -1,0 +1,63 @@
+<!doctype html><html lang="hu"><meta charset="utf-8"><title>Szerkesztett szövegek megőrzése</title>
+<output id="result">Teszt folyamatban…</output><iframe id="app" style="width:100%;height:850px;border:0"></iframe>
+<script>
+(async()=>{
+ const results=[];
+ const assert=(value,message)=>{if(!value)throw new Error(message);};
+ const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+ const date=iso(new Date()),key='diszkertek-napi-adatok-v1',frame=document.querySelector('#app');
+ try {
+  assert(location.hostname==='127.0.0.1'&&location.port==='4175','Csak elkülönített tesztporton futtatható.');
+  const source={tools:[{id:'tool',name:'Gereblye',active:true}],plans:[{id:'plan',date,tasks:[{id:'task',teamId:'team',customerName:'Eredeti név',address:'Eredeti cím',toolIds:['tool'],jobs:[{id:'job',name:'Eredeti feladat',note:'Eredeti leírás',steps:[]}],materials:[{name:'Föld',quantity:'1',unit:'zsák'}]}],workItems:[]}]};
+  for(const emitsInput of [true,false])for(const action of ['custom-job','material','team-item','new-team','work-item','setting-tool','save-only']) {
+   try {
+    for(const k of Object.keys(localStorage))if(k.startsWith('diszkertek-napi-'))localStorage.removeItem(k);
+    sessionStorage.clear();localStorage.setItem(key,JSON.stringify(source));
+    await new Promise(resolve=>{frame.onload=resolve;frame.src='../index.html?retention='+action+emitsInput+Date.now();});
+    const win=frame.contentWindow,doc=win.document;
+    // Nincs élő Supabase-írás; a teljes alkalmazást helyi mentéssel teszteljük.
+    win.NapiCustomerDirectory.hasSession=()=>false;
+    win.NapiCloudSync.pushPlan=async()=>{throw new Error('Élő adat nem írható.');};
+    doc.querySelector('.edit-task').click();
+    const card=()=>doc.querySelector('[data-task-id="task"]');
+    card().querySelectorAll('details').forEach(detail=>detail.open=true);
+    const expected={'.customer-input':'Árvíztűrő ügyfél','.address-input':'Megőrzendő cím 12.','.start-time-input':'08:45','.extra-tools-input':'Lapát, ásó','.notes-input':'Első sor\nMásodik sor','.job-name-input':'Félkész saját feladat','.job-note-input':'Saját leírás ékezettel: ő, ű.','.material-source':'Saját beszerzési hely','.material-name':'Virágföld','.material-quantity':'2,5','.material-unit':'m³','.tool-quantity-input':'3'};
+    for(const [selector,value] of Object.entries(expected)) {
+     const input=card().querySelector(selector);input.value=value;
+     if(emitsInput)input.dispatchEvent(new win.Event('input',{bubbles:true}));
+    }
+    card().querySelector('.job-note-input').focus();
+    const headings={'#meetingInput':'Új találkozóhely','#stopsInput':'Új megálló','#generalNoteInput':'Megőrzendő napi megjegyzés'};
+    for(const [selector,value] of Object.entries(headings)) {doc.querySelector(selector).value=value;if(emitsInput)doc.querySelector(selector).dispatchEvent(new win.Event('input',{bubbles:true}));}
+    if(action==='custom-job')card().querySelector('.add-custom-job').click();
+    if(action==='material')card().querySelector('.add-material').click();
+    if(action==='team-item')doc.querySelector('[data-add-team-customer]').click();
+    if(action==='new-team')doc.querySelector('#addTaskButton').click();
+    if(action==='work-item') {
+     doc.querySelector('#addWorkItemButton').click();
+     doc.querySelector('#workItemCustomer').value='Teszt előjegyzés';doc.querySelector('#workItemAddress').value='Teszt helyszín';
+     doc.querySelector('#workItemForm').requestSubmit();
+    }
+    if(action==='setting-tool') {
+     doc.querySelector('#settingsButton').click();doc.querySelector('[data-settings-tab="tools"]').click();
+     doc.querySelector('#settingName').value='Új teszteszköz';doc.querySelector('[data-setting-submit]').click();doc.querySelector('#settingsDialog').close();
+    }
+    for(const [selector,value] of Object.entries(expected))assert(card().querySelector(selector)?.value===value,`${action}: hozzáadáskor elveszett: ${selector}`);
+    doc.querySelector('#saveButton').click();
+    for(let count=0;count<100&&!doc.querySelector('#saveState').textContent.includes('Elmentve');count++)await new Promise(resolve=>setTimeout(resolve,20));
+    const saved=JSON.parse(localStorage.getItem(key)).plans.find(plan=>plan.date===date).tasks.find(task=>task.id==='task');
+    assert(saved.jobs[0].name===expected['.job-name-input']&&saved.jobs[0].note===expected['.job-note-input'],`${action}: hibás tartós feladatmentés`);
+    assert(saved.jobs.every(job=>job.name!=='Feladat'),`${action}: önkényes Feladat megnevezés`);
+    const savedPlan=JSON.parse(localStorage.getItem(key)).plans.find(plan=>plan.date===date);
+    assert(savedPlan.meeting===headings['#meetingInput']&&savedPlan.stops===headings['#stopsInput']&&savedPlan.generalNote===headings['#generalNoteInput'],`${action}: napi fejléc vagy megjegyzés elveszett`);
+    await new Promise(resolve=>{frame.onload=resolve;frame.src='../index.html?retention-reload='+Date.now();});
+    const reloaded=frame.contentDocument.querySelector('[data-task-id="task"]');
+    for(const [selector,value] of Object.entries(expected))assert(reloaded.querySelector(selector)?.value===value,`${action}: újratöltéskor elveszett: ${selector}`);
+    results.push(`${emitsInput?'normál':'késleltetett'} / ${action}: OK`);
+   }catch(error){results.push(`${emitsInput?'normál':'késleltetett'} / ${action}: HIBA: ${error.message}`);}
+   document.querySelector('#result').textContent=results.join('\n');
+  }
+  document.querySelector('#result').textContent=(results.some(result=>result.includes('HIBA'))?'RETENTION_ERROR':'RETENTION_OK')+'\n'+results.join('\n');
+ }catch(error){document.querySelector('#result').textContent='RETENTION_ERROR: '+error.message;}
+})();
+</script></html>
